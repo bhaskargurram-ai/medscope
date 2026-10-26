@@ -30,6 +30,7 @@ def main() -> None:
             for c in cases:
                 f.write(json.dumps(c.to_dict()) + "\n")
     print(report.summary())
+    (out / "prepare_report.txt").write_text(report.summary() + "\n")
     print(f"manifests written to {out}")
 
 

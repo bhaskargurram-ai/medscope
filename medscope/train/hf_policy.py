@@ -1,0 +1,213 @@
+"""Hugging Face backend for the agent: generation, token log-probs and LoRA.
+
+Works for Qwen3.5-4B and MedGemma 1.5 4B through the shared AutoProcessor +
+image-text-to-text interface. Heavy imports happen inside the class so the rest
+of the package stays importable without torch.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Optional
+
+import numpy as np
+from PIL import Image
+
+from ..agent.episode import Generation
+
+STOP_STRINGS = ["</tool>", "</final>"]
+LORA_DEFAULTS = dict(r=16, lora_alpha=32, lora_dropout=0.05, target_modules="all-linear", task_type="CAUSAL_LM")
+
+
+def _to_pil(img: np.ndarray, max_side: int) -> Image.Image:
+    pil = Image.fromarray(img)
+    if max(pil.size) > max_side:
+        scale = max_side / max(pil.size)
+        pil = pil.resize((max(1, round(pil.width * scale)), max(1, round(pil.height * scale))), Image.BICUBIC)
+    return pil
+
+
+class HFPolicy:
+    def __init__(
+        self,
+        model_id: str,
+        adapter: Optional[str] = None,
+        trainable: bool = False,
+        new_lora: bool = False,
+        load_in_4bit: bool = True,
+        max_new_tokens: int = 384,
+        temperature: float = 1.0,
+        top_p: float = 1.0,
+        max_image_side: int = 768,
+        gradient_checkpointing: bool = True,
+    ):
+        import torch
+        import transformers
+        from transformers import AutoProcessor, BitsAndBytesConfig
+
+        self.torch = torch
+        self.model_id = model_id
+        self.max_new_tokens = max_new_tokens
+        self.temperature = temperature
+        self.top_p = top_p
+        self.max_image_side = max_image_side
+        self.dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float16
+
+        self.processor = AutoProcessor.from_pretrained(model_id)
+        self.tokenizer = getattr(self.processor, "tokenizer", self.processor)
+        if self.tokenizer.pad_token_id is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        model_cls = getattr(transformers, "AutoModelForImageTextToText", None) or transformers.AutoModelForMultimodalLM
+        kwargs: dict[str, Any] = dict(torch_dtype=self.dtype, device_map="auto")
+        if load_in_4bit:
+            kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True, bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=self.dtype, bnb_4bit_use_double_quant=True)
+        model = model_cls.from_pretrained(model_id, **kwargs)
+
+        if trainable or adapter or new_lora:
+            from peft import LoraConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
+            if trainable and load_in_4bit:
+                model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=gradient_checkpointing,
+                                                        gradient_checkpointing_kwargs={"use_reentrant": False})
+            elif trainable and gradient_checkpointing:
+                model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+                model.enable_input_require_grads()
+            if adapter:
+                model = PeftModel.from_pretrained(model, adapter, is_trainable=trainable)
+            elif new_lora:
+                model = get_peft_model(model, LoraConfig(**LORA_DEFAULTS))
+        self.model = model
+        if not trainable:
+            self.model.eval()
+        self.end_of_turn_id = self._find_end_of_turn_id()
+
+    # ---- message encoding ---------------------------------------------------
+
+    def to_hf(self, messages: list[dict]) -> list[dict]:
+        out = []
+        for m in messages:
+            content = []
+            for c in m["content"]:
+                if c["type"] == "image":
+                    content.append({"type": "image", "image": _to_pil(c["image"], self.max_image_side)})
+                else:
+                    content.append({"type": "text", "text": c["text"]})
+            out.append({"role": m["role"], "content": content})
+        return out
+
+    def encode(self, messages: list[dict]):
+        """Tokenise a conversation ending where the assistant should start writing."""
+        hf = self.to_hf(messages)
+        kw = dict(add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt")
+        try:
+            inputs = self.processor.apply_chat_template(hf, enable_thinking=False, **kw)
+        except TypeError:
+            inputs = self.processor.apply_chat_template(hf, **kw)
+        return inputs.to(self.model.device)
+
+    def _find_end_of_turn_id(self) -> int:
+        """Token that closes an assistant turn (<|im_end|>, <end_of_turn>, ...)."""
+        marker = "XQZMARKERXQZ"
+        convo = [{"role": "user", "content": [{"type": "text", "text": "hi"}]},
+                 {"role": "assistant", "content": [{"type": "text", "text": marker}]}]
+        try:
+            rendered = self.processor.apply_chat_template(convo, tokenize=False)
+            after = rendered.split(marker, 1)[1]
+            ids = self.tokenizer(after, add_special_tokens=False)["input_ids"]
+            if ids:
+                return int(ids[0])
+        except Exception:  # noqa: BLE001 - fall back to the tokenizer's eos
+            pass
+        return int(self.tokenizer.eos_token_id)
+
+    # ---- generation -----------------------------------------------------------
+
+    def _gen_kwargs(self, sample: bool) -> dict:
+        kw = dict(max_new_tokens=self.max_new_tokens, do_sample=sample, stop_strings=STOP_STRINGS,
+                  tokenizer=self.tokenizer, pad_token_id=self.tokenizer.pad_token_id)
+        if sample:
+            kw.update(temperature=self.temperature, top_p=self.top_p, top_k=0)
+        return kw
+
+    def _trim(self, ids):
+        """Drop padding and anything after the first end-of-turn token."""
+        ids = ids.tolist()
+        pad = self.tokenizer.pad_token_id
+        out = []
+        for t in ids:
+            if t == pad and pad != self.end_of_turn_id:
+                break
+            out.append(t)
+            if t == self.end_of_turn_id:
+                break
+        return self.torch.tensor(out, dtype=self.torch.long)
+
+    def generate_n(self, messages: list[dict], n: int, sample: bool = True) -> list[Generation]:
+        torch = self.torch
+        inputs = self.encode(messages)
+        prompt_len = inputs["input_ids"].shape[1]
+        was_training = self.model.training
+        self.model.eval()
+        with torch.no_grad():
+            out = self.model.generate(**inputs, num_return_sequences=n, **self._gen_kwargs(sample))
+        if was_training:
+            self.model.train()
+        gens = []
+        for row in out[:, prompt_len:]:
+            ids = self._trim(row.cpu())
+            text = self.tokenizer.decode(ids, skip_special_tokens=True)
+            gens.append(Generation(text, {"gen_ids": ids}))
+        return gens
+
+    def generate(self, messages: list[dict], sample: bool = False) -> Generation:
+        return self.generate_n(messages, 1, sample)[0]
+
+    # ---- training signals ------------------------------------------------------
+
+    def token_logprobs(self, messages: list[dict], target_ids):
+        """Log-prob of each target token given the conversation (with gradients)."""
+        torch = self.torch
+        inputs = self.encode(messages)
+        prompt = inputs["input_ids"]
+        target = target_ids.to(prompt.device).unsqueeze(0)
+        n_prompt, n_target = prompt.shape[1], target.shape[1]
+        batch = {}
+        for k, v in inputs.items():
+            if torch.is_tensor(v) and v.dim() >= 2 and v.shape[:2] == prompt.shape:
+                pad_val = 1 if k == "attention_mask" else 0
+                extra = torch.full((v.shape[0], n_target, *v.shape[2:]), pad_val, dtype=v.dtype, device=v.device)
+                batch[k] = torch.cat([v, extra], dim=1)
+            else:
+                batch[k] = v
+        batch["input_ids"] = torch.cat([prompt, target], dim=1)
+        try:
+            logits = self.model(**batch, use_cache=False, logits_to_keep=n_target + 1).logits[:, :n_target]
+        except TypeError:
+            logits = self.model(**batch, use_cache=False).logits[:, n_prompt - 1:n_prompt - 1 + n_target]
+        logp = torch.log_softmax(logits.float(), dim=-1)
+        return logp.gather(-1, target.unsqueeze(-1)).squeeze(-1).squeeze(0)
+
+    def target_ids(self, text: str):
+        ids = self.tokenizer(text, add_special_tokens=False)["input_ids"] + [self.end_of_turn_id]
+        return self.torch.tensor(ids, dtype=self.torch.long)
+
+    def save_adapter(self, path: str, adapter_name: str = "default") -> None:
+        """Save one LoRA adapter's files directly into `path`."""
+        cfg = getattr(self.model, "peft_config", {})
+        if adapter_name in cfg and len(cfg) > 1:
+            # PEFT writes non-default adapters into a subfolder; save just this one at the root
+            active = self.model.active_adapter
+            self.model.save_pretrained(path, selected_adapters=[adapter_name])
+            if adapter_name != "default":
+                import shutil
+                sub = f"{path}/{adapter_name}"
+                for name in ("adapter_config.json", "adapter_model.safetensors", "adapter_model.bin"):
+                    src = f"{sub}/{name}"
+                    import os
+                    if os.path.exists(src):
+                        shutil.move(src, f"{path}/{name}")
+                shutil.rmtree(sub, ignore_errors=True)
+            self.model.set_adapter(active)
+        else:
+            self.model.save_pretrained(path)
