@@ -19,6 +19,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from medscope.data.inpaint import get_inpainter  # noqa: E402
 from medscope.data.schema import Case  # noqa: E402
 from medscope.data.views import build_views, load_image  # noqa: E402
 
@@ -28,7 +29,10 @@ def main() -> None:
     ap.add_argument("--manifest", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--seed", type=int, default=2026)
+    ap.add_argument("--inpainter", choices=["telea", "lama"], default="telea",
+                    help="use lama for real builds (needs a GPU and simple-lama-inpainting)")
     args = ap.parse_args()
+    inpaint_fn = get_inpainter(args.inpainter)
 
     rng = np.random.default_rng(args.seed)
     out = Path(args.out)
@@ -42,7 +46,7 @@ def main() -> None:
             other = next((c for c in cases[i + 1:] + cases[:i] if c.patient_id != case.patient_id), None)
             other_img = load_image(other.image_path) if other else None
             try:
-                views = build_views(case, out, rng, other_image=other_img)
+                views = build_views(case, out, rng, other_image=other_img, inpaint_fn=inpaint_fn)
             except ValueError as exc:
                 views, reason = [], str(exc)
             else:
@@ -54,6 +58,8 @@ def main() -> None:
             for v in views:
                 vf.write(json.dumps(v.to_dict()) + "\n")
             kept += 1
+            if (i + 1) % 100 == 0:
+                print(f"  {i + 1}/{len(cases)} cases processed", flush=True)
     print(f"built views for {kept} cases, dropped {dropped}; output in {out}")
 
 

@@ -13,8 +13,11 @@ A small open multimodal medical agent that answers only after it has checked the
 | `medscope/actions.py` | Parses model output into tool calls and final actions |
 | `medscope/rewards.py` | Cost-matrix reward with grounding and format terms, used for RL |
 | `medscope/eval/` | MedScope-Bench metrics: coverage, CCR, AURC, abstention specificity gap, grounded accuracy, net utility, bootstrap CIs |
+| `medscope/data/loaders/` | Dataset loaders (SLAKE so far) that produce case manifests |
+| `medscope/data/quality.py` | Automated view checks: lesion removed, evidence intact, shortcut AUC, duplicates |
 | `configs/` | Reward cost matrix and dataset registry |
-| `scripts/` | Command-line entry points |
+| `scripts/` | `prepare_slake.py` → `build_views.py` → `check_views.py` |
+| `notebooks/` | Colab notebooks that run each step on a GPU |
 | `tests/` | Unit tests (run on CPU, no downloads needed) |
 
 ## The four views
@@ -49,15 +52,31 @@ Boxes use integer coordinates normalised to 0–1000 on the image the model was 
 ```bash
 pip install -e .            # core: numpy, pillow, opencv, pyyaml
 python -m unittest -v       # all tests run on CPU
-python scripts/build_views.py --manifest data/raw/slake/cases.jsonl --out data/views/slake
+
+python scripts/prepare_slake.py --root data/raw/slake --out data/cases/slake
+python scripts/build_views.py --manifest data/cases/slake/cases_test.jsonl --out data/views/slake_test --inpainter lama
+python scripts/check_views.py --views data/views/slake_test/views.jsonl --dedup-against data/views/slake_train/views.jsonl
 ```
+
+Or open `notebooks/01_build_slake_views.ipynb` in Colab and run all cells.
+
+## Automated quality checks
+
+No human annotation is used anywhere. `check_views.py` keeps a case only if:
+
+- **the lesion is really gone** in the target-removal view: it no longer stands out from the surrounding tissue (a learned detector can be plugged in);
+- **the evidence is intact** in the random-removal view: no lesion pixel changed;
+- **it is not a duplicate** of a training image (perceptual hash, confirmed by pixel correlation).
+
+Across the whole split it also reports a **shortcut AUC**: how well a classifier tells target-removal edits from random-removal edits by texture alone. It should be at or below 0.6; it needs at least 50 cases to be meaningful. OpenCV Telea inpainting scores about 0.6 on synthetic tests, which is why real builds use LaMa.
 
 Training extras (`pip install -e ".[train]"`) are meant for Colab with a GPU.
 
 ## Roadmap
 
 1. ✅ Core: schema, counterfactual views, tools, reward, metrics
-2. Dataset loaders (SLAKE, VQA-RAD, PathVQA, VinDr-CXR, ISIC, IDRiD) and automated view quality checks
+2. ✅ SLAKE loader, LaMa inpainting, automated view quality checks, Colab notebook
+2b. More loaders: ISIC 2018, IDRiD, VinDr-CXR, VinDr-Mammo; VQA-RAD and PathVQA for accuracy-only evaluation
 3. Baseline evaluation harness (Qwen3.5-4B, MedGemma 1.5 4B, frontier APIs on open data)
 4. Stage 1–2 SFT on Colab
 5. Adapter merging + evolutionary per-layer search

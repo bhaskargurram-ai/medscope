@@ -14,11 +14,16 @@ Train a 4B open medical VLM agent (base: Qwen3.5-4B) with RL so it answers only 
 
 ## Commands
 - Tests: `python -m unittest -v` (pytest also works if installed)
-- Build views: `python scripts/build_views.py --manifest <cases.jsonl> --out <dir>`
+- SLAKE manifests: `python scripts/prepare_slake.py --root <slake dir> --out <dir>`
+- Build views: `python scripts/build_views.py --manifest <cases.jsonl> --out <dir> [--inpainter lama]`
+- Quality checks: `python scripts/check_views.py --views <views.jsonl> [--dedup-against <train views.jsonl>]`
 
 ## Layout
 - `medscope/data/schema.py` case and view records
 - `medscope/data/counterfactual.py` view generation
+- `medscope/data/inpaint.py` Telea (CPU) or LaMa (GPU) inpainting
+- `medscope/data/quality.py` automated view checks (shortcut AUC needs 50+ cases)
+- `medscope/data/loaders/slake.py` SLAKE → cases (lesion classes from mask.txt)
 - `medscope/env/tools.py` zoom/window tools with budget
 - `medscope/actions.py` output parser
 - `medscope/rewards.py` cost-matrix reward
