@@ -38,6 +38,22 @@ def checkpoint_path(out_dir: str | Path) -> Path:
     return Path(out_dir) / "checkpoint"
 
 
+def save_optimizer(opt, out_dir: str | Path) -> None:
+    import torch
+    tmp = Path(out_dir) / "optimizer.pt.tmp"
+    torch.save(opt.state_dict(), tmp)
+    tmp.replace(Path(out_dir) / "optimizer.pt")
+
+
+def load_optimizer(opt, out_dir: str | Path) -> bool:
+    p = Path(out_dir) / "optimizer.pt"
+    if not p.exists():
+        return False
+    import torch
+    opt.load_state_dict(torch.load(p, map_location="cpu"))
+    return True
+
+
 def load_adapter_weights(model, path: str | Path) -> None:
     """Load saved LoRA weights into an already-built PEFT model (for resuming)."""
     from peft import set_peft_model_state_dict

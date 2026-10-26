@@ -15,7 +15,24 @@ from PIL import Image
 from ..agent.episode import Generation
 
 STOP_STRINGS = ["</tool>", "</final>"]
-LORA_DEFAULTS = dict(r=16, lora_alpha=32, lora_dropout=0.05, target_modules="all-linear", task_type="CAUSAL_LM")
+# Vision encoder and projector stay in 16-bit and outside LoRA: only the language model is adapted.
+VISION_MODULES = ["visual", "vision_tower", "vision_model", "multi_modal_projector"]
+VISION_REGEX = r".*(" + "|".join(VISION_MODULES) + r").*"
+LORA_DEFAULTS = dict(r=16, lora_alpha=32, lora_dropout=0.05, target_modules="all-linear",
+                     exclude_modules=VISION_REGEX, task_type="CAUSAL_LM")
+
+
+def pick_dtype(torch, model_id: str):
+    """bf16 only on GPUs that support it natively (compute capability 8+: L4, A100).
+
+    On older GPUs (T4) use fp16, except Gemma-family models whose activations overflow
+    fp16, which get fp32.
+    """
+    if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
+        return torch.bfloat16
+    if "gemma" in model_id.lower():
+        return torch.float32
+    return torch.float16
 
 
 def _to_pil(img: np.ndarray, max_side: int) -> Image.Image:
@@ -50,19 +67,22 @@ class HFPolicy:
         self.temperature = temperature
         self.top_p = top_p
         self.max_image_side = max_image_side
-        self.dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float16
+        self.dtype = pick_dtype(torch, model_id)
 
         self.processor = AutoProcessor.from_pretrained(model_id)
         self.tokenizer = getattr(self.processor, "tokenizer", self.processor)
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        template = getattr(self.processor, "chat_template", None) or getattr(self.tokenizer, "chat_template", None) or ""
+        self.template_kwargs = {"enable_thinking": False} if "enable_thinking" in str(template) else {}
 
         model_cls = getattr(transformers, "AutoModelForImageTextToText", None) or transformers.AutoModelForMultimodalLM
-        kwargs: dict[str, Any] = dict(torch_dtype=self.dtype, device_map="auto")
+        kwargs: dict[str, Any] = dict(dtype=self.dtype, device_map="auto")
         if load_in_4bit:
             kwargs["quantization_config"] = BitsAndBytesConfig(
                 load_in_4bit=True, bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=self.dtype, bnb_4bit_use_double_quant=True)
+                bnb_4bit_compute_dtype=self.dtype, bnb_4bit_use_double_quant=True,
+                llm_int8_skip_modules=VISION_MODULES + ["lm_head"])
         model = model_cls.from_pretrained(model_id, **kwargs)
 
         if trainable or adapter or new_lora:
@@ -99,11 +119,9 @@ class HFPolicy:
     def encode(self, messages: list[dict]):
         """Tokenise a conversation ending where the assistant should start writing."""
         hf = self.to_hf(messages)
-        kw = dict(add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt")
-        try:
-            inputs = self.processor.apply_chat_template(hf, enable_thinking=False, **kw)
-        except TypeError:
-            inputs = self.processor.apply_chat_template(hf, **kw)
+        inputs = self.processor.apply_chat_template(
+            hf, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt",
+            **self.template_kwargs)
         return inputs.to(self.model.device)
 
     def _find_end_of_turn_id(self) -> int:
@@ -127,7 +145,8 @@ class HFPolicy:
         kw = dict(max_new_tokens=self.max_new_tokens, do_sample=sample, stop_strings=STOP_STRINGS,
                   tokenizer=self.tokenizer, pad_token_id=self.tokenizer.pad_token_id)
         if sample:
-            kw.update(temperature=self.temperature, top_p=self.top_p, top_k=0)
+            # override any generation_config defaults so samples come from the plain policy (on-policy RL)
+            kw.update(temperature=self.temperature, top_p=self.top_p, top_k=0, repetition_penalty=1.0)
         return kw
 
     def _trim(self, ids):

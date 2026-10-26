@@ -22,16 +22,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from medscope.eval.runner import evaluate, load_views, select_cases  # noqa: E402
 from medscope.rewards import load_config  # noqa: E402
 
-# name, PEFT combination_type, weights [agentic, grounding], density
+# name, PEFT combination_type, weights [agentic, grounding], density.
+# For LoRA, PEFT's plain "linear"/"ties"/"dare_ties" combine the A and B factors separately,
+# which mixes cross terms of two independently trained adapters. The *_svd variants merge
+# the actual weight updates (delta W) and re-factorise them; "cat" is exact.
 CANDIDATES = [
     ("agentic_only", None, None, None),
     ("grounding_only", None, None, None),
-    ("linear_50_50", "linear", [0.5, 0.5], None),
-    ("linear_70_30", "linear", [0.7, 0.3], None),
+    ("svd_50_50", "svd", [0.5, 0.5], None),
+    ("svd_70_30", "svd", [0.7, 0.3], None),
     ("cat_100_50", "cat", [1.0, 0.5], None),
-    ("ties_d50", "ties", [1.0, 1.0], 0.5),
-    ("dare_ties_d50", "dare_ties", [1.0, 1.0], 0.5),
+    ("ties_svd_d50", "ties_svd", [1.0, 1.0], 0.5),
+    ("dare_ties_svd_d50", "dare_ties_svd", [1.0, 1.0], 0.5),
 ]
+SVD_RANK = 32
 
 
 def main() -> None:
@@ -65,7 +69,11 @@ def main() -> None:
         else:
             adapter = name
             if adapter not in model.peft_config:
+                import torch
+                torch.manual_seed(0)  # DARE prunes at random
                 kw = {"density": density} if density is not None else {}
+                if kind.endswith("svd"):
+                    kw["svd_rank"] = SVD_RANK
                 model.add_weighted_adapter(["default", "grounding"], weights, adapter_name=adapter,
                                            combination_type=kind, **kw)
         model.set_adapter(adapter)
@@ -73,7 +81,8 @@ def main() -> None:
         print(f"=== {name} (adapter {adapter}) ===")
         summary = evaluate(policy, views, cfg, Path(args.results) / f"merge_{name}",
                            {"name": f"merge_{name}", "model": args.model, "split": "validation",
-                            "combination": kind, "weights": weights, "density": density})
+                            "combination": kind, "weights": weights, "density": density,
+                            "svd_rank": SVD_RANK if kind and kind.endswith("svd") else None})
         scores[name] = (summary["metrics"]["net_utility"]["value"], adapter)
         print(f"{name}: net utility {scores[name][0]:.3f}")
 

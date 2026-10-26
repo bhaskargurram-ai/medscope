@@ -22,7 +22,16 @@ import numpy as np
 
 from ..agent.episode import Episode, run_group
 from ..data.schema import View
-from .common import append_log, checkpoint_path, load_adapter_weights, lr_at, read_state, write_state
+from .common import (
+    append_log,
+    checkpoint_path,
+    load_adapter_weights,
+    load_optimizer,
+    lr_at,
+    read_state,
+    save_optimizer,
+    write_state,
+)
 
 
 def group_advantages(rewards: list[float], eps: float = 1e-4) -> list[float]:
@@ -58,24 +67,30 @@ def train_grpo(
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     model = policy.model
-    for m in model.modules():  # deterministic log-probs: the samples came from the same weights
-        if isinstance(m, torch.nn.Dropout):
-            m.p = 0.0
-
     use_kl = beta > 0
     if use_kl:
         if not ref_adapter:
             raise ValueError("beta > 0 needs ref_adapter (the starting adapter)")
         model.load_adapter(ref_adapter, adapter_name="ref", is_trainable=False)
         model.set_adapter("default")
+    # deterministic log-probs (the samples came from the same weights); after loading "ref",
+    # so its dropout modules are zeroed too
+    for m in model.modules():
+        if isinstance(m, torch.nn.Dropout):
+            m.p = 0.0
 
     params = [p for n, p in model.named_parameters() if p.requires_grad and ".ref." not in n]
     opt = torch.optim.AdamW(params, lr=lr, weight_decay=0.0)
 
     state = read_state(out)
+    final = out / "final"
+    if state.get("step", 0) >= steps and final.exists():
+        log(f"already finished {steps} steps; final adapter is at {final}")
+        return final
     start = state.get("step", 0)
     if start and checkpoint_path(out).exists():
         load_adapter_weights(model, checkpoint_path(out))
+        load_optimizer(opt, out)
         log(f"resuming GRPO at step {start}")
 
     rng = np.random.default_rng(seed)
@@ -138,13 +153,13 @@ def train_grpo(
 
         if (step + 1) % save_every == 0 or step + 1 == steps:
             policy.save_adapter(str(checkpoint_path(out)))
+            save_optimizer(opt, out)
             write_state(out, {"step": step + 1, "steps": steps})
         if eval_fn and eval_every and (step + 1) % eval_every == 0:
             summary = eval_fn(step + 1)
             append_log(out, {"step": step + 1, "eval_net_utility": summary["metrics"]["net_utility"]["value"]})
             model.train()
 
-    final = out / "final"
     policy.save_adapter(str(final))
     log(f"saved final adapter to {final}")
     return final

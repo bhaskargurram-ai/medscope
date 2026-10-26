@@ -253,8 +253,8 @@ def nb04() -> list[dict]:
         md("""
 # MedScope 04: merge the adapters
 
-Combines the grounding and agentic adapters seven ways (each alone, linear, concatenation, TIES,
-DARE-TIES), scores each on 40 validation cases, and keeps the best as the starting point for RL.
+Combines the grounding and agentic adapters seven ways (each alone, SVD-weighted sums, concatenation,
+TIES-SVD, DARE-TIES-SVD), scores each on 40 validation cases, and keeps the best as the starting point for RL.
 These results are also the data for the "does merging damage abstention?" analysis.
 
 **Runtime:** L4, about 2-3 hours. Finished candidates are skipped if you rerun.
