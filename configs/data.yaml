@@ -1,0 +1,44 @@
+# Dataset registry. Verify each licence before downloading; access notes are a guide, not legal advice.
+# `credentialed: true` data must never be sent to external APIs (PhysioNet DUA).
+
+datasets:
+  slake:
+    modality: [ct, mri, xray]
+    annotations: masks
+    access: open download
+    credentialed: false
+  vqa_rad:
+    modality: [radiology]
+    annotations: none          # used for SFT/eval accuracy only, not counterfactuals
+    access: open (CC0)
+    credentialed: false
+  pathvqa:
+    modality: [pathology]
+    annotations: none
+    access: open
+    credentialed: false
+  vindr_cxr:
+    modality: [chest_xray]
+    annotations: boxes
+    access: PhysioNet credentialed
+    credentialed: true
+  isic2018:
+    modality: [dermoscopy]
+    annotations: masks
+    access: open, non-commercial terms
+    credentialed: false
+  idrid:
+    modality: [fundus]
+    annotations: masks
+    access: open for research
+    credentialed: false
+  vindr_mammo:
+    modality: [mammography]
+    annotations: boxes
+    access: PhysioNet credentialed
+    credentialed: true
+
+splits:
+  seed: 2026
+  test_cases: 800           # held-out base cases for MedScope-Bench, split by patient
+  val_fraction: 0.05

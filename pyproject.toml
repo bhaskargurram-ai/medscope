@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medscope"
+version = "0.1.0"
+description = "Evidence-verified, cost-aware multimodal medical agent and counterfactual benchmark"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "numpy>=1.24",
+  "pillow>=10",
+  "opencv-python-headless>=4.8",
+  "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+train = [
+  "torch",
+  "transformers",
+  "datasets",
+  "peft",
+  "trl",
+  "accelerate",
+  "bitsandbytes",
+]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["medscope*"]
