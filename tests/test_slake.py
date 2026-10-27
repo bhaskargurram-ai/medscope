@@ -94,6 +94,20 @@ class TestMaskEncodings(unittest.TestCase):
             enc, _ = detect_encoding(self.save(Path(d), rgba), set(self.IDS))
             self.assertEqual(enc, "single")
 
+    def test_real_slake_shape_grey_rgba_with_some_odd_masks(self):
+        """As seen on Colab: grey RGBA masks fit perfectly, a minority hold unlisted values."""
+        lm = self.label_map()
+        good = np.stack([lm, lm, lm, np.full_like(lm, 255)], -1)
+        odd = np.stack([np.full_like(lm, 100)] * 3 + [np.full_like(lm, 255)], -1)  # 100 is not an id
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            paths = []
+            for i, arr in enumerate([good] * 7 + [odd] * 3):
+                Image.fromarray(arr).save(d / f"m{i}.png")
+                paths.append(d / f"m{i}.png")
+            enc, why = detect_encoding(paths, set(self.IDS))  # mean fit 70%, median 100%
+            self.assertIn(enc, ("single", "red"), why)
+
     def test_unknown_colours_fail_with_a_useful_message(self):
         lm = self.label_map()
         palette = {0: (0, 0, 0), 55: (200, 30, 90), 120: (10, 240, 17), 30: (77, 77, 250)}
@@ -136,6 +150,19 @@ class TestSlake(unittest.TestCase):
             self.assertEqual(mask.sum(), 64)              # only the 8x8 cancer, not the liver
             self.assertEqual(report.dropped["no lesion pixels in mask"], 1)  # xmlab2 has no lesion
             self.assertEqual(report.lesion_pixels_by_label["Liver Cancer"], 1)
+
+    def test_forced_encoding_and_odd_mask_dropped(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "slake"
+            make_release(root)
+            # turn xmlab1's mask into grey RGBA (as in real SLAKE) and xmlab2's into unlisted values
+            lm = np.asarray(Image.open(root / "imgs/xmlab1/mask.png"))
+            Image.fromarray(np.stack([lm, lm, lm, np.full_like(lm, 255)], -1)).save(root / "imgs/xmlab1/mask.png")
+            Image.fromarray(np.full((64, 64), 99, np.uint8)).save(root / "imgs/xmlab2/mask.png")
+            splits, report = load_slake(root, Path(d) / "masks", encoding="red")
+            self.assertEqual(sorted(c.case_id for c in splits["train"]), ["slake_1", "slake_2"])
+            self.assertEqual(report.dropped["mask values don't match mask.txt"], 1)
+            self.assertIn("set by hand", report.summary())
 
 
 if __name__ == "__main__":

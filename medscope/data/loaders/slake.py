@@ -106,9 +106,11 @@ def detect_encoding(mask_paths: list[Path], known: set[int]) -> tuple[str, str]:
     scores = {}
     for enc in ENCODINGS:
         fits = [fit(decode(a, enc), known) for a in arrays]
-        scores[enc] = (float(np.mean([f for f, _ in fits])), sum(s for _, s in fits))
+        # median, not mean: a few odd masks must not hide an encoding that fits the rest;
+        # those odd masks are dropped one by one in load_slake
+        scores[enc] = (float(np.median([f for f, _ in fits])), sum(s for _, s in fits))
     best = max(scores, key=lambda e: (scores[e][0] >= MIN_FIT, scores[e][1] > 0, scores[e][0], scores[e][1]))
-    table = "; ".join(f"{e}: {scores[e][0]:.1%} pixels fit, {scores[e][1]} ids seen" for e in ENCODINGS)
+    table = "; ".join(f"{e}: median {scores[e][0]:.1%} pixels fit, {scores[e][1]} ids seen" for e in ENCODINGS)
     if scores[best][0] < MIN_FIT or scores[best][1] == 0:
         raise ValueError(
             "could not work out how mask.png stores class ids.\n"
@@ -154,7 +156,11 @@ class SlakeReport:
         return "\n".join(lines)
 
 
-def load_slake(root: str | Path, mask_out: str | Path, min_lesion_pixels: int = 20) -> tuple[dict[str, list[Case]], SlakeReport]:
+PER_MASK_MIN_FIT = 0.9  # a mask whose decoded values mostly aren't known ids is skipped
+
+
+def load_slake(root: str | Path, mask_out: str | Path, min_lesion_pixels: int = 20,
+               encoding: str = "auto") -> tuple[dict[str, list[Case]], SlakeReport]:
     """Return {split: [Case]} and a report. Binary lesion masks are written to mask_out."""
     root, mask_out = Path(root), Path(mask_out)
     labels = parse_mask_labels(root / "mask.txt")
@@ -163,8 +169,13 @@ def load_slake(root: str | Path, mask_out: str | Path, min_lesion_pixels: int = 
         raise ValueError("mask.txt has no lesion classes; check LESION_WORDS against it")
 
     report = SlakeReport()
-    sample = sorted((root / "imgs").glob("*/mask.png"))[:40]
-    encoding, report.encoding = detect_encoding(sample, set(labels))
+    if encoding == "auto":
+        sample = sorted((root / "imgs").glob("*/mask.png"))[:40]
+        encoding, report.encoding = detect_encoding(sample, set(labels))
+    elif encoding in ENCODINGS:
+        report.encoding = f"mask encoding '{encoding}' (set by hand)"
+    else:
+        raise ValueError(f"encoding must be 'auto' or one of {ENCODINGS}")
     mask_cache: dict[str, str | None] = {}
     out: dict[str, list[Case]] = {}
 
@@ -188,7 +199,9 @@ def load_slake(root: str | Path, mask_out: str | Path, min_lesion_pixels: int = 
                 else:
                     lm = read_label_map(label_path, encoding)
                     binary = np.isin(lm, list(lesion))
-                    if binary.sum() < min_lesion_pixels:
+                    if fit(lm, set(labels))[0] < PER_MASK_MIN_FIT:
+                        mask_cache[key] = "bad"
+                    elif binary.sum() < min_lesion_pixels:
                         mask_cache[key] = None
                     else:
                         for lid in np.unique(lm[binary]):
@@ -197,6 +210,9 @@ def load_slake(root: str | Path, mask_out: str | Path, min_lesion_pixels: int = 
                         dest.parent.mkdir(parents=True, exist_ok=True)
                         Image.fromarray((binary * 255).astype(np.uint8)).save(dest)
                         mask_cache[key] = str(dest)
+            if mask_cache[key] == "bad":
+                report.dropped["mask values don't match mask.txt"] += 1
+                continue
             if mask_cache[key] is None:
                 report.dropped["no lesion pixels in mask"] += 1
                 continue

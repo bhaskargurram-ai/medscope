@@ -209,7 +209,8 @@ print(FORMAT_CHECK)
 """),
         md("## Build case manifests, views and quality checks"),
         code(r"""
-r = subprocess.run(['python', 'scripts/prepare_slake.py', '--root', RAW, '--out', f'{WORK}/cases'],
+# SLAKE masks are grey RGBA images whose grey level is the class id in mask.txt, so read the red channel
+r = subprocess.run(['python', 'scripts/prepare_slake.py', '--root', RAW, '--out', f'{WORK}/cases', '--encoding', 'red'],
                    capture_output=True, text=True)
 print(r.stdout, r.stderr[-3000:])
 if r.returncode != 0:

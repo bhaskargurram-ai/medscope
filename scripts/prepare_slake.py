@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from medscope.data.loaders.slake import load_slake  # noqa: E402
+from medscope.data.loaders.slake import ENCODINGS, load_slake  # noqa: E402
 
 
 def main() -> None:
@@ -21,10 +21,12 @@ def main() -> None:
     ap.add_argument("--root", required=True, help="folder with train.json, mask.txt and imgs/")
     ap.add_argument("--out", required=True)
     ap.add_argument("--min-lesion-pixels", type=int, default=20)
+    ap.add_argument("--encoding", default="auto", choices=("auto",) + ENCODINGS,
+                    help="how mask.png stores class ids; SLAKE masks are grey RGBA, so 'red' works")
     args = ap.parse_args()
 
     out = Path(args.out)
-    splits, report = load_slake(args.root, out / "masks", args.min_lesion_pixels)
+    splits, report = load_slake(args.root, out / "masks", args.min_lesion_pixels, encoding=args.encoding)
     for split, cases in splits.items():
         with open(out / f"cases_{split}.jsonl", "w") as f:
             for c in cases:
