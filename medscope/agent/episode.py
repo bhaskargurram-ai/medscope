@@ -7,7 +7,7 @@ from typing import Any, Optional, Protocol
 
 import numpy as np
 
-from ..actions import FinalAction, parse
+from ..actions import FinalAction, parse, tool_text
 from ..data.schema import View
 from ..data.views import load_image
 from ..env.tools import ToolEnv
@@ -88,6 +88,9 @@ def run_episode(
         if parsed.final is not None:
             final = parsed.final
             break
+        # keep only the action that ran: anything the model wrote after it (e.g. an answer
+        # guessed before seeing the zoom) must not sit in the history it reads next turn
+        messages[-1] = assistant_message(tool_text(parsed.tool))
         result = env.call(parsed.tool.name, parsed.tool.args)
         messages.append(tool_result_message(result))
     else:

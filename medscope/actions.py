@@ -54,18 +54,75 @@ def _valid_box(box) -> Optional[Box]:
     return b
 
 
+_THINK_END = ("</think>", "<unused95>")          # Qwen-style and Gemma/MedGemma-style thinking
+_THINK_START = ("<think>", "<unused94>")
+_SPECIAL = re.compile(r"<unused\d+>|<think>|</think>")
+_OPEN = re.compile(r"<(tool|final)>")
+_TOOL_NAMES = {"zoom", "window"}
+
+
+def strip_thinking(text: str) -> tuple[str, bool]:
+    """(text after any thinking block, True if the thinking never finished)."""
+    for end in _THINK_END:
+        if end in text:
+            return _SPECIAL.sub("", text.rsplit(end, 1)[1]), False
+    stripped = text.lstrip()
+    unfinished = any(stripped.startswith(s) for s in _THINK_START) or stripped.startswith("thought\n")
+    return _SPECIAL.sub("", text), unfinished
+
+
+def _first_action(text: str) -> tuple[Optional[str], Optional[object], str]:
+    """Find the first action in the text: a <tool>/<final> tag (closing tag optional), or a
+    bare JSON object (e.g. in a ```json block) that is clearly a tool call or final action.
+    Returns (tag, object, error)."""
+    decoder = json.JSONDecoder()
+    candidates = []
+    for m in _OPEN.finditer(text):
+        candidates.append((m.end(), m.group(1)))
+    for m in re.finditer(r"\{", text):
+        candidates.append((m.start(), None))
+    first_error = ""
+    for pos, tag in sorted(candidates, key=lambda c: (c[0], c[1] is None)):
+        start = pos
+        while start < len(text) and text[start].isspace():
+            start += 1
+        if start >= len(text) or text[start] != "{":
+            if tag and not first_error:
+                first_error = f"<{tag}> not followed by a JSON object"
+            continue
+        try:
+            obj, _ = decoder.raw_decode(text, start)
+        except json.JSONDecodeError as exc:
+            if tag and not first_error:
+                first_error = f"bad JSON after <{tag}>: {exc.msg}"
+            continue
+        if not isinstance(obj, dict):
+            continue
+        if tag is None:  # bare JSON: infer what it is
+            if "action" in obj:
+                tag = "final"
+            elif obj.get("name") in _TOOL_NAMES:
+                tag = "tool"
+            else:
+                continue
+        return tag, obj, ""
+    return None, None, first_error or "no <tool> or <final> action found"
+
+
 def parse(text: str) -> Parsed:
-    """Use the LAST tagged object in the text; anything else is malformed."""
-    matches = _TAG.findall(text)
-    if not matches:
-        return Parsed(malformed=True, error="no <tool> or <final> tag")
-    tag, raw = matches[-1]
-    try:
-        obj = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        return Parsed(malformed=True, error=f"bad JSON: {exc}")
-    if not isinstance(obj, dict):
-        return Parsed(malformed=True, error="tag content is not an object")
+    """Read the FIRST action in a model turn, as agent frameworks do: what the model writes
+    after its first action is ignored, because it hasn't seen that action's result yet.
+
+    Lenient about format, so zero-shot models are judged on their decisions rather than
+    on following our exact syntax: closing tags may be missing, a bare JSON object (e.g. in
+    a ```json block) counts, and thinking blocks are skipped.
+    """
+    body, unfinished = strip_thinking(text)
+    tag, obj, error = _first_action(body)
+    if tag is None:
+        if unfinished:
+            error = "still thinking when the output ended (no action)"
+        return Parsed(malformed=True, error=error)
 
     if tag == "tool":
         name = obj.get("name")
@@ -101,14 +158,75 @@ def parse(text: str) -> Parsed:
     return Parsed(final=FinalAction(kind, confidence=conf, text=text_field if isinstance(text_field, str) else None))
 
 
+def tool_text(call: ToolCall) -> str:
+    """The canonical form of a tool call, as kept in the conversation history."""
+    return f"<tool>{json.dumps({'name': call.name, **call.args})}</tool>"
+
+
 def normalise_answer(s: str) -> str:
     s = s.lower().strip()
     s = re.sub(r"[^\w\s]", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
-def answer_matches(pred: Optional[str], gold: str, aliases: list[str] | None = None) -> bool:
+NEGATIONS = {"no", "not", "none", "absent", "without", "negative", "normal", "healthy", "unremarkable"}
+AFFIRM = {"yes", "present", "positive", "visible", "seen", "there"}
+
+
+def polarity(text: str) -> Optional[str]:
+    """'yes', 'no' or None for a free-text reply to a yes/no question."""
+    words = normalise_answer(text).split()
+    if not words:
+        return None
+    if words[0] in ("yes", "no"):
+        return words[0]
+    if any(w in NEGATIONS for w in words):
+        return "no"
+    if any(w in AFFIRM for w in words):
+        return "yes"
+    return None
+
+
+def _mentions(text_words: list[str], term: str) -> bool:
+    """Whole-phrase match, where each word of the term may also start a longer word
+    ("polyp" matches "polypoid", "kidney" matches "kidneys")."""
+    t = normalise_answer(term).split()
+    if not t:
+        return False
+    n = len(t)
+    for i in range(len(text_words) - n + 1):
+        if all(text_words[i + j] == t[j] or (len(t[j]) >= 4 and text_words[i + j].startswith(t[j]))
+               for j in range(n)):
+            return True
+    return False
+
+
+def answer_matches(pred: Optional[str], gold: str, aliases: list[str] | None = None,
+                   rivals: Optional[set[str]] = None) -> bool:
+    """Lenient but not credulous matching of a free-text answer to the gold answer.
+
+    - exact match (after normalising) always counts;
+    - yes/no gold: the answer's polarity must agree;
+    - otherwise: the gold term (or an alias) must be mentioned, and no rival answer from
+      the benchmark's answer set may be mentioned too, so hedging across options
+      ("liver or kidney") is not rewarded.
+    """
     if pred is None:
         return False
     p = normalise_answer(pred)
-    return any(p == normalise_answer(g) for g in [gold, *(aliases or [])])
+    golds = [gold, *(aliases or [])]
+    if any(p == normalise_answer(g) for g in golds):
+        return True
+    g = normalise_answer(gold)
+    if g in ("yes", "no"):
+        return polarity(pred) == g
+    words = p.split()
+    if not any(_mentions(words, x) for x in golds):
+        return False
+    own = {normalise_answer(x) for x in golds}
+    return not any(_mentions(words, r) for r in (rivals or set()) if normalise_answer(r) not in own)
+
+
+def answer_vocabulary(golds) -> set[str]:
+    """The non-yes/no answers in a benchmark: each one is a rival for the others."""
+    return {a for a in (normalise_answer(x) for x in golds) if a and a not in ("yes", "no")}

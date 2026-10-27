@@ -189,9 +189,18 @@ class HFPolicy:
         gens = []
         for row in out[:, prompt_len:]:
             ids = self._trim(row.cpu())
-            text = self.tokenizer.decode(ids, skip_special_tokens=True)
-            gens.append(Generation(text, {"gen_ids": ids}))
+            gens.append(Generation(self.decode(ids), {"gen_ids": ids}))
         return gens
+
+    KEEP_TOKENS = ("<think>", "</think>", "<unused94>", "<unused95>")  # thinking markers the parser needs
+
+    def decode(self, ids) -> str:
+        """Decode, dropping special tokens except the ones that mark thinking blocks."""
+        text = self.tokenizer.decode(ids, skip_special_tokens=False)
+        for tok in self.tokenizer.all_special_tokens:
+            if tok and tok not in self.KEEP_TOKENS:
+                text = text.replace(tok, "")
+        return text
 
     def generate(self, messages: list[dict], sample: bool = False) -> Generation:
         return self.generate_n(messages, 1, sample)[0]

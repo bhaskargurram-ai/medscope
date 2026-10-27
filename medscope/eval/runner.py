@@ -13,7 +13,7 @@ import numpy as np
 
 from ..agent.episode import Policy, run_episode
 from ..data.schema import View
-from ..rewards import Outcome
+from ..rewards import Outcome, with_vocab
 from .metrics import bootstrap
 
 
@@ -51,6 +51,8 @@ def evaluate(
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     outcomes_path, transcripts_path = out / "outcomes.jsonl", out / "transcripts.jsonl"
+    cfg = with_vocab(cfg, views)
+    meta = {**meta, "scoring": SCORING_VERSION}
 
     # Each result row carries a key of the exact view (question, edits, degradation) and the
     # model's precision. Rows whose key no longer matches are set aside and redone, so a run
@@ -95,9 +97,12 @@ def evaluate(
     return summary
 
 
+SCORING_VERSION = 2  # bump when parsing or answer matching changes, so old results are redone
+
+
 def view_key(view: View, precision=None) -> str:
-    """Fingerprint of everything that defines a view's result: content of the view + model precision."""
-    payload = json.dumps(view.to_dict(), sort_keys=True) + f"|precision={precision}"
+    """Fingerprint of everything that defines a view's result: the view, model precision, scoring rules."""
+    payload = json.dumps(view.to_dict(), sort_keys=True) + f"|precision={precision}|scoring={SCORING_VERSION}"
     return hashlib.sha1(payload.encode()).hexdigest()[:16]
 
 
@@ -163,7 +168,11 @@ def make_report(summary: dict, outcomes: list[Outcome], transcripts: list[dict],
             lines.append(f"### {kind}: {t['question']} (gold: {t['gold']})")
             for turn in t["turns"]:
                 if turn["role"] == "assistant":
-                    lines.append(f"- assistant: {turn['content'][:400]}")
+                    c = turn["content"]
+                    shown = c if len(c) <= 700 else f"{c[:250]} [...] {c[-400:]}"
+                    lines.append(f"- assistant: {shown}")
+            if t.get("error"):
+                lines.append(f"- (scored as malformed: {t['error']})")
             lines.append("")
     return "\n".join(lines)
 

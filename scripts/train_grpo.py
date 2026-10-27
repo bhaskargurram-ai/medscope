@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from medscope.eval.runner import evaluate, load_views, select_cases  # noqa: E402
-from medscope.rewards import load_config  # noqa: E402
+from medscope.rewards import load_config, with_vocab  # noqa: E402
 from medscope.train.grpo import train_grpo  # noqa: E402
 
 
@@ -40,7 +40,7 @@ def main() -> None:
 
     from medscope.train.hf_policy import HFPolicy
 
-    cfg = load_config()
+    cfg = with_vocab(load_config(), load_views(args.views))
     policy = HFPolicy(args.model, adapter=args.init, trainable=True, max_new_tokens=args.max_new_tokens)
 
     eval_fn = None

@@ -44,6 +44,19 @@ class TestEpisode(unittest.TestCase):
         self.assertEqual(ep.outcome.reward, 1.5)
         self.assertEqual(pol.seen, [2, 4])             # system+question, then +assistant+tool result
         self.assertEqual(ep.messages[3]["content"][0]["type"], "image")
+        # history keeps only the action that ran, not the prose or anything after it
+        self.assertEqual(ep.messages[2]["content"][0]["text"], '<tool>{"name": "zoom", "box": [200, 200, 600, 600]}</tool>')
+
+    def test_answer_written_before_zoom_result_is_dropped_from_history(self):
+        view, img = make_view(ViewKind.ORIGINAL)
+        pol = Scripted([
+            '<tool>{"name": "zoom", "box": [200, 200, 600, 600]}\n<final>{"action": "answer", "answer": "no"}',
+            '<final>{"action": "answer", "answer": "yes"}</final>',
+        ])
+        ep = run_episode(pol, view, CFG, image=img)
+        self.assertEqual(ep.tool_calls, 1)
+        self.assertNotIn('"no"', ep.messages[2]["content"][0]["text"])
+        self.assertEqual(ep.final.answer, "yes")
         self.assertEqual(ep.transcript()[0]["content"], "[image] Question: Is there a tumor?")
 
     def test_malformed_and_turn_limit(self):

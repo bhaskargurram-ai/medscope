@@ -29,7 +29,8 @@ def main() -> None:
     ap.add_argument("--name", required=True)
     ap.add_argument("--split", default="test")
     ap.add_argument("--limit-cases", type=int, default=None)
-    ap.add_argument("--max-new-tokens", type=int, default=384)
+    ap.add_argument("--max-new-tokens", type=int, default=1536,
+                    help="per turn; generous because some models (MedGemma 1.5) think before answering")
     ap.add_argument("--quant", choices=["auto", "4bit", "none"], default="auto",
                     help="auto: 4-bit only on GPUs under 20 GB (T4); 16-bit on L4/A100")
     args = ap.parse_args()

@@ -19,6 +19,12 @@ def load_config(path: str | Path = DEFAULT_CONFIG) -> dict:
         return yaml.safe_load(f)
 
 
+def with_vocab(cfg: dict, views) -> dict:
+    """Config copy carrying the benchmark's answer vocabulary, used to reject hedged answers."""
+    from .actions import answer_vocabulary
+    return {**cfg, "answer_vocab": sorted(answer_vocabulary(v.answer for v in views))}
+
+
 @dataclass
 class Outcome:
     """Everything the metrics need about one episode."""
@@ -57,7 +63,8 @@ def score(
     correct: Optional[bool] = None
     overlap = 0.0
     if final.kind is ActionKind.ANSWER:
-        correct = answer_matches(final.answer, view.answer, view.answer_aliases)
+        correct = answer_matches(final.answer, view.answer, view.answer_aliases,
+                                 rivals=set(cfg.get("answer_vocab", ())))
         overlap = iou(final.box, view.lesion_box)
 
     if view.kind in (ViewKind.ORIGINAL, ViewKind.RANDOM_REMOVAL):

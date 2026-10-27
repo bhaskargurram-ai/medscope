@@ -22,9 +22,11 @@ class TestParse(unittest.TestCase):
         self.assertEqual(p.tool.name, "zoom")
         self.assertEqual(p.tool.args["box"], [100, 100, 500, 500])
 
-    def test_final_answer_and_last_tag_wins(self):
+    def test_first_action_wins_and_confidence_clamped(self):
         p = parse('<tool>{"name": "zoom", "box": [0,0,10,10]}</tool> then '
                   '<final>{"action": "answer", "answer": "Yes", "box": [300,300,400,400], "confidence": 1.4}</final>')
+        self.assertEqual(p.tool.name, "zoom")   # it hasn't seen the zoom yet, so its answer is ignored
+        p = parse('<final>{"action": "answer", "answer": "Yes", "box": [300,300,400,400], "confidence": 1.4}</final>')
         self.assertEqual(p.final.kind, ActionKind.ANSWER)
         self.assertEqual(p.final.confidence, 1.0)  # clamped
 

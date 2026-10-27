@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..actions import ToolCall, tool_text
 from ..data.schema import Box, View, ViewKind
 from ..data.views import load_image
 from ..env.tools import ToolEnv
@@ -103,6 +104,7 @@ def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.
     if zoom:
         region = pad_box(view.lesion_box)
         emit(f"{pick(LOOK_CLOSER)} {_tool('zoom', box=region)}")
+        messages[-1] = assistant_message(tool_text(ToolCall("zoom", {"box": region})))  # as run_episode keeps it
         messages.append(tool_result_message(env.call("zoom", {"box": region})))
 
     if view.kind is ViewKind.TARGET_REMOVAL:
