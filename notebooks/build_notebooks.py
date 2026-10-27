@@ -54,19 +54,31 @@ def github_diagnosis():
         req = urllib.request.Request(f'https://api.github.com{path}', headers={'Authorization': f'Bearer {gh}'})
         try:
             with urllib.request.urlopen(req) as r:
-                return r.status, json.load(r)
+                return r.status, json.load(r), dict(r.headers)
         except urllib.error.HTTPError as e:
-            return e.code, {}
-    status, user = call('/user')
+            return e.code, {}, dict(e.headers or {})
+    kind = 'classic' if gh.startswith('ghp_') else 'fine-grained' if gh.startswith('github_pat_') else 'unknown'
+    if kind == 'unknown':
+        return ('The secret does not look like a GitHub token (they start with github_pat_ or ghp_). '
+                'Re-copy it into the GITHUB_TOKEN secret with no quotes or spaces.')
+    status, user, headers = call('/user')
     if status == 401:
         return 'GitHub rejects the token itself: it is mistyped, expired or revoked. Make a new one.'
     who = user.get('login', '?')
-    status, _ = call(f'/repos/{REPO}')
+    owner = REPO.split('/')[0]
+    if who.lower() != owner:
+        return f'The token belongs to GitHub account "{who}", not "{owner}". Sign in as {owner} and make the token there.'
+    if kind == 'classic':
+        scopes = headers.get('X-OAuth-Scopes', headers.get('x-oauth-scopes', '')) or 'none'
+        if 'repo' not in [s.strip() for s in scopes.split(',')]:
+            return (f'This is a classic token with scopes [{scopes}]; private repos need the "repo" box ticked. '
+                    'Make a new classic token with "repo" checked, or a fine-grained one.')
+    status, _, _ = call(f'/repos/{REPO}')
     if status == 200:
-        return f'The token (account {who}) can see the repo but cannot read its code: set Contents to Read-only.'
-    if who.lower() != REPO.split('/')[0]:
-        return f'The token belongs to GitHub account "{who}", not "{REPO.split("/")[0]}". Sign in as {REPO.split("/")[0]} and make the token there.'
-    return f'The token (account {who}) does not include {REPO}: edit it, choose "Only select repositories", add medscope, and set Contents to Read-only.'
+        return f'The token can see the repo but cannot read its code: set Contents to Read-only.'
+    return ('This fine-grained token cannot see the private repo. Under "Repository access" it is probably on '
+            'GitHub\'s default "Public repositories"; switch it to "Only select repositories", add medscope, '
+            'and set Contents to Read-only. If you made a new token, also paste it into the GITHUB_TOKEN secret.')
 
 if os.path.exists('/content/medscope/.git'):
     subprocess.run(['git', '-C', '/content/medscope', 'remote', 'set-url', 'origin', url])
