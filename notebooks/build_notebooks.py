@@ -91,7 +91,10 @@ if r.returncode != 0:
                      + '\nDiagnosis: ' + github_diagnosis())
 %cd /content/medscope
 !git log --oneline -1
-!pip install -q -e .
+# Colab already has numpy, pillow, opencv and pyyaml; --no-deps avoids a second, clashing OpenCV
+!pip install -q -e . --no-deps
+import cv2, yaml, numpy, PIL
+print('medscope installed; opencv', cv2.__version__)
 """
 
 GPU_STACK = r"""
@@ -149,7 +152,23 @@ automated quality checks, saves everything to Drive and publishes a report as a 
 **Runtime:** T4 GPU is enough. About 30-60 minutes.
 """ + SECRETS_NOTE),
         code(SETUP),
-        code("!pip install -q simple-lama-inpainting huggingface_hub"),
+        code(r"""
+!pip install -q huggingface_hub
+# Big-LaMa inpainting model (about 200 MB), cached on Drive so it downloads only once
+import torch, numpy as np
+from medscope.data.inpaint import LAMA_URL, lama_inpaint
+LAMA = f'{DRIVE}/models/big-lama.pt'
+if not os.path.exists(LAMA):
+    os.makedirs(os.path.dirname(LAMA), exist_ok=True)
+    torch.hub.download_url_to_file(LAMA_URL, LAMA)
+os.environ['MEDSCOPE_LAMA_PATH'] = LAMA
+# smoke test: inpaint a square on a random image; pixels outside the square must not change
+test = np.random.default_rng(0).integers(0, 256, (200, 300, 3), dtype=np.uint8)
+hole = np.zeros((200, 300), bool); hole[50:90, 100:160] = True
+out = lama_inpaint(test, hole)
+assert out.shape == test.shape and (out[~hole] == test[~hole]).all()
+print('LaMa works on', 'GPU' if torch.cuda.is_available() else 'CPU (slow: switch the runtime to T4)')
+"""),
         md("## Download SLAKE"),
         code(r"""
 from huggingface_hub import hf_hub_download

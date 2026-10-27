@@ -30,7 +30,7 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--inpainter", choices=["telea", "lama"], default="telea",
-                    help="use lama for real builds (needs a GPU and simple-lama-inpainting)")
+                    help="use lama for real builds (needs torch; fast on a GPU)")
     args = ap.parse_args()
     inpaint_fn = get_inpainter(args.inpainter)
 
