@@ -73,6 +73,17 @@ class TestRunner(unittest.TestCase):
             table = compare_runs(d)
             self.assertIn("| oracle | test | 6 |", table)
 
+    def test_changed_views_start_fresh(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            views = load_views(build_dataset(d))
+            quiet = dict(n_bootstrap=20, log=lambda m: None)
+            evaluate(Oracle(), views[:8], CFG, d / "run", {"name": "a"}, **quiet)
+            s = evaluate(Oracle(), views[8:], CFG, d / "run", {"name": "a"}, **quiet)
+            self.assertEqual(s["n_views"], 16)
+            self.assertEqual(len((d / "run" / "outcomes.jsonl").read_text().splitlines()), 16)
+            self.assertEqual(len(list((d / "run").glob("stale_*/outcomes.jsonl"))), 1)
+
     def test_select_cases_keeps_whole_cases(self):
         with tempfile.TemporaryDirectory() as d:
             views = load_views(build_dataset(Path(d)))

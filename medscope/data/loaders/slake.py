@@ -158,6 +158,134 @@ class SlakeReport:
 
 PER_MASK_MIN_FIT = 0.9  # a mask whose decoded values mostly aren't known ids is skipped
 
+# ---- question generation from masks ---------------------------------------------------
+
+ORGAN_WORDS = ("Brain", "Liver", "Kidney", "Lung")
+CRITICAL_WORDS = ("cancer", "tumor", "tumour")
+
+
+def lesion_organ(name: str) -> str:
+    for organ in ORGAN_WORDS:
+        if organ.lower() in name.lower():
+            return organ
+    return name.split()[0].title()
+
+
+def lesion_finding(name: str) -> str:
+    n = name.lower()
+    if "edema" in n or "oedema" in n:
+        return "edema"
+    if "cancer" in n or "tumor" in n or "tumour" in n:
+        return "a tumor"
+    return "a lesion"
+
+
+def template_questions(main_label: str) -> list[tuple[str, str, list[str], str]]:
+    """(tag, question, answer, aliases) generated from the dominant lesion label.
+
+    Only questions whose correct answer depends on the lesion being visible, so that
+    removing it removes the evidence."""
+    organ, finding = lesion_organ(main_label), lesion_finding(main_label)
+    return [
+        ("abn", "Is there an abnormality in this image?", "Yes", []),
+        ("organ", "Which organ shows an abnormality in this image?", organ, [f"the {organ.lower()}", f"{organ.lower()}s"]),
+        ("finding", f"Is there {finding} in the {organ.lower()}?", "Yes", []),
+    ]
+
+
+@dataclass
+class ImageRecord:
+    key: str                 # e.g. "xmlab102"
+    image_path: str
+    mask_path: str           # binary lesion mask written by the loader
+    main_label: str          # lesion class with the most pixels
+    modality: str
+    critical: bool
+    slake_questions: list[dict] = field(default_factory=list)
+
+
+def scan_lesion_images(root: str | Path, mask_out: str | Path, encoding: str = "red",
+                       min_lesion_pixels: int = 20, max_lesion_fraction: float = 0.2) -> tuple[list[ImageRecord], Counter, str]:
+    """Every SLAKE image whose mask contains lesion pixels, with SLAKE's own positive questions attached.
+
+    Lesions covering more than `max_lesion_fraction` of the image are skipped: erasing a
+    lesion that large cannot be done convincingly and makes edits easy to spot.
+    """
+    root, mask_out = Path(root), Path(mask_out)
+    labels = parse_mask_labels(root / "mask.txt")
+    lesion = lesion_ids(labels)
+    known = set(labels)
+    stats: Counter = Counter()
+    unknown_values: Counter = Counter()
+
+    questions: dict[str, list[dict]] = {}
+    modality: dict[str, str] = {}
+    for fname in SPLIT_FILES.values():
+        p = root / fname
+        if p.exists():
+            for q in json.loads(p.read_text(encoding="utf-8")):
+                key = Path(q["img_name"]).parent.name
+                modality.setdefault(key, str(q.get("modality", "unknown")).lower())
+                if keep_question(q):
+                    questions.setdefault(key, []).append(q)
+
+    records = []
+    for mask_file in sorted((root / "imgs").glob("*/mask.png")):
+        key = mask_file.parent.name
+        stats["masks"] += 1
+        lm = read_label_map(mask_file, encoding)
+        share, _ = fit(lm, known)
+        if share < PER_MASK_MIN_FIT:
+            stats["mask values don't match mask.txt"] += 1
+            vals, cnts = np.unique(lm, return_counts=True)
+            for v, c in zip(vals, cnts):
+                if int(v) != 0 and int(v) not in known:
+                    unknown_values[int(v)] += int(c)
+            continue
+        binary = np.isin(lm, list(lesion))
+        if binary.sum() < min_lesion_pixels:
+            stats["no lesion"] += 1
+            continue
+        if binary.mean() > max_lesion_fraction:
+            stats["lesion too large to erase"] += 1
+            continue
+        ids, counts = np.unique(lm[binary], return_counts=True)
+        main = labels[int(ids[np.argmax(counts)])]
+        dest = mask_out / f"{key}.png"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray((binary * 255).astype(np.uint8)).save(dest)
+        image_path = mask_file.parent / "source.jpg"
+        if not image_path.exists():
+            stats["no source image"] += 1
+            continue
+        records.append(ImageRecord(
+            key=key, image_path=str(image_path), mask_path=str(dest), main_label=main,
+            modality=modality.get(key, "unknown"),
+            critical=any(any(w in labels[int(i)].lower() for w in CRITICAL_WORDS) for i in ids),
+            slake_questions=questions.get(key, [])))
+        stats[f"kept: {main}"] += 1
+    note = ""
+    if unknown_values:
+        note = "values not in mask.txt (pixels): " + ", ".join(f"{v}={c}" for v, c in unknown_values.most_common(6))
+    return records, stats, note
+
+
+def cases_for_image(rec: ImageRecord, split: str, group: int, max_train_cases: int = 3) -> list[Case]:
+    """Train: several questions per image. Validation/test: exactly one, chosen deterministically."""
+    from .common import stable_index
+
+    options = [(f"q{q.get('qid')}", q["question"], str(q["answer"]), []) for q in rec.slake_questions]
+    options += template_questions(rec.main_label)
+    if split == "train":
+        chosen = (options[:1] if rec.slake_questions else []) + template_questions(rec.main_label)
+        chosen = chosen[:max_train_cases]
+    else:
+        chosen = [options[stable_index(rec.key, len(options))]]
+    return [Case(case_id=f"slake_{rec.key}_{tag}", patient_id=f"slake_g{group}", dataset="slake",
+                 modality=rec.modality, image_path=rec.image_path, question=question, answer=answer,
+                 answer_aliases=aliases, mask_path=rec.mask_path, critical=rec.critical)
+            for tag, question, answer, aliases in chosen]
+
 
 def load_slake(root: str | Path, mask_out: str | Path, min_lesion_pixels: int = 20,
                encoding: str = "auto") -> tuple[dict[str, list[Case]], SlakeReport]:

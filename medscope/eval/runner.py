@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from collections import Counter, defaultdict
@@ -50,6 +51,18 @@ def evaluate(
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     outcomes_path, transcripts_path = out / "outcomes.jsonl", out / "transcripts.jsonl"
+
+    # if the benchmark views changed since the last run here, set old results aside and start fresh
+    fingerprint = hashlib.sha1("\n".join(sorted(v.view_id for v in views)).encode()).hexdigest()[:12]
+    marker = out / "views_fingerprint.txt"
+    if marker.exists() and marker.read_text().strip() != fingerprint:
+        stale = out / f"stale_{marker.read_text().strip()}"
+        stale.mkdir(exist_ok=True)
+        for p in out.iterdir():
+            if p.is_file():
+                p.rename(stale / p.name)
+        log(f"views changed since the last run in {out}; old results moved to {stale.name}/")
+    marker.write_text(fingerprint)
     done = {r["view_id"] for r in _read_jsonl(outcomes_path)}
     todo = [v for v in views if v.view_id not in done]
     log(f"{len(done)} views already done, {len(todo)} to run")

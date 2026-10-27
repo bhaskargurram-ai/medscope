@@ -153,11 +153,12 @@ print(report[:3000])
 def nb01() -> list[dict]:
     return [
         md("""
-# MedScope 01: build SLAKE counterfactual views
+# MedScope 01: build the counterfactual benchmark data
 
-Downloads SLAKE, keeps English abnormality questions with lesion masks, builds four views per case
-(original, lesion removed, matched random edit, degraded input) with LaMa inpainting, runs the
-automated quality checks, saves everything to Drive and publishes a report as a Google Doc.
+Downloads SLAKE (CT/MRI/X-ray) and Kvasir-SEG (colonoscopy), turns every image with a lesion mask into
+questions, splits by groups of near-identical images, builds four views per case (original, lesion
+removed, matched random edit, degraded input) with LaMa inpainting, runs the automated quality checks,
+saves everything to Drive and publishes a report as a Google Doc.
 
 **Runtime:** T4 GPU is enough. About 30-60 minutes.
 """ + SECRETS_NOTE),
@@ -207,14 +208,33 @@ fmt.append(f'mask shape {m.shape}, ids {np.unique(m)[:20].tolist()}')
 FORMAT_CHECK = '\n'.join(fmt)
 print(FORMAT_CHECK)
 """),
+        md("""
+## Download Kvasir-SEG
+1,000 colonoscopy images with polyp masks (46 MB). Terms: research and education only; cite
+Jha et al., *Kvasir-SEG: A Segmented Polyp Dataset*, MMM 2020.
+"""),
+        code(r"""
+KV = f'{WORK}/raw/kvasir'
+if not os.path.exists(f'{KV}/done'):
+    os.makedirs(KV, exist_ok=True)
+    torch.hub.download_url_to_file('https://datasets.simula.no/downloads/kvasir-seg.zip', f'{KV}/kvasir-seg.zip')
+    with zipfile.ZipFile(f'{KV}/kvasir-seg.zip') as z:
+        z.extractall(KV)
+    open(f'{KV}/done', 'w').close()
+from medscope.data.loaders.kvasir import find_root
+print('Kvasir-SEG folder:', find_root(KV))
+"""),
         md("## Build case manifests, views and quality checks"),
         code(r"""
-# SLAKE masks are grey RGBA images whose grey level is the class id in mask.txt, so read the red channel
-r = subprocess.run(['python', 'scripts/prepare_slake.py', '--root', RAW, '--out', f'{WORK}/cases', '--encoding', 'red'],
+# Questions from every image with a lesion mask; splits by groups of near-identical images.
+# SLAKE masks are grey RGBA images whose grey level is the class id in mask.txt.
+shutil.rmtree(f'{WORK}/cases', ignore_errors=True)
+shutil.rmtree(VIEWS, ignore_errors=True)
+r = subprocess.run(['python', 'scripts/prepare_data.py', '--slake', RAW, '--kvasir', KV, '--out', f'{WORK}/cases'],
                    capture_output=True, text=True)
 print(r.stdout, r.stderr[-3000:])
 if r.returncode != 0:
-    raise SystemExit('Preparing SLAKE failed (see the message above). Copy it into the chat so the loader can be fixed.')
+    raise SystemExit('Preparing the data failed (see the message above). Copy it into the chat so the loader can be fixed.')
 for split in ['train', 'validation', 'test']:
     !python scripts/build_views.py --manifest {WORK}/cases/cases_{split}.jsonl --out {VIEWS}/{split} --inpainter lama
 !python scripts/check_views.py --views {VIEWS}/train/views.jsonl
@@ -230,7 +250,7 @@ by_case = defaultdict(dict)
 for v in views:
     by_case[v['case_id']][v['kind']] = v
 kinds = ['original', 'target_removal', 'random_removal', 'degraded']
-cases = list(by_case)[:4]
+cases = [c for c in by_case if c.startswith('slake')][:2] + [c for c in by_case if c.startswith('kvasir')][:2]
 fig, axes = plt.subplots(len(cases), 4, figsize=(12, 3 * len(cases)), squeeze=False)
 for r, cid in enumerate(cases):
     for c, k in enumerate(kinds):
@@ -254,7 +274,7 @@ def quality(split):
 """),
         publish("MedScope report - 01 data", """
     ('File format check', FORMAT_CHECK),
-    ('SLAKE filtering', read_text(f'{WORK}/cases/prepare_report.txt')),
+    ('Data preparation (SLAKE + Kvasir-SEG)', read_text(f'{WORK}/cases/prepare_report.txt')),
     ('Quality: train', quality('train')),
     ('Quality: validation', quality('validation')),
     ('Quality: test', quality('test')),
