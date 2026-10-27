@@ -209,7 +209,11 @@ print(FORMAT_CHECK)
 """),
         md("## Build case manifests, views and quality checks"),
         code(r"""
-!python scripts/prepare_slake.py --root {RAW} --out {WORK}/cases
+r = subprocess.run(['python', 'scripts/prepare_slake.py', '--root', RAW, '--out', f'{WORK}/cases'],
+                   capture_output=True, text=True)
+print(r.stdout, r.stderr[-3000:])
+if r.returncode != 0:
+    raise SystemExit('Preparing SLAKE failed (see the message above). Copy it into the chat so the loader can be fixed.')
 for split in ['train', 'validation', 'test']:
     !python scripts/build_views.py --manifest {WORK}/cases/cases_{split}.jsonl --out {VIEWS}/{split} --inpainter lama
 !python scripts/check_views.py --views {VIEWS}/train/views.jsonl

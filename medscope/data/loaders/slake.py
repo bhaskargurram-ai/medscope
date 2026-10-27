@@ -51,13 +51,76 @@ def lesion_ids(labels: dict[int, str]) -> set[int]:
     return {i for i, name in labels.items() if any(w in name.lower() for w in LESION_WORDS)}
 
 
-def read_label_map(path: str | Path) -> np.ndarray:
-    arr = np.asarray(Image.open(path))
-    if arr.ndim == 3:
-        if not (np.array_equal(arr[..., 0], arr[..., 1]) and np.array_equal(arr[..., 0], arr[..., 2])):
-            raise ValueError(f"{path} is a colour image, expected a single-channel label map")
-        arr = arr[..., 0]
-    return arr
+# Ways a mask.png might store the class id of each pixel. SLAKE's exact encoding is
+# detected from the data: the one whose values best match the ids in mask.txt wins.
+ENCODINGS = ("single", "red", "green", "blue", "luma")
+MIN_FIT = 0.95  # share of pixels whose decoded value is background (0) or a known id
+
+
+def _raw(path: str | Path) -> np.ndarray:
+    """Pixels as stored. Palette ('P') images give their index array, which is the label."""
+    with Image.open(path) as img:
+        return np.asarray(img).copy()
+
+
+def _mode(path: str | Path) -> str:
+    with Image.open(path) as img:
+        return img.mode
+
+
+def decode(arr: np.ndarray, encoding: str) -> np.ndarray:
+    if arr.ndim == 2:
+        return arr
+    rgb = arr[..., :3]
+    if encoding == "single":
+        if not (np.array_equal(rgb[..., 0], rgb[..., 1]) and np.array_equal(rgb[..., 0], rgb[..., 2])):
+            return np.full(rgb.shape[:2], -1, dtype=np.int32)  # not a grey image: fits nothing
+        return rgb[..., 0]
+    if encoding in ("red", "green", "blue"):
+        return rgb[..., ("red", "green", "blue").index(encoding)]
+    if encoding == "luma":
+        return np.asarray(Image.fromarray(np.ascontiguousarray(rgb)).convert("L"))
+    raise ValueError(f"unknown encoding {encoding!r}")
+
+
+def fit(values: np.ndarray, known: set[int]) -> tuple[float, int]:
+    """(share of pixels that are 0 or a known id, number of distinct known non-zero ids seen)."""
+    ids, counts = np.unique(values, return_counts=True)
+    ok = sum(int(c) for i, c in zip(ids, counts) if int(i) == 0 or int(i) in known)
+    seen = sum(1 for i in ids if int(i) != 0 and int(i) in known)
+    return ok / max(1, int(counts.sum())), seen
+
+
+def colour_summary(arr: np.ndarray, top: int = 12) -> str:
+    flat = arr.reshape(-1, arr.shape[-1]) if arr.ndim == 3 else arr.reshape(-1, 1)
+    colours, counts = np.unique(flat, axis=0, return_counts=True)
+    order = np.argsort(-counts)[:top]
+    return ", ".join(f"{tuple(int(v) for v in colours[i])}: {int(counts[i])} px" for i in order)
+
+
+def detect_encoding(mask_paths: list[Path], known: set[int]) -> tuple[str, str]:
+    """Pick the encoding that fits a sample of masks best. Returns (encoding, explanation)."""
+    if not mask_paths:
+        raise ValueError("no mask.png files found to inspect")
+    arrays = [_raw(p) for p in mask_paths]
+    scores = {}
+    for enc in ENCODINGS:
+        fits = [fit(decode(a, enc), known) for a in arrays]
+        scores[enc] = (float(np.mean([f for f, _ in fits])), sum(s for _, s in fits))
+    best = max(scores, key=lambda e: (scores[e][0] >= MIN_FIT, scores[e][1] > 0, scores[e][0], scores[e][1]))
+    table = "; ".join(f"{e}: {scores[e][0]:.1%} pixels fit, {scores[e][1]} ids seen" for e in ENCODINGS)
+    if scores[best][0] < MIN_FIT or scores[best][1] == 0:
+        raise ValueError(
+            "could not work out how mask.png stores class ids.\n"
+            f"  tried: {table}\n"
+            f"  known ids from mask.txt: {sorted(known)}\n"
+            f"  first mask {mask_paths[0]}: mode {_mode(mask_paths[0])}, shape {arrays[0].shape}\n"
+            f"  its most common colours: {colour_summary(arrays[0])}")
+    return best, f"mask encoding '{best}' ({table})"
+
+
+def read_label_map(path: str | Path, encoding: str = "single") -> np.ndarray:
+    return decode(_raw(path), encoding)
 
 
 def keep_question(q: dict) -> bool:
@@ -80,9 +143,10 @@ class SlakeReport:
     kept: Counter = field(default_factory=Counter)
     dropped: Counter = field(default_factory=Counter)
     lesion_pixels_by_label: Counter = field(default_factory=Counter)
+    encoding: str = ""
 
     def summary(self) -> str:
-        lines = [f"questions seen: {self.questions_seen}",
+        lines = [self.encoding, f"questions seen: {self.questions_seen}",
                  f"kept per split: {dict(self.kept)}",
                  f"dropped by reason: {dict(self.dropped)}",
                  "lesion labels found (images): " + ", ".join(
@@ -99,6 +163,8 @@ def load_slake(root: str | Path, mask_out: str | Path, min_lesion_pixels: int = 
         raise ValueError("mask.txt has no lesion classes; check LESION_WORDS against it")
 
     report = SlakeReport()
+    sample = sorted((root / "imgs").glob("*/mask.png"))[:40]
+    encoding, report.encoding = detect_encoding(sample, set(labels))
     mask_cache: dict[str, str | None] = {}
     out: dict[str, list[Case]] = {}
 
@@ -120,7 +186,7 @@ def load_slake(root: str | Path, mask_out: str | Path, min_lesion_pixels: int = 
                 if not label_path.exists():
                     mask_cache[key] = None
                 else:
-                    lm = read_label_map(label_path)
+                    lm = read_label_map(label_path, encoding)
                     binary = np.isin(lm, list(lesion))
                     if binary.sum() < min_lesion_pixels:
                         mask_cache[key] = None

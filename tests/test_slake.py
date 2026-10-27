@@ -6,7 +6,14 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from medscope.data.loaders.slake import keep_question, lesion_ids, load_slake, parse_mask_labels
+from medscope.data.loaders.slake import (
+    detect_encoding,
+    keep_question,
+    lesion_ids,
+    load_slake,
+    parse_mask_labels,
+    read_label_map,
+)
 
 MASK_TXT = """30: Left Lung
 55: Liver
@@ -40,6 +47,65 @@ def make_release(root: Path) -> None:
          "answer": "否", "q_lang": "zh", "content_type": "Abnormal", "modality": "CT"},
     ]
     (root / "train.json").write_text(json.dumps(qs), encoding="utf-8")
+
+
+class TestMaskEncodings(unittest.TestCase):
+    """mask.png may store ids in different ways; the loader must work out which from the data."""
+
+    IDS = {30: "Left Lung", 55: "Liver", 120: "Liver Cancer"}
+
+    def label_map(self):
+        lm = np.zeros((40, 40), np.uint8)
+        lm[5:30, 5:30] = 55
+        lm[10:15, 10:15] = 120
+        lm[30:38, 2:10] = 30
+        return lm
+
+    def save(self, d: Path, arr, n=3):
+        paths = []
+        for i in range(n):
+            p = d / f"m{i}.png"
+            Image.fromarray(arr).save(p)
+            paths.append(p)
+        return paths
+
+    def test_detects_each_encoding(self):
+        lm = self.label_map()
+        rng = np.random.default_rng(0)
+        colour = rng.integers(0, 256, (40, 40), dtype=np.uint8)
+        cases = {
+            "single": lm,
+            "red": np.stack([lm, colour, colour[::-1]], -1),
+            "blue": np.stack([colour, colour[::-1], lm], -1),
+        }
+        with tempfile.TemporaryDirectory() as d:
+            for expected, arr in cases.items():
+                sub = Path(d) / expected
+                sub.mkdir()
+                enc, why = detect_encoding(self.save(sub, arr), set(self.IDS))
+                self.assertEqual(enc, expected, why)
+                decoded = read_label_map(sub / "m0.png", enc)
+                np.testing.assert_array_equal(decoded, lm)
+
+    def test_rgba_grey_mask(self):
+        lm = self.label_map()
+        rgba = np.stack([lm, lm, lm, np.full_like(lm, 255)], -1)
+        with tempfile.TemporaryDirectory() as d:
+            enc, _ = detect_encoding(self.save(Path(d), rgba), set(self.IDS))
+            self.assertEqual(enc, "single")
+
+    def test_unknown_colours_fail_with_a_useful_message(self):
+        lm = self.label_map()
+        palette = {0: (0, 0, 0), 55: (200, 30, 90), 120: (10, 240, 17), 30: (77, 77, 250)}
+        rgb = np.zeros((40, 40, 3), np.uint8)
+        for i, c in palette.items():
+            rgb[lm == i] = c
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(ValueError) as ctx:
+                detect_encoding(self.save(Path(d), rgb), set(self.IDS))
+        msg = str(ctx.exception)
+        self.assertIn("most common colours", msg)
+        self.assertIn("(200, 30, 90)", msg)
 
 
 class TestSlake(unittest.TestCase):
