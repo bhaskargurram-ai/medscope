@@ -210,19 +210,22 @@ print(FORMAT_CHECK)
 """),
         md("""
 ## Download Kvasir-SEG
-1,000 colonoscopy images with polyp masks (46 MB). Terms: research and education only; cite
-Jha et al., *Kvasir-SEG: A Segmented Polyp Dataset*, MMM 2020.
+1,000 colonoscopy images with polyp masks, from the Hugging Face copy `MedOtter/kvasir-seg` (the original
+site's certificate chain is broken, so Python can't download from it). Terms: research and education only;
+cite Jha et al., *Kvasir-SEG: A Segmented Polyp Dataset*, MMM 2020.
 """),
         code(r"""
+from huggingface_hub import snapshot_download
+from medscope.data.loaders.kvasir import export_hf_dataset, find_roots
 KV = f'{WORK}/raw/kvasir'
-if not os.path.exists(f'{KV}/done'):
-    os.makedirs(KV, exist_ok=True)
-    torch.hub.download_url_to_file('https://datasets.simula.no/downloads/kvasir-seg.zip', f'{KV}/kvasir-seg.zip')
-    with zipfile.ZipFile(f'{KV}/kvasir-seg.zip') as z:
-        z.extractall(KV)
-    open(f'{KV}/done', 'w').close()
-from medscope.data.loaders.kvasir import find_root
-print('Kvasir-SEG folder:', find_root(KV))
+snapshot_download('MedOtter/kvasir-seg', repo_type='dataset', local_dir=KV)
+try:
+    roots = find_roots(KV)
+except FileNotFoundError:
+    # the copy stores image/mask columns instead of folders: write them out as images/ and masks/
+    roots = [export_hf_dataset('MedOtter/kvasir-seg', f'{KV}/exported')]
+n = sum(len(list((r / 'images').iterdir())) for r in roots)
+print(f'Kvasir-SEG: {n} images in', [str(r.relative_to(KV)) for r in roots])
 """),
         md("## Build case manifests, views and quality checks"),
         code(r"""

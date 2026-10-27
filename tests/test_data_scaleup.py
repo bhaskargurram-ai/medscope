@@ -114,6 +114,24 @@ class TestKvasir(unittest.TestCase):
                 self.assertEqual(mm.size, im.size)
 
 
+class TestKvasirMirrorLayout(unittest.TestCase):
+    def test_one_folder_per_split(self):
+        """The Hugging Face copy has train/validation/test folders, each with images/ and masks/."""
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            for k, split in enumerate(("train", "validation", "test")):
+                for sub in ("images", "masks"):
+                    (d / "raw" / split / sub).mkdir(parents=True)
+                for i in range(2):
+                    img, les = synthetic_case(size=200, seed=10 * k + i + 1, lesion_center=(90, 100), lesion_radius=20)
+                    Image.fromarray(img).save(d / "raw" / split / "images" / f"{split}{i}.png")
+                    Image.fromarray((les * 255).astype(np.uint8)).save(d / "raw" / split / "masks" / f"{split}{i}.png")
+            Image.fromarray(img).save(d / "raw" / "test" / "images" / "train0.png")  # duplicate name
+            recs, stats = scan_kvasir(d / "raw", d / "out")
+            self.assertEqual(stats["kept"], 6)       # the copy with a mask wins
+            self.assertEqual(stats["no mask"], 0)
+
+
 class TestPrepareScript(unittest.TestCase):
     def test_end_to_end(self):
         with tempfile.TemporaryDirectory() as d:

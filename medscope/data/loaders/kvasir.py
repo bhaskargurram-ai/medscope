@@ -27,13 +27,37 @@ TEMPLATES = [
 IMAGE_EXTS = (".jpg", ".jpeg", ".png")
 
 
-def find_root(path: str | Path) -> Path:
-    """The folder that holds images/ and masks/, wherever the zip put it."""
+def find_roots(path: str | Path) -> list[Path]:
+    """Every folder that holds images/ and masks/ (the original zip has one; the Hugging Face
+    mirror has one per split)."""
     path = Path(path)
-    for cand in [path, *path.rglob("*")]:
-        if cand.is_dir() and (cand / "images").is_dir() and (cand / "masks").is_dir():
-            return cand
-    raise FileNotFoundError(f"no folder with images/ and masks/ under {path}")
+    roots = [c for c in [path, *sorted(path.rglob("*"))]
+             if c.is_dir() and (c / "images").is_dir() and (c / "masks").is_dir()]
+    if not roots:
+        raise FileNotFoundError(f"no folder with images/ and masks/ under {path}")
+    return roots
+
+
+def find_root(path: str | Path) -> Path:
+    return find_roots(path)[0]
+
+
+def export_hf_dataset(repo_id: str, out_dir: str | Path) -> Path:
+    """Fallback when a Hugging Face copy only has image/mask columns: write them to images/ and masks/."""
+    from datasets import load_dataset
+
+    out = Path(out_dir)
+    (out / "images").mkdir(parents=True, exist_ok=True)
+    (out / "masks").mkdir(parents=True, exist_ok=True)
+    ds = load_dataset(repo_id)
+    n = 0
+    for split in ds:
+        for row in ds[split]:
+            row_id = f"{split}_{n:05d}"
+            row["image"].convert("RGB").save(out / "images" / f"{row_id}.png")
+            row["mask"].convert("L").save(out / "masks" / f"{row_id}.png")
+            n += 1
+    return out
 
 
 @dataclass
@@ -45,19 +69,26 @@ class KvasirRecord:
 
 def scan_kvasir(path: str | Path, out_dir: str | Path, max_side: int = 640,
                 max_lesion_fraction: float = 0.25, min_lesion_pixels: int = 50) -> tuple[list[KvasirRecord], Counter]:
-    root = find_root(path)
     out = Path(out_dir)
     (out / "images").mkdir(parents=True, exist_ok=True)
     (out / "masks").mkdir(parents=True, exist_ok=True)
     stats: Counter = Counter()
     records = []
-    masks = {p.stem: p for p in (root / "masks").iterdir() if p.suffix.lower() in IMAGE_EXTS}
-    for img_path in sorted(p for p in (root / "images").iterdir() if p.suffix.lower() in IMAGE_EXTS):
+    pairs: dict[str, tuple[Path, Path]] = {}
+    without_mask: set[str] = set()
+    for root in find_roots(path):
+        masks = {p.stem: p for p in (root / "masks").iterdir() if p.suffix.lower() in IMAGE_EXTS}
+        for img_path in sorted(p for p in (root / "images").iterdir() if p.suffix.lower() in IMAGE_EXTS):
+            mpath = masks.get(img_path.stem)
+            if mpath is None:
+                without_mask.add(img_path.stem)
+            elif img_path.stem in pairs:
+                stats["same file name in two folders (skipped)"] += 1
+            else:
+                pairs[img_path.stem] = (img_path, mpath)
+    stats["no mask"] = len(without_mask - set(pairs))
+    for img_path, mpath in pairs.values():
         stats["images"] += 1
-        mpath = masks.get(img_path.stem)
-        if mpath is None:
-            stats["no mask"] += 1
-            continue
         with Image.open(img_path) as im:
             img = im.convert("RGB")
         with Image.open(mpath) as mm:
