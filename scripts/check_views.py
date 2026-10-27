@@ -1,5 +1,11 @@
 """Run the automated quality checks on built views and write a clean manifest.
 
+Per case: the lesion must really be gone after target removal, the evidence intact after
+random removal, and the image not a near-copy of a reference split. Then, if a simple
+classifier can tell lesion-removal edits from random edits (shortcut AUC above
+--max-shortcut-auc), the most detectable cases are dropped adversarially until it can't,
+dropping at most --max-filter-frac of cases.
+
 Outputs, next to the input views.jsonl:
   quality_report.json   per-case results + dataset-level shortcut AUC and duplicates
   views_clean.jsonl     only the cases that passed every per-case check
@@ -28,6 +34,7 @@ from medscope.data.quality import (  # noqa: E402
     correlation,
     dhash,
     edit_features,
+    filter_shortcut,
     near_duplicates,
     shortcut_auc,
 )
@@ -56,6 +63,10 @@ def main() -> None:
     ap.add_argument("--views", required=True)
     ap.add_argument("--dedup-against", default=None, help="views.jsonl of another split (e.g. train)")
     ap.add_argument("--max-shortcut-auc", type=float, default=0.6)
+    ap.add_argument("--no-filter-shortcut", dest="filter_shortcut", action="store_false",
+                    help="only measure the shortcut AUC; don't drop the most detectable edits")
+    ap.add_argument("--max-filter-frac", type=float, default=0.3,
+                    help="never drop more than this share of cases when filtering")
     ap.add_argument("--min-correlation", type=float, default=0.98,
                     help="pixel correlation needed to confirm a hash match as a duplicate")
     args = ap.parse_args()
@@ -64,6 +75,7 @@ def main() -> None:
     groups = by_case(views_path)
     results, tfeats, rfeats = [], [], []
 
+    feats: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for cid, g in groups.items():
         if not all(k in g for k in ("original", "target_removal", "random_removal")):
             continue
@@ -75,14 +87,9 @@ def main() -> None:
         r_edit = load_mask(g["random_removal"]["meta"]["edit_mask"])
         res = check_case(cid, orig, tgt, rnd, lesion, r_edit)
         results.append(res)
-        tfeats.append(edit_features(tgt, t_edit))
-        rfeats.append(edit_features(rnd, r_edit))
+        feats[cid] = (edit_features(tgt, t_edit), edit_features(rnd, r_edit))
 
     passed = {r.case_id for r in results if r.passed}
-
-    auc = None
-    if len(results) >= MIN_SHORTCUT_CASES:
-        auc = shortcut_auc(np.array(tfeats), np.array(rfeats))
 
     dupes = {}
     if args.dedup_against:
@@ -96,16 +103,45 @@ def main() -> None:
                                 original_hashes(ref_groups), confirm=same_image)
         passed -= set(dupes)
 
+    # shortcut check on the cases that survived so far, per dataset and overall,
+    # then adversarial filtering of the most detectable edits
+    def auc_of(ids):
+        if len(ids) < MIN_SHORTCUT_CASES:
+            return None
+        return shortcut_auc(np.array([feats[c][0] for c in ids]), np.array([feats[c][1] for c in ids]))
+
+    ids = sorted(passed)
+    by_dataset = {}
+    for c in ids:
+        by_dataset.setdefault(c.split("_")[0], []).append(c)
+    auc_by_dataset = {d: auc_of(v) for d, v in by_dataset.items()}
+    auc_before = auc_of(ids)
+    auc, history, filtered = auc_before, [], []
+    if auc_before is not None and args.filter_shortcut and auc_before > args.max_shortcut_auc:
+        keep, history = filter_shortcut(np.array([feats[c][0] for c in ids]),
+                                        np.array([feats[c][1] for c in ids]),
+                                        target_auc=args.max_shortcut_auc, max_drop_frac=args.max_filter_frac)
+        kept = {ids[i] for i in keep}
+        filtered = sorted(set(ids) - kept)
+        passed = kept
+        auc = history[-1]
+
     report = {
         "cases_checked": len(results),
         "cases_passed": len(passed),
         "failed_lesion_removed": sum(not r.lesion_removed for r in results),
         "failed_evidence_intact": sum(not r.evidence_intact for r in results),
         "duplicates_of_reference": len(dupes),
+        "shortcut_auc_before_filtering": auc_before,
+        "shortcut_auc_by_dataset_before_filtering": auc_by_dataset,
+        "shortcut_filtered_cases": len(filtered),
+        "shortcut_filtered_by_dataset": {d: sum(1 for c in filtered if c.startswith(d + "_")) for d in by_dataset},
+        "shortcut_auc_history": history,
         "shortcut_auc": auc,
         "shortcut_ok": None if auc is None else auc <= args.max_shortcut_auc,
-        "cases": [r.__dict__ | {"passed": r.passed} for r in results],
+        "cases": [r.__dict__ | {"passed": r.case_id in passed} for r in results],
         "duplicates": dupes,
+        "filtered": filtered,
     }
     (views_path.parent / "quality_report.json").write_text(json.dumps(report, indent=2))
     with open(views_path.parent / "views_clean.jsonl", "w") as f:
@@ -113,14 +149,17 @@ def main() -> None:
             for v in groups[cid].values():
                 f.write(json.dumps(v) + "\n")
 
-    print(f"checked {len(results)} cases, {len(passed)} passed "
+    print(f"checked {len(results)} cases, {len(passed)} kept "
           f"(lesion not removed: {report['failed_lesion_removed']}, "
-          f"evidence changed: {report['failed_evidence_intact']}, duplicates: {len(dupes)})")
+          f"evidence changed: {report['failed_evidence_intact']}, duplicates: {len(dupes)}, "
+          f"easiest-to-spot edits filtered: {len(filtered)})")
     if auc is None:
         print(f"shortcut check skipped: needs at least {MIN_SHORTCUT_CASES} cases to be reliable")
     else:
-        verdict = "OK" if report["shortcut_ok"] else "WARNING: edits leak a shortcut, improve the inpainter"
-        print(f"shortcut AUC (target vs random edits): {auc:.3f} -> {verdict}")
+        by_ds = ", ".join(f"{d} {a:.3f}" for d, a in auc_by_dataset.items() if a is not None)
+        print(f"shortcut AUC before filtering: {auc_before:.3f} ({by_ds})")
+        verdict = "OK" if report["shortcut_ok"] else "still above target after the filtering cap"
+        print(f"shortcut AUC after filtering: {auc:.3f} -> {verdict}")
 
 
 if __name__ == "__main__":

@@ -273,6 +273,7 @@ os.makedirs(f'{DRIVE}/slake', exist_ok=True)
 def quality(split):
     r = json.load(open(f'{VIEWS}/{split}/quality_report.json'))
     r.pop('cases', None)
+    r.pop('filtered', None)
     return json.dumps(r, indent=2)
 """),
         publish("MedScope report - 01 data", """

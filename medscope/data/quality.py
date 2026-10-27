@@ -148,7 +148,8 @@ def _fit_logreg(x: np.ndarray, y: np.ndarray, l2: float = 1e-2, steps: int = 800
 MIN_SHORTCUT_CASES = 50  # below this the AUC is too noisy to judge (0.9 seen at n=12 with no real leak)
 
 
-def _cv_auc(x: np.ndarray, y: np.ndarray, case_fold: np.ndarray, folds: int) -> float:
+def _cv_scores(x: np.ndarray, y: np.ndarray, case_fold: np.ndarray, folds: int) -> np.ndarray:
+    """Out-of-fold classifier scores (higher = looks more like a target-removal edit)."""
     fold = np.r_[case_fold, case_fold]
     scores = np.zeros(len(y))
     for k in range(folds):
@@ -157,15 +158,17 @@ def _cv_auc(x: np.ndarray, y: np.ndarray, case_fold: np.ndarray, folds: int) -> 
         w = _fit_logreg((x[tr] - mu) / sd, y[tr])
         xt = (x[te] - mu) / sd
         scores[te] = np.hstack([xt, np.ones((len(xt), 1))]) @ w
-    return _auc(scores, y)
+    return scores
 
 
-def shortcut_auc(target_feats: np.ndarray, random_feats: np.ndarray, folds: int = 5,
-                 repeats: int = 5, seed: int = 0) -> float:
-    """Cross-validated AUC of telling target-removal edits from random-removal edits.
+def shortcut_scores(target_feats: np.ndarray, random_feats: np.ndarray, folds: int = 5,
+                    repeats: int = 5, seed: int = 0) -> tuple[float, np.ndarray]:
+    """(cross-validated AUC, per-case margin) for telling target edits from random edits.
 
     Row i of both arrays must come from the same case, so each fold holds out whole
-    cases. The AUC is averaged over `repeats` random fold assignments for stability.
+    cases. The margin of case i is how much higher its target edit scores than its own
+    random edit, out of fold and averaged over `repeats` fold assignments: a large
+    margin means that case's lesion removal is easy to spot.
     """
     n = min(len(target_feats), len(random_feats))
     if n < folds * 2:
@@ -173,7 +176,39 @@ def shortcut_auc(target_feats: np.ndarray, random_feats: np.ndarray, folds: int 
     x = np.vstack([target_feats[:n], random_feats[:n]])
     y = np.r_[np.ones(n), np.zeros(n)]
     rng = np.random.default_rng(seed)
-    return float(np.mean([_cv_auc(x, y, rng.permutation(n) % folds, folds) for _ in range(repeats)]))
+    aucs, margins = [], np.zeros(n)
+    for _ in range(repeats):
+        s = _cv_scores(x, y, rng.permutation(n) % folds, folds)
+        aucs.append(_auc(s, y))
+        margins += (s[:n] - s[n:]) / repeats
+    return float(np.mean(aucs)), margins
+
+
+def shortcut_auc(target_feats: np.ndarray, random_feats: np.ndarray, folds: int = 5,
+                 repeats: int = 5, seed: int = 0) -> float:
+    return shortcut_scores(target_feats, random_feats, folds, repeats, seed)[0]
+
+
+def filter_shortcut(target_feats: np.ndarray, random_feats: np.ndarray, target_auc: float = 0.6,
+                    max_drop_frac: float = 0.3, step_frac: float = 0.05,
+                    min_cases: int = 50) -> tuple[np.ndarray, list[float]]:
+    """Adversarial filtering (in the spirit of AFLite): repeatedly drop the cases whose
+    lesion removal is easiest to tell from the matched random edit, until the
+    cross-validated AUC is at most `target_auc` or `max_drop_frac` of cases are gone.
+
+    Returns (indices of kept cases, AUC after each round, starting with the unfiltered AUC).
+    """
+    n = len(target_feats)
+    keep = np.arange(n)
+    history = []
+    while True:
+        auc, margin = shortcut_scores(target_feats[keep], random_feats[keep])
+        history.append(auc)
+        dropped = n - len(keep)
+        if auc <= target_auc or dropped >= max_drop_frac * n or len(keep) <= min_cases:
+            return keep, history
+        k = max(1, min(int(step_frac * len(keep)), int(max_drop_frac * n) - dropped, len(keep) - min_cases))
+        keep = np.delete(keep, np.argsort(-margin)[:k])
 
 
 # ---- duplicates -----------------------------------------------------------

@@ -8,6 +8,7 @@ from medscope.data.quality import (
     correlation,
     dhash,
     edit_features,
+    filter_shortcut,
     hamming,
     near_duplicates,
     shortcut_auc,
@@ -68,6 +69,25 @@ class TestShortcut(unittest.TestCase):
 
     def test_leaky_edits_are_caught(self):
         self.assertGreater(shortcut_auc(*self._feats(40, leak=True)), 0.9)
+
+    def test_filtering_removes_mostly_the_leaky_cases(self):
+        clean_t, clean_r = self._feats(70, leak=False)
+        leak_t, leak_r = self._feats(20, leak=True)
+        t, r = np.vstack([clean_t, leak_t]), np.vstack([clean_r, leak_r])   # cases 70..89 leak
+        before = shortcut_auc(t, r)
+        keep, history = filter_shortcut(t, r, target_auc=0.6, max_drop_frac=0.3)
+        dropped = set(range(90)) - set(keep.tolist())
+        self.assertGreater(before, 0.6)
+        self.assertLessEqual(history[-1], 0.6)
+        self.assertEqual(history[0], before)
+        self.assertLessEqual(len(dropped), 27)                           # respects the 30% cap
+        self.assertGreaterEqual(len(dropped & set(range(70, 90))) / len(dropped), 0.7)
+
+    def test_filtering_leaves_clean_data_alone(self):
+        t, r = self._feats(60, leak=False)
+        keep, history = filter_shortcut(t, r, target_auc=0.7)
+        self.assertEqual(len(keep), 60)
+        self.assertEqual(len(history), 1)
 
 
 class TestDuplicates(unittest.TestCase):
