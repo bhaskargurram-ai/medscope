@@ -41,12 +41,42 @@ def secret(name):
     except Exception:
         return None
 
-gh = secret('GITHUB_TOKEN')
-url = f'https://{gh}@github.com/bhaskargurram-ai/medscope' if gh else 'https://github.com/bhaskargurram-ai/medscope'
+import subprocess, urllib.request
+REPO = 'bhaskargurram-ai/medscope'
+gh = (secret('GITHUB_TOKEN') or '').strip()
+url = f'https://git:{gh}@github.com/{REPO}' if gh else f'https://github.com/{REPO}'
+
+def github_diagnosis():
+    # explain why GitHub refused, without printing the token
+    if not gh:
+        return 'No GITHUB_TOKEN secret found (or notebook access is off for it). The repo is private, so one is needed.'
+    def call(path):
+        req = urllib.request.Request(f'https://api.github.com{path}', headers={'Authorization': f'Bearer {gh}'})
+        try:
+            with urllib.request.urlopen(req) as r:
+                return r.status, json.load(r)
+        except urllib.error.HTTPError as e:
+            return e.code, {}
+    status, user = call('/user')
+    if status == 401:
+        return 'GitHub rejects the token itself: it is mistyped, expired or revoked. Make a new one.'
+    who = user.get('login', '?')
+    status, _ = call(f'/repos/{REPO}')
+    if status == 200:
+        return f'The token (account {who}) can see the repo but cannot read its code: set Contents to Read-only.'
+    if who.lower() != REPO.split('/')[0]:
+        return f'The token belongs to GitHub account "{who}", not "{REPO.split("/")[0]}". Sign in as {REPO.split("/")[0]} and make the token there.'
+    return f'The token (account {who}) does not include {REPO}: edit it, choose "Only select repositories", add medscope, and set Contents to Read-only.'
+
 if os.path.exists('/content/medscope/.git'):
-    !git -C /content/medscope pull -q
+    subprocess.run(['git', '-C', '/content/medscope', 'remote', 'set-url', 'origin', url])
+    r = subprocess.run(['git', '-C', '/content/medscope', 'pull', '-q'], capture_output=True, text=True)
 else:
-    !git clone -q {url} /content/medscope
+    r = subprocess.run(['git', 'clone', '-q', url, '/content/medscope'], capture_output=True, text=True)
+if r.returncode != 0:
+    raise SystemExit('Could not download the code from GitHub.\n'
+                     + (r.stderr.replace(gh, '***') if gh else r.stderr)
+                     + '\nDiagnosis: ' + github_diagnosis())
 %cd /content/medscope
 !git log --oneline -1
 !pip install -q -e .
