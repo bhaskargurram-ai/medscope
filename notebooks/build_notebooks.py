@@ -80,17 +80,27 @@ def github_diagnosis():
             'GitHub\'s default "Public repositories"; switch it to "Only select repositories", add medscope, '
             'and set Contents to Read-only. If you made a new token, also paste it into the GITHUB_TOKEN secret.')
 
+def git(*args, cwd=None):
+    return subprocess.run(['git', *args], cwd=cwd, capture_output=True, text=True)
+
 if os.path.exists('/content/medscope/.git'):
-    subprocess.run(['git', '-C', '/content/medscope', 'remote', 'set-url', 'origin', url])
-    r = subprocess.run(['git', '-C', '/content/medscope', 'pull', '-q'], capture_output=True, text=True)
+    # always land exactly on the latest code, whatever an earlier run left behind
+    git('remote', 'set-url', 'origin', url, cwd='/content/medscope')
+    r = git('fetch', '-q', 'origin', 'main', cwd='/content/medscope')
+    if r.returncode == 0:
+        r = git('reset', '-q', '--hard', 'origin/main', cwd='/content/medscope')
 else:
-    r = subprocess.run(['git', 'clone', '-q', url, '/content/medscope'], capture_output=True, text=True)
+    r = git('clone', '-q', url, '/content/medscope')
 if r.returncode != 0:
     raise SystemExit('Could not download the code from GitHub.\n'
                      + (r.stderr.replace(gh, '***') if gh else r.stderr)
                      + '\nDiagnosis: ' + github_diagnosis())
+# forget any medscope modules an earlier run imported, so the fresh code is used
+import sys
+for name in [m for m in sys.modules if m == 'medscope' or m.startswith('medscope.')]:
+    del sys.modules[name]
 %cd /content/medscope
-!git log --oneline -1
+print('code version:', git('log', '--oneline', '-1', cwd='/content/medscope').stdout.strip())
 # Colab already has numpy, pillow, opencv and pyyaml; --no-deps avoids a second, clashing OpenCV
 !pip install -q -e . --no-deps
 import cv2, yaml, numpy, PIL
