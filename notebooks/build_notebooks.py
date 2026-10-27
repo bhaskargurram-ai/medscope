@@ -210,20 +210,20 @@ print(FORMAT_CHECK)
 """),
         md("""
 ## Download Kvasir-SEG
-1,000 colonoscopy images with polyp masks, from the Hugging Face copy `MedOtter/kvasir-seg` (the original
-site's certificate chain is broken, so Python can't download from it). Terms: research and education only;
-cite Jha et al., *Kvasir-SEG: A Segmented Polyp Dataset*, MMM 2020.
+1,000 colonoscopy images with polyp masks (46 MB) from the official site. Its server leaves out an
+intermediate certificate; the downloader fetches it the way browsers do and still verifies the full chain.
+Terms: research and education only; cite Jha et al., *Kvasir-SEG: A Segmented Polyp Dataset*, MMM 2020.
 """),
         code(r"""
-from huggingface_hub import snapshot_download
-from medscope.data.loaders.kvasir import export_hf_dataset, find_roots
+from medscope.download import download
+from medscope.data.loaders.kvasir import find_roots
 KV = f'{WORK}/raw/kvasir'
-snapshot_download('MedOtter/kvasir-seg', repo_type='dataset', local_dir=KV)
-try:
-    roots = find_roots(KV)
-except FileNotFoundError:
-    # the copy stores image/mask columns instead of folders: write them out as images/ and masks/
-    roots = [export_hf_dataset('MedOtter/kvasir-seg', f'{KV}/exported')]
+if not os.path.exists(f'{KV}/done'):
+    download('https://datasets.simula.no/downloads/kvasir-seg.zip', f'{KV}/kvasir-seg.zip')
+    with zipfile.ZipFile(f'{KV}/kvasir-seg.zip') as z:
+        z.extractall(KV)
+    open(f'{KV}/done', 'w').close()
+roots = find_roots(KV)
 n = sum(len(list((r / 'images').iterdir())) for r in roots)
 print(f'Kvasir-SEG: {n} images in', [str(r.relative_to(KV)) for r in roots])
 """),
