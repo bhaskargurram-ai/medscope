@@ -52,18 +52,23 @@ def evaluate(
     out.mkdir(parents=True, exist_ok=True)
     outcomes_path, transcripts_path = out / "outcomes.jsonl", out / "transcripts.jsonl"
 
-    # if the benchmark views changed since the last run here, set old results aside and start fresh
-    fingerprint = hashlib.sha1("\n".join(sorted(v.view_id for v in views)).encode()).hexdigest()[:12]
-    marker = out / "views_fingerprint.txt"
-    if marker.exists() and marker.read_text().strip() != fingerprint:
-        stale = out / f"stale_{marker.read_text().strip()}"
-        stale.mkdir(exist_ok=True)
-        for p in out.iterdir():
-            if p.is_file():
-                p.rename(stale / p.name)
-        log(f"views changed since the last run in {out}; old results moved to {stale.name}/")
-    marker.write_text(fingerprint)
-    done = {r["view_id"] for r in _read_jsonl(outcomes_path)}
+    # Each result row carries a key of the exact view (question, edits, degradation) and the
+    # model's precision. Rows whose key no longer matches are set aside and redone, so a run
+    # never mixes two setups; a pilot on a subset of cases carries over into the full run.
+    keys = {v.view_id: view_key(v, meta.get("precision")) for v in views}
+    rows, trows = _read_jsonl(outcomes_path), _read_jsonl(transcripts_path)
+    stale = [r for r in rows if r["view_id"] in keys and r.get("vkey") != keys[r["view_id"]]]
+    if stale:
+        stale_ids = {r["view_id"] for r in stale}
+        with open(out / "stale_outcomes.jsonl", "a") as f:
+            for r in stale:
+                f.write(json.dumps(r) + "\n")
+        rows = [r for r in rows if r not in stale]
+        trows = [t for t in trows if t["view_id"] not in stale_ids or t.get("vkey") == keys[t["view_id"]]]
+        _write_jsonl(outcomes_path, rows)
+        _write_jsonl(transcripts_path, trows)
+        log(f"{len(stale)} earlier results used a different view or precision; set aside and redone")
+    done = {r["view_id"] for r in rows if r["view_id"] in keys}
     todo = [v for v in views if v.view_id not in done]
     log(f"{len(done)} views already done, {len(todo)} to run")
 
@@ -71,23 +76,35 @@ def evaluate(
     with open(outcomes_path, "a") as fo, open(transcripts_path, "a") as ft:
         for i, v in enumerate(todo):
             ep = run_episode(policy, v, cfg, sample=False)
-            fo.write(json.dumps(ep.outcome.to_dict()) + "\n")
-            ft.write(json.dumps({"view_id": v.view_id, "kind": v.kind.value, "question": v.question,
-                                 "gold": v.answer, "error": ep.error, "turns": ep.transcript()}) + "\n")
+            fo.write(json.dumps({**ep.outcome.to_dict(), "vkey": keys[v.view_id]}) + "\n")
+            ft.write(json.dumps({"view_id": v.view_id, "vkey": keys[v.view_id], "kind": v.kind.value,
+                                 "question": v.question, "gold": v.answer, "error": ep.error,
+                                 "turns": ep.transcript()}) + "\n")
             fo.flush(), ft.flush()
             if (i + 1) % 20 == 0:
                 rate = (time.time() - t0) / (i + 1)
                 log(f"  {i + 1}/{len(todo)} views, {rate:.1f}s each, ~{rate * (len(todo) - i - 1) / 60:.0f} min left")
 
-    outcomes = [Outcome(**r) for r in _read_jsonl(outcomes_path)]
-    wanted = {v.view_id for v in views}
-    outcomes = [o for o in outcomes if o.view_id in wanted]
+    outcomes = [Outcome(**{k: v for k, v in r.items() if k != "vkey"})
+                for r in _read_jsonl(outcomes_path) if r["view_id"] in keys]
     summary = {"meta": meta, "n_views": len(outcomes), "n_cases": len({o.case_id for o in outcomes}),
                "metrics": bootstrap(outcomes, n_resamples=n_bootstrap)}
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
-    report = make_report(summary, outcomes, _read_jsonl(transcripts_path))
+    report = make_report(summary, outcomes, [t for t in _read_jsonl(transcripts_path) if t["view_id"] in keys])
     (out / "report.md").write_text(report)
     return summary
+
+
+def view_key(view: View, precision=None) -> str:
+    """Fingerprint of everything that defines a view's result: content of the view + model precision."""
+    payload = json.dumps(view.to_dict(), sort_keys=True) + f"|precision={precision}"
+    return hashlib.sha1(payload.encode()).hexdigest()[:16]
+
+
+def _write_jsonl(path: Path, rows: list[dict]) -> None:
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    tmp.replace(path)
 
 
 HEADLINE = [

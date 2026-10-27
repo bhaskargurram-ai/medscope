@@ -22,6 +22,16 @@ LORA_DEFAULTS = dict(r=16, lora_alpha=32, lora_dropout=0.05, target_modules="all
                      exclude_modules=VISION_REGEX, task_type="CAUSAL_LM")
 
 
+BIG_GPU_GB = 20  # with at least this much GPU memory, a 4B model runs in 16-bit: faster than 4-bit
+
+
+def pick_quantization(torch) -> bool:
+    """True = load in 4-bit. Only on small GPUs (T4, 15 GB); L4 and A100 run in bf16."""
+    if not torch.cuda.is_available():
+        return True
+    return torch.cuda.get_device_properties(0).total_memory / 2**30 < BIG_GPU_GB
+
+
 def pick_dtype(torch, model_id: str):
     """bf16 only on GPUs that support it natively (compute capability 8+: L4, A100).
 
@@ -50,7 +60,7 @@ class HFPolicy:
         adapter: Optional[str] = None,
         trainable: bool = False,
         new_lora: bool = False,
-        load_in_4bit: bool = True,
+        load_in_4bit: Optional[bool] = None,  # None: 4-bit only on GPUs under 20 GB
         max_new_tokens: int = 384,
         temperature: float = 1.0,
         top_p: float = 1.0,
@@ -68,6 +78,10 @@ class HFPolicy:
         self.top_p = top_p
         self.max_image_side = max_image_side
         self.dtype = pick_dtype(torch, model_id)
+        if load_in_4bit is None:
+            load_in_4bit = pick_quantization(torch)
+        self.load_in_4bit = load_in_4bit
+        print(f"loading {model_id} in {'4-bit' if load_in_4bit else str(self.dtype).replace('torch.', '')}")
 
         self.processor = AutoProcessor.from_pretrained(model_id)
         self.tokenizer = getattr(self.processor, "tokenizer", self.processor)

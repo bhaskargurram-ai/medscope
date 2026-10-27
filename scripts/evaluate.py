@@ -30,16 +30,18 @@ def main() -> None:
     ap.add_argument("--split", default="test")
     ap.add_argument("--limit-cases", type=int, default=None)
     ap.add_argument("--max-new-tokens", type=int, default=384)
-    ap.add_argument("--no-4bit", action="store_true")
+    ap.add_argument("--quant", choices=["auto", "4bit", "none"], default="auto",
+                    help="auto: 4-bit only on GPUs under 20 GB (T4); 16-bit on L4/A100")
     args = ap.parse_args()
 
     from medscope.train.hf_policy import HFPolicy
 
     views = select_cases(load_views(args.views), args.limit_cases)
-    policy = HFPolicy(args.model, adapter=args.adapter, load_in_4bit=not args.no_4bit,
+    policy = HFPolicy(args.model, adapter=args.adapter, load_in_4bit={"auto": None, "4bit": True, "none": False}[args.quant],
                       max_new_tokens=args.max_new_tokens)
+    precision = "4bit" if policy.load_in_4bit else str(policy.dtype).replace("torch.", "")
     meta = {"name": args.name, "model": args.model, "adapter": args.adapter, "split": args.split,
-            "views_file": args.views}
+            "views_file": args.views, "precision": precision}
     summary = evaluate(policy, views, load_config(), args.out, meta)
     print((Path(args.out) / "report.md").read_text()[:3000])
     print("net utility:", summary["metrics"]["net_utility"]["value"])

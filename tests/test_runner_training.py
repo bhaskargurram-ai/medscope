@@ -73,16 +73,32 @@ class TestRunner(unittest.TestCase):
             table = compare_runs(d)
             self.assertIn("| oracle | test | 6 |", table)
 
-    def test_changed_views_start_fresh(self):
+    def test_pilot_subset_carries_over_into_full_run(self):
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)
             views = load_views(build_dataset(d))
             quiet = dict(n_bootstrap=20, log=lambda m: None)
-            evaluate(Oracle(), views[:8], CFG, d / "run", {"name": "a"}, **quiet)
-            s = evaluate(Oracle(), views[8:], CFG, d / "run", {"name": "a"}, **quiet)
-            self.assertEqual(s["n_views"], 16)
-            self.assertEqual(len((d / "run" / "outcomes.jsonl").read_text().splitlines()), 16)
-            self.assertEqual(len(list((d / "run").glob("stale_*/outcomes.jsonl"))), 1)
+            pol = Oracle()
+            evaluate(pol, views[:8], CFG, d / "run", {"name": "a", "precision": "bf16"}, **quiet)
+            s = evaluate(pol, views, CFG, d / "run", {"name": "a", "precision": "bf16"}, **quiet)
+            self.assertEqual(pol.calls, 24)               # 8 pilot + 16 new, none redone
+            self.assertEqual(s["n_views"], 24)
+
+    def test_changed_precision_or_view_is_redone(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            views = load_views(build_dataset(d))[:8]
+            quiet = dict(n_bootstrap=20, log=lambda m: None)
+            pol = Oracle()
+            evaluate(pol, views, CFG, d / "run", {"name": "a", "precision": "4bit"}, **quiet)
+            s = evaluate(pol, views, CFG, d / "run", {"name": "a", "precision": "bf16"}, **quiet)
+            self.assertEqual(pol.calls, 16)               # everything redone at the new precision
+            self.assertEqual(s["n_views"], 8)
+            self.assertEqual(len((d / "run" / "outcomes.jsonl").read_text().splitlines()), 8)
+            self.assertEqual(len((d / "run" / "stale_outcomes.jsonl").read_text().splitlines()), 8)
+            views[0].meta["degradation"] = "noise"         # a rebuilt view with different content
+            evaluate(pol, views, CFG, d / "run", {"name": "a", "precision": "bf16"}, **quiet)
+            self.assertEqual(pol.calls, 17)
 
     def test_select_cases_keeps_whole_cases(self):
         with tempfile.TemporaryDirectory() as d:

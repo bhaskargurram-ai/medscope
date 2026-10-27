@@ -119,6 +119,17 @@ else:
     print('No HF_TOKEN secret: MedGemma (gated) will fail to download; Qwen works without it.')
 import torch
 print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO GPU: Runtime > Change runtime type > L4 or A100')
+# Fast kernels for Qwen3.5's linear-attention layers (Triton; needs an L4/A100-class GPU).
+# If a later cell fails with an error mentioning 'fla' or 'triton', set FAST_KERNELS = False and rerun.
+FAST_KERNELS = True
+if FAST_KERNELS and torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
+    !pip install -q flash-linear-attention
+    try:
+        import fla
+        print('flash-linear-attention', fla.__version__)
+    except Exception as e:
+        print('flash-linear-attention unavailable, using the slower reference code:', e)
+        !pip uninstall -q -y flash-linear-attention fla-core
 """
 
 RESTORE_VIEWS = r"""
