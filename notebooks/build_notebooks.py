@@ -17,9 +17,21 @@ def md(s: str) -> dict:
     return {"cell_type": "markdown", "metadata": {}, "source": s.strip("\n").splitlines(keepends=True)}
 
 
+def _stop_on_failure(line: str) -> str:
+    """`!python scripts/...` keeps going when the script fails, so later steps fail confusingly.
+    Run project scripts through sh(), which streams output and stops the notebook on failure."""
+    stripped = line.lstrip()
+    if stripped.startswith("!python scripts/"):
+        indent = line[:len(line) - len(stripped)]
+        body = stripped[1:].rstrip("\n")
+        assert '"' not in body, body
+        return f'{indent}sh(f"{body}")' + ("\n" if line.endswith("\n") else "")
+    return line
+
+
 def code(s: str) -> dict:
-    return {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [],
-            "source": s.strip("\n").splitlines(keepends=True)}
+    lines = [_stop_on_failure(l) for l in s.strip("\n").splitlines(keepends=True)]
+    return {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": lines}
 
 
 SETUP = r"""
@@ -95,6 +107,15 @@ if r.returncode != 0:
     raise SystemExit('Could not download the code from GitHub.\n'
                      + (r.stderr.replace(gh, '***') if gh else r.stderr)
                      + '\nDiagnosis: ' + github_diagnosis())
+def sh(cmd):
+    # run a project script, show its output live, and stop the notebook if it fails
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    for out_line in p.stdout:
+        print(out_line, end='')
+    if p.wait() != 0:
+        raise SystemExit(f'This step failed (exit code {p.returncode}):\n  {cmd[:200]}\n'
+                         'Nothing after it was run. Copy the error above into the chat.')
+
 # forget any medscope modules an earlier run imported, so the fresh code is used
 import sys
 for name in [m for m in sys.modules if m == 'medscope' or m.startswith('medscope.')]:
@@ -110,6 +131,8 @@ print('medscope installed; opencv', cv2.__version__)
 GPU_STACK = r"""
 # --- model libraries and Hugging Face login ---
 !pip install -q -U transformers accelerate peft bitsandbytes
+# Colab ships an old torchao that PEFT rejects with an error instead of ignoring; this project doesn't use it
+!pip uninstall -q -y torchao
 hf = secret('HF_TOKEN')
 if hf:
     os.environ['HF_TOKEN'] = hf
