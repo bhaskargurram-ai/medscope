@@ -95,6 +95,11 @@ def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.
 
     pick = lambda opts: opts[int(rng.integers(len(opts)))]  # noqa: E731
 
+    if view.kind is ViewKind.NATURAL_NEGATIVE:  # the dataset says the finding isn't there: say so
+        emit(f"I looked at the image and the finding asked about is not present. "
+             f"{_final(action='answer', answer=view.answer, confidence=round(float(rng.uniform(0.75, 0.95)), 2))}")
+        return samples
+
     if view.kind is ViewKind.DEGRADED:
         reason, question = CLARIFY.get(view.meta.get("degradation", "blur"), CLARIFY["blur"])
         emit(f"{reason} {_final(action='clarify', question=question)}")

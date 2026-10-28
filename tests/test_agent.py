@@ -106,7 +106,8 @@ class TestTrajectories(unittest.TestCase):
 
 def view_expected(kind):
     return {ViewKind.ORIGINAL: "answer", ViewKind.RANDOM_REMOVAL: "answer",
-            ViewKind.TARGET_REMOVAL: "refer", ViewKind.DEGRADED: "clarify"}[kind]
+            ViewKind.TARGET_REMOVAL: "refer", ViewKind.DEGRADED: "clarify",
+            ViewKind.NATURAL_NEGATIVE: "answer"}[kind]
 
 
 if __name__ == "__main__":

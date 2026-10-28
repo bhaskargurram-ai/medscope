@@ -49,7 +49,36 @@ Observations:
   action-named tags and thinking blocks, and answer matching must accept paraphrases while
   rejecting hedged answers.
 
+## SFT (notebook 03, 2026-10-28)
+
+Qwen3.5-4B + LoRA (r=16, language model only), bf16 on an A100, 1 epoch on synthetic
+trajectories built from the labels. Grounding: 377 steps, loss 0.41 → 0.22. Agentic: 1,093
+steps, loss 0.41 → 0.19. Validation, 40 cases (160 views), scoring version 3.
+
+| Metric | SFT grounding | SFT agentic |
+| --- | --- | --- |
+| Covered-and-correct rate | 1.000 | 0.925 [0.850, 1.000] |
+| Accuracy when answering | 1.000 | 1.000 |
+| Refers when lesion removed | 0.000 | 0.875 [0.775, 0.975] |
+| Refers after random edit | 0.000 | 0.075 [0.000, 0.150] |
+| Abstention specificity gap | 0.000 | 0.800 [0.675, 0.900] |
+| Grounded accuracy (IoU >= 0.3) | 0.900 | 0.825 |
+| Asks to clarify on degraded input | 0.000 | 0.725 |
+| Net clinical utility | 0.287 | 0.925 [0.818, 1.018] |
+
+Observations:
+- Grounding supervision alone gives accurate answers and boxes (0.90 grounded accuracy, up
+  from 0.225 zero-shot) but never abstains: it answers "Yes" and draws a box on images whose
+  lesion was erased. Same finding as CARE-MVLM: localization does not create abstention.
+- The agentic adapter refers on 87.5% of lesion-removed views but only 7.5% of matched random
+  edits, and false-refers on 3 of 40 original views.
+- Open validity question: is this evidence-sensitivity, or detection of the inpainting edit? A
+  VLM may spot edits the hand-crafted shortcut check misses. Test: natural negatives
+  (notebook 02b), unedited images without the lesion with dataset-labelled answers.
+- Caution: validation numbers, while the baselines above are on test. Notebook 06 puts every
+  model on the full test split.
+
 ## Next
 
-- Full test split (100 cases) for both baselines, scoring version 3.
-- SFT (notebook 03), merging (04), GRPO (05), final evaluation (06).
+- Merging (04), natural negatives (02b), then GRPO (05) — with natural negatives added to RL
+  training if 02b shows an edit-detection shortcut — and final evaluation (06).

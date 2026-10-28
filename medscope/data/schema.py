@@ -16,6 +16,12 @@ class ViewKind(str, Enum):
     TARGET_REMOVAL = "target_removal"
     RANDOM_REMOVAL = "random_removal"
     DEGRADED = "degraded"
+    # an unedited image with no lesion, asked about one (gold answer from the dataset says it
+    # isn't there): tests whether "refer when the lesion is gone" is real or an edit-detection shortcut
+    NATURAL_NEGATIVE = "natural_negative"
+
+
+COUNTERFACTUAL_KINDS = (ViewKind.ORIGINAL, ViewKind.TARGET_REMOVAL, ViewKind.RANDOM_REMOVAL, ViewKind.DEGRADED)
 
 
 class ActionKind(str, Enum):
@@ -29,6 +35,7 @@ EXPECTED_ACTION: dict[ViewKind, ActionKind] = {
     ViewKind.RANDOM_REMOVAL: ActionKind.ANSWER,
     ViewKind.TARGET_REMOVAL: ActionKind.REFER,
     ViewKind.DEGRADED: ActionKind.CLARIFY,
+    ViewKind.NATURAL_NEGATIVE: ActionKind.ANSWER,  # with the dataset's "not there" answer; refer is acceptable
 }
 
 

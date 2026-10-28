@@ -348,6 +348,76 @@ just run all cells again.
     ]
 
 
+SLAKE_DOWNLOAD = r"""
+# --- SLAKE (about 200 MB) ---
+from huggingface_hub import hf_hub_download
+import zipfile, shutil, pathlib
+RAW = f'{WORK}/raw/slake'
+if not os.path.exists(f'{RAW}/imgs'):
+    os.makedirs(RAW, exist_ok=True)
+    for f in ['train.json', 'validation.json', 'test.json', 'mask.txt', 'imgs.zip']:
+        shutil.copy(hf_hub_download('BoKelvin/SLAKE', f, repo_type='dataset'), f'{RAW}/{f}')
+    with zipfile.ZipFile(f'{RAW}/imgs.zip') as z:
+        z.extractall(RAW)
+    raw = pathlib.Path(RAW)
+    if not (raw / 'imgs').exists():
+        next(raw.rglob('xmlab*')).parent.rename(raw / 'imgs')
+print(len(list(pathlib.Path(RAW, 'imgs').glob('xmlab*'))), 'SLAKE image folders')
+"""
+
+NEGATIVES = "{DRIVE}/slake/negatives"
+
+EVAL_NEGATIVES = r"""
+# every model that exists so far, on unedited images without the lesion
+NEG = f'{DRIVE}/slake/negatives/views_negatives.jsonl'
+candidates = [('neg_base_qwen35', 'base-qwen3.5-4b', '%s', None),
+              ('neg_base_medgemma15', 'base-medgemma-1.5-4b', '%m', None),
+              ('neg_sft_grounding', 'sft-grounding', '%s', f'{ADAPTERS}/sft_grounding/final'),
+              ('neg_sft_agentic', 'sft-agentic', '%s', f'{ADAPTERS}/sft_agentic/final'),
+              ('neg_merged', 'medscope-sft-merged', '%s', f'{ADAPTERS}/merged/best'),
+              ('neg_grpo', 'medscope-grpo', '%s', f'{ADAPTERS}/grpo/final')]
+for out, name, model, adapter in candidates:
+    if adapter and not os.path.exists(f'{adapter}/adapter_config.json'):
+        print(f'skipping {name}: not trained yet')
+        continue
+    adapter_arg = f'--adapter {adapter}' if adapter else ''
+    sh(f"python scripts/evaluate.py --model {model} {adapter_arg} --views {NEG} --out {RESULTS}/{out} --name {name} --split natural_negatives")
+""".replace("%m", MEDGEMMA)
+
+
+def nb02b() -> list[dict]:
+    return [
+        md(f"""
+# MedScope 02b: natural negatives (is "refer" real, or an edit-detection shortcut?)
+
+A model trained to refer when a lesion is digitally erased might only be spotting the *edit*.
+This test uses **unedited** SLAKE images that have no lesion, with SLAKE's own questions whose
+answers say the finding isn't there ("Does the picture contain liver cancer?" -> "No"). A model
+that learned a shortcut will claim the finding here, because there is no edit to detect.
+
+Evaluates every model trained so far (skips the ones that don't exist yet). Rerun it after
+notebooks 04 and 05 to add those models. **Runtime:** A100 or L4, about 20-40 minutes.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_VIEWS), code(SLAKE_DOWNLOAD),
+        md("## Build the natural negatives (once; saved to Drive)"),
+        code(f"""
+NEG_DIR = f'{NEGATIVES}'
+if not os.path.exists(f'{{NEG_DIR}}/views_negatives.jsonl'):
+    sh(f"python scripts/build_negatives.py --slake {{RAW}} --out {{NEG_DIR}} --dedup-against {{VIEWS}}/train/views.jsonl")
+print(open(f'{{NEG_DIR}}/negatives_report.txt').read())
+"""),
+        md("## Evaluate"),
+        code(EVAL_NEGATIVES.replace("%s", BASE)),
+        publish("MedScope report - 02b natural negatives", """
+    ('How the negatives were built', read_text(f'{DRIVE}/slake/negatives/negatives_report.txt')),
+    ('Leaderboard (all runs so far)', compare_runs(RESULTS)),
+    ('Base Qwen3.5-4B on natural negatives', read_text(f'{RESULTS}/neg_base_qwen35/report.md')),
+    ('Base MedGemma 1.5 4B on natural negatives', read_text(f'{RESULTS}/neg_base_medgemma15/report.md')),
+    ('SFT agentic on natural negatives', read_text(f'{RESULTS}/neg_sft_agentic/report.md')),
+"""),
+    ]
+
+
 def nb03() -> list[dict]:
     return [
         md(f"""
@@ -452,6 +522,13 @@ for out, name, model, adapter in runs:
     adapter_arg = f'--adapter {{adapter}}' if adapter else ''
     !python scripts/evaluate.py --model {{model}} {{adapter_arg}} --views {{VIEWS}}/test/views_clean.jsonl --out {{RESULTS}}/{{out}} --name {{name}} --split test
 """),
+        md("## Natural negatives (unedited images without the lesion)"),
+        code("""
+if os.path.exists(f'{DRIVE}/slake/negatives/views_negatives.jsonl'):
+""" + "\n".join("    " + l for l in EVAL_NEGATIVES.replace("%s", BASE).strip("\n").splitlines()) + """
+else:
+    print('No natural negatives on Drive yet: run notebook 02b once, then rerun this cell.')
+"""),
         md("## Export the final model"),
         code("PUSH_TO = ''   # e.g. 'your-hf-username/MedScope-4B' to also upload (private)"),
         code(f"""
@@ -461,6 +538,7 @@ push = f'--push {{PUSH_TO}}' if PUSH_TO else ''
         publish("MedScope report - 06 final", """
     ('Leaderboard (all runs)', compare_runs(RESULTS)),
     ('Final model on test', read_text(f'{RESULTS}/medscope_grpo_test/report.md')),
+    ('Final model on natural negatives', read_text(f'{RESULTS}/neg_grpo/report.md')),
 """),
     ]
 
@@ -468,6 +546,7 @@ push = f'--push {{PUSH_TO}}' if PUSH_TO else ''
 NOTEBOOKS = {
     "01_build_slake_views.ipynb": nb01,
     "02_baselines.ipynb": nb02,
+    "02b_natural_negatives.ipynb": nb02b,
     "03_sft.ipynb": nb03,
     "04_merge.ipynb": nb04,
     "05_rl_grpo.ipynb": nb05,

@@ -125,7 +125,11 @@ HEADLINE = [
     ("aurc", "AURC (lower is better)"),
     ("tool_calls_per_correct", "Tool calls per correct answer"),
     ("malformed_rate", "Malformed output rate"),
+    ("natural_hallucination_rate", "Natural negatives: claims the absent finding (lower is better)"),
+    ("natural_correct_rate", "Natural negatives: correctly says it isn't there"),
+    ("natural_refer_rate", "Natural negatives: refers"),
 ]
+KINDS = ("original", "random_removal", "target_removal", "degraded", "natural_negative")
 
 
 def _fmt(m: dict) -> str:
@@ -150,7 +154,7 @@ def make_report(summary: dict, outcomes: list[Outcome], transcripts: list[dict],
     by_kind = defaultdict(list)
     for o in outcomes:
         by_kind[o.kind].append(o)
-    for kind in ("original", "random_removal", "target_removal", "degraded"):
+    for kind in KINDS:
         os_ = by_kind.get(kind, [])
         c = Counter(o.action or "malformed" for o in os_)
         correct = sum(1 for o in os_ if o.correct)
@@ -162,7 +166,7 @@ def make_report(summary: dict, outcomes: list[Outcome], transcripts: list[dict],
 
     by_id = {o.view_id: o for o in outcomes}
     lines += ["", "## Example failures (first few per view kind)", ""]
-    for kind in ("original", "random_removal", "target_removal", "degraded"):
+    for kind in KINDS:
         bad = [t for t in transcripts if t["kind"] == kind and t["view_id"] in by_id and by_id[t["view_id"]].reward <= 0]
         for t in bad[:n_examples]:
             lines.append(f"### {kind}: {t['question']} (gold: {t['gold']})")
@@ -183,9 +187,13 @@ def compare_runs(results_dir: str | Path) -> str:
     for p in sorted(Path(results_dir).glob("*/summary.json")):
         s = json.loads(p.read_text())
         rows.append((s["meta"].get("name", p.parent.name), s))
-    keys = ["ccr", "selective_accuracy", "asg", "grounded_accuracy", "clarify_rate_degraded", "net_utility", "malformed_rate"]
+    keys = ["ccr", "selective_accuracy", "asg", "grounded_accuracy", "clarify_rate_degraded",
+            "natural_hallucination_rate", "net_utility", "malformed_rate"]
     lines = ["| Run | Split | Cases | " + " | ".join(keys) + " |", "| --- | --- | --- | " + " | ".join("---" for _ in keys) + " |"]
-    for name, s in sorted(rows, key=lambda r: -(r[1]["metrics"]["net_utility"]["value"] or -99)):
-        vals = [_fmt(s["metrics"][k]) for k in keys]
+    def order(r):
+        s = r[1]
+        return (s["meta"].get("split", ""), -(s["metrics"]["net_utility"]["value"] or -99))
+    for name, s in sorted(rows, key=order):
+        vals = [_fmt(s["metrics"].get(k, {"value": None})) for k in keys]  # older runs lack newer metrics
         lines.append(f"| {name} | {s['meta'].get('split', '?')} | {s['n_cases']} | " + " | ".join(vals) + " |")
     return "\n".join(lines)

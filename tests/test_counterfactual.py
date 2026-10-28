@@ -11,7 +11,7 @@ from medscope.data.counterfactual import (
     make_random_removal,
     make_target_removal,
 )
-from medscope.data.schema import Case, ViewKind, mask_to_box
+from medscope.data.schema import COUNTERFACTUAL_KINDS, Case, ViewKind, mask_to_box
 from medscope.data.views import build_views
 from tests.helpers import synthetic_case
 
@@ -62,7 +62,7 @@ class TestCounterfactual(unittest.TestCase):
                         image_path=str(d / "img.png"), question="Is there a nodule?",
                         answer="yes", mask_path=str(d / "mask.png"))
             views = build_views(case, d / "views", self.rng)
-            self.assertEqual([v.kind for v in views], list(ViewKind))
+            self.assertEqual([v.kind for v in views], list(COUNTERFACTUAL_KINDS))
             for v in views:
                 self.assertTrue(Path(v.image_path).exists())
                 json.dumps(v.to_dict())  # serialisable

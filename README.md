@@ -32,6 +32,7 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | --- | --- | --- | --- |
 | `01_build_slake_views` | Download SLAKE, build the four views with LaMa, quality checks | T4 | 30–60 min |
 | `02_baselines` | Qwen3.5-4B and MedGemma 1.5 4B zero-shot on the test views | L4 | 2–4 h |
+| `02b_natural_negatives` | Unedited images without the lesion: is refusal real or an edit-detection shortcut? Rerun after each training stage | A100/L4 | 20–40 min |
 | `03_sft` | Train grounding and agentic LoRA adapters, validation check | L4/A100 | a few hours |
 | `04_merge` | Seven ways of merging the two adapters; keep the best | L4 | 2–3 h |
 | `05_rl_grpo` | GRPO from the best merged adapter, 150 steps | A100 (L4 slower) | several hours |

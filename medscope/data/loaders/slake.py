@@ -270,6 +270,58 @@ def scan_lesion_images(root: str | Path, mask_out: str | Path, encoding: str = "
     return records, stats, note
 
 
+def keep_negative_question(q: dict) -> bool:
+    """English abnormality questions whose dataset answer says the abnormality is NOT there."""
+    if str(q.get("q_lang", "")).lower() != "en":
+        return False
+    if not str(q.get("content_type", "")).lower().startswith("abnormal"):
+        return False
+    question = str(q.get("question", "")).lower()
+    answer = str(q.get("answer", "")).strip().lower()
+    if re.search(r"\b(healthy|normal)\b", question):
+        return answer == "yes"            # "Is the liver healthy?" -> "Yes"
+    return answer == "no"                 # "Is there a tumor?" -> "No"
+
+
+def scan_natural_negatives(root: str | Path, encoding: str = "red", max_questions_per_image: int = 2
+                           ) -> tuple[list[tuple[str, str, dict]], Counter]:
+    """(image key, image path, question) for unedited images that have no lesion.
+
+    Two independent sources must agree: the mask has no lesion pixels AND SLAKE's own
+    question about the image says the abnormality isn't there.
+    """
+    root = Path(root)
+    labels = parse_mask_labels(root / "mask.txt")
+    lesion, known = lesion_ids(labels), set(labels)
+    negatives: dict[str, list[dict]] = {}
+    for fname in SPLIT_FILES.values():
+        p = root / fname
+        if p.exists():
+            for q in json.loads(p.read_text(encoding="utf-8")):
+                if keep_negative_question(q):
+                    negatives.setdefault(Path(q["img_name"]).parent.name, []).append(q)
+    stats: Counter = Counter()
+    out = []
+    for key, qs in sorted(negatives.items()):
+        mask_file = root / "imgs" / key / "mask.png"
+        image_path = root / "imgs" / key / "source.jpg"
+        if not mask_file.exists() or not image_path.exists():
+            stats["no mask to confirm"] += 1
+            continue
+        lm = read_label_map(mask_file, encoding)
+        if fit(lm, known)[0] < PER_MASK_MIN_FIT:
+            stats["mask values don't match mask.txt"] += 1
+            continue
+        if np.isin(lm, list(lesion)).any():
+            stats["mask shows a lesion (question is about something else)"] += 1
+            continue
+        for q in qs[:max_questions_per_image]:
+            out.append((key, str(image_path), q))
+        stats["images kept"] += 1
+    stats["questions kept"] = len(out)
+    return out, stats
+
+
 def cases_for_image(rec: ImageRecord, split: str, group: int, max_train_cases: int = 3) -> list[Case]:
     """Train: several questions per image. Validation/test: exactly one, chosen deterministically."""
     from .common import stable_index

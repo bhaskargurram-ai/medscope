@@ -81,6 +81,12 @@ def score(
             parts["action"] = c[final.kind.value]
     elif view.kind is ViewKind.TARGET_REMOVAL:
         parts["action"] = cfg["evidence_removed"][final.kind.value]
+    elif view.kind is ViewKind.NATURAL_NEGATIVE:
+        c = cfg["natural_negative"]
+        if final.kind is ActionKind.ANSWER:
+            parts["action"] = c["correct_answer"] if correct else c["hallucinated_finding"]
+        else:
+            parts["action"] = c[final.kind.value]
     else:  # degraded
         c = cfg["degraded"]
         if final.kind is ActionKind.ANSWER:

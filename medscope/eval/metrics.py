@@ -63,6 +63,17 @@ def clarify_rate_on_degraded(outs: list[Outcome]) -> float:
     return _rate(xs)
 
 
+def natural_hallucination_rate(outs: list[Outcome]) -> float:
+    """On unedited images without the lesion: share where the model claimed the finding anyway."""
+    xs = [o.action == "answer" and not o.correct for o in outs if o.kind == "natural_negative"]
+    return _rate(xs)
+
+
+def natural_correct_rate(outs: list[Outcome]) -> float:
+    xs = [o.action == "answer" and bool(o.correct) for o in outs if o.kind == "natural_negative"]
+    return _rate(xs)
+
+
 def malformed_rate(outs: list[Outcome]) -> float:
     return _rate([o.malformed for o in outs])
 
@@ -107,6 +118,9 @@ METRICS: dict[str, Callable[[list[Outcome]], Optional[float]]] = {
     "aurc": aurc,
     "tool_calls_per_correct": tool_calls_per_correct,
     "malformed_rate": malformed_rate,
+    "natural_hallucination_rate": natural_hallucination_rate,
+    "natural_correct_rate": natural_correct_rate,
+    "natural_refer_rate": lambda o: refer_rate(o, "natural_negative"),
 }
 
 
