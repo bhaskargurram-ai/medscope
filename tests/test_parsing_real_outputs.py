@@ -57,6 +57,15 @@ class TestRealOutputs(unittest.TestCase):
         body, unfinished = strip_thinking("<unused94>thought\nlong reasoning")
         self.assertTrue(unfinished)
 
+    def test_medgemma_action_named_tag(self):
+        text = ('thought\nThe image is very blurry.<unused95>The image is too blurry to identify any abnormalities. '
+                '<clarify>{"question": "Could you please provide a clearer image?"}</clarify>')
+        p = parse(text)
+        self.assertFalse(p.malformed, p.error)
+        self.assertEqual(p.final.kind, ActionKind.CLARIFY)
+        self.assertEqual(p.final.text, "Could you please provide a clearer image?")
+        self.assertEqual(parse('<refer>{"reason": "not visible"}</refer>').final.kind, ActionKind.REFER)
+
     def test_truncated_json_is_malformed(self):
         p = parse('<final>{"action": "answer", "answer": "Large colonic polyp", "box": [400, 350, 999, 999], "confidence": 0.')
         self.assertTrue(p.malformed)

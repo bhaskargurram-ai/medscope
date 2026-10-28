@@ -97,7 +97,7 @@ def evaluate(
     return summary
 
 
-SCORING_VERSION = 2  # bump when parsing or answer matching changes, so old results are redone
+SCORING_VERSION = 3  # bump when parsing or answer matching changes, so old results are redone
 
 
 def view_key(view: View, precision=None) -> str:

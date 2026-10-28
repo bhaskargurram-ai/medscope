@@ -57,7 +57,8 @@ def _valid_box(box) -> Optional[Box]:
 _THINK_END = ("</think>", "<unused95>")          # Qwen-style and Gemma/MedGemma-style thinking
 _THINK_START = ("<think>", "<unused94>")
 _SPECIAL = re.compile(r"<unused\d+>|<think>|</think>")
-_OPEN = re.compile(r"<(tool|final)>")
+_OPEN = re.compile(r"<(tool|final|answer|clarify|refer|abstain)>")
+_ACTION_TAGS = {"answer", "clarify", "refer", "abstain"}  # e.g. MedGemma's <clarify>{"question": ...}</clarify>
 _TOOL_NAMES = {"zoom", "window"}
 
 
@@ -98,6 +99,9 @@ def _first_action(text: str) -> tuple[Optional[str], Optional[object], str]:
             continue
         if not isinstance(obj, dict):
             continue
+        if tag in _ACTION_TAGS:  # a tag named after the action: the action is implied
+            obj = {"action": tag, **obj}
+            tag = "final"
         if tag is None:  # bare JSON: infer what it is
             if "action" in obj:
                 tag = "final"
