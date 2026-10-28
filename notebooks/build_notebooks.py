@@ -410,7 +410,7 @@ def nb06() -> list[dict]:
         md(f"""
 # MedScope 06: final test evaluation and export
 
-Evaluates the RL model and its earlier stages on the full test split (the ablation table for the paper),
+Evaluates the RL model, its earlier stages and both baselines on the full test split (the paper's main table),
 then merges the final adapter into `{BASE}` and saves the model to Drive. Pushing to Hugging Face is
 optional and private by default.
 
@@ -418,11 +418,16 @@ optional and private by default.
 """ + SECRETS_NOTE),
         code(SETUP), code(GPU_STACK), code(RESTORE_VIEWS),
         code(f"""
-runs = [('medscope_grpo_test', 'medscope-grpo', f'{{ADAPTERS}}/grpo/final'),
-        ('medscope_merged_test', 'medscope-sft-merged', f'{{ADAPTERS}}/merged/best'),
-        ('medscope_sft_agentic_test', 'medscope-sft-agentic', f'{{ADAPTERS}}/sft_agentic/final')]
-for out, name, adapter in runs:
-    !python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{VIEWS}}/test/views_clean.jsonl --out {{RESULTS}}/{{out}} --name {{name}} --split test
+# every model on the FULL test split with the same scoring rules: the paper's main table.
+# Runs that finished earlier on a subset (e.g. the 40-case baseline pilot) carry over.
+runs = [('medscope_grpo_test', 'medscope-grpo', {BASE!r}, f'{{ADAPTERS}}/grpo/final'),
+        ('medscope_merged_test', 'medscope-sft-merged', {BASE!r}, f'{{ADAPTERS}}/merged/best'),
+        ('medscope_sft_agentic_test', 'medscope-sft-agentic', {BASE!r}, f'{{ADAPTERS}}/sft_agentic/final'),
+        ('base_qwen35_test', 'base-qwen3.5-4b', {BASE!r}, None),
+        ('base_medgemma15_test', 'base-medgemma-1.5-4b', {MEDGEMMA!r}, None)]
+for out, name, model, adapter in runs:
+    adapter_arg = f'--adapter {{adapter}}' if adapter else ''
+    !python scripts/evaluate.py --model {{model}} {{adapter_arg}} --views {{VIEWS}}/test/views_clean.jsonl --out {{RESULTS}}/{{out}} --name {{name}} --split test
 """),
         md("## Export the final model"),
         code("PUSH_TO = ''   # e.g. 'your-hf-username/MedScope-4B' to also upload (private)"),
