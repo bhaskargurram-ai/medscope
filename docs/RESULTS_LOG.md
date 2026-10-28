@@ -78,6 +78,26 @@ Observations:
 - Caution: validation numbers, while the baselines above are on test. Notebook 06 puts every
   model on the full test split.
 
+## Adapter merging (notebook 04, 2026-10-28)
+
+Grounding + agentic LoRA adapters (both r=16), merged with PEFT; 40 validation cases chosen with
+a different seed from notebook 03, so agentic_only differs slightly from its notebook 03 score.
+
+| Candidate | Net clinical utility |
+| --- | --- |
+| agentic only | 0.891 |
+| SVD 70% agentic / 30% grounding (rank 32) | 0.700 |
+| concatenation (agentic 1.0 + grounding 0.5) | 0.459 |
+| TIES-SVD, density 0.5 | 0.239 |
+| SVD 50/50 | 0.208 |
+| grounding only | 0.189 |
+| DARE-TIES-SVD, density 0.5 | (first run hit GPU out-of-memory; rerun pending) |
+
+Observation: every merge is worse than the agentic adapter alone, and utility falls as the
+grounding weight rises (0.89 → 0.70 → 0.21). Merging a grounding expert into an abstention-trained
+agent dilutes the abstention behaviour: evidence for contribution 2 ("merging damages abstention").
+Per-metric breakdown (refer rates, grounding) is in results/merge_*/summary.json.
+
 ## Next
 
 - Merging (04), natural negatives (02b), then GRPO (05) — with natural negatives added to RL
