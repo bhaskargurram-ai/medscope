@@ -7,7 +7,11 @@ of the package stays importable without torch.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Optional
+
+# fewer out-of-memory errors from fragmentation; must be set before CUDA starts
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import numpy as np
 from PIL import Image

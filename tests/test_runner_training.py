@@ -8,7 +8,7 @@ import numpy as np
 from medscope.agent.episode import Generation, run_group
 from medscope.data.schema import Case, ViewKind
 from medscope.data.views import build_views
-from medscope.eval.runner import compare_runs, evaluate, load_views, select_cases
+from medscope.eval.runner import compare_runs, evaluate, load_views, remaining, select_cases
 from medscope.rewards import load_config
 from medscope.train.common import lr_at
 from medscope.train.grpo import group_advantages
@@ -83,6 +83,17 @@ class TestRunner(unittest.TestCase):
             s = evaluate(pol, views, CFG, d / "run", {"name": "a", "precision": "bf16"}, **quiet)
             self.assertEqual(pol.calls, 24)               # 8 pilot + 16 new, none redone
             self.assertEqual(s["n_views"], 24)
+
+    def test_remaining_matches_what_evaluate_would_run(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            views = load_views(build_dataset(d))
+            quiet = dict(n_bootstrap=20, log=lambda m: None)
+            self.assertEqual(len(remaining(views, d / "run")), 24)
+            evaluate(Oracle(), views[:8], CFG, d / "run", {"name": "a"}, **quiet)
+            self.assertEqual(len(remaining(views, d / "run")), 16)
+            self.assertEqual(remaining(views[:8], d / "run"), [])
+            self.assertEqual(len(remaining(views[:8], d / "run", precision="bf16")), 8)
 
     def test_changed_precision_or_view_is_redone(self):
         with tempfile.TemporaryDirectory() as d:

@@ -106,6 +106,14 @@ def view_key(view: View, precision=None) -> str:
     return hashlib.sha1(payload.encode()).hexdigest()[:16]
 
 
+def remaining(views: list[View], out_dir: str | Path, precision=None) -> list[View]:
+    """Views that `evaluate` would still have to run in out_dir (same keys as evaluate uses)."""
+    keys = {v.view_id: view_key(v, precision) for v in views}
+    rows = _read_jsonl(Path(out_dir) / "outcomes.jsonl")
+    done = {r["view_id"] for r in rows if r.get("vkey") == keys.get(r["view_id"])}
+    return [v for v in views if v.view_id not in done]
+
+
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text("".join(json.dumps(r) + "\n" for r in rows))

@@ -19,7 +19,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from medscope.eval.runner import evaluate, load_views, select_cases  # noqa: E402
+import shutil  # noqa: E402
+
+from medscope.eval.runner import evaluate, load_views, remaining, select_cases  # noqa: E402
 from medscope.rewards import load_config  # noqa: E402
 
 # name, PEFT combination_type, weights [agentic, grounding], density.
@@ -58,42 +60,65 @@ def main() -> None:
     model = policy.model
     model.load_adapter(args.grounding, adapter_name="grounding")
 
+    import gc
+
+    import torch
+
+    def build(name, kind, weights, density):
+        """Create a merged adapter. Built without gradients; deleted again after scoring so
+        merged adapters never pile up in GPU memory (that ran an 80 GB A100 out of memory)."""
+        torch.manual_seed(0)  # DARE prunes at random
+        kw = {"density": density} if density is not None else {}
+        if kind.endswith("svd"):
+            kw["svd_rank"] = SVD_RANK
+        with torch.no_grad():
+            model.add_weighted_adapter(["default", "grounding"], weights, adapter_name=name,
+                                       combination_type=kind, **kw)
+
+    def drop(name):
+        model.set_adapter("default")
+        model.delete_adapter(name)
+        gc.collect()
+        torch.cuda.empty_cache()
+
     scores = {}
     for name, kind, weights, density in CANDIDATES:
         if args.only and name not in args.only:
             continue
-        if name == "agentic_only":
-            adapter = "default"
-        elif name == "grounding_only":
-            adapter = "grounding"
-        else:
-            adapter = name
+        adapter = {"agentic_only": "default", "grounding_only": "grounding"}.get(name, name)
+        run_dir = Path(args.results) / f"merge_{name}"
+        meta = {"name": f"merge_{name}", "model": args.model, "split": "validation",
+                "combination": kind, "weights": weights, "density": density,
+                "svd_rank": SVD_RANK if kind and kind.endswith("svd") else None}
+        todo = remaining(views, run_dir, meta.get("precision"))
+        built = False
+        if todo:  # only build and load what still has to be evaluated
             if adapter not in model.peft_config:
-                import torch
-                torch.manual_seed(0)  # DARE prunes at random
-                kw = {"density": density} if density is not None else {}
-                if kind.endswith("svd"):
-                    kw["svd_rank"] = SVD_RANK
-                model.add_weighted_adapter(["default", "grounding"], weights, adapter_name=adapter,
-                                           combination_type=kind, **kw)
-        model.set_adapter(adapter)
-        model.eval()
-        print(f"=== {name} (adapter {adapter}) ===")
-        summary = evaluate(policy, views, cfg, Path(args.results) / f"merge_{name}",
-                           {"name": f"merge_{name}", "model": args.model, "split": "validation",
-                            "combination": kind, "weights": weights, "density": density,
-                            "svd_rank": SVD_RANK if kind and kind.endswith("svd") else None})
-        scores[name] = (summary["metrics"]["net_utility"]["value"], adapter)
-        print(f"{name}: net utility {scores[name][0]:.3f}")
+                build(adapter, kind, weights, density)
+                built = True
+            model.set_adapter(adapter)
+            model.eval()
+        print(f"=== {name}: {len(views) - len(todo)} views already scored, {len(todo)} to run ===")
+        summary = evaluate(policy, views, cfg, run_dir, meta)
+        scores[name] = summary["metrics"]["net_utility"]["value"]
+        print(f"{name}: net utility {scores[name]:.3f}")
+        if built:
+            drop(adapter)
 
-    best = max(scores, key=lambda k: scores[k][0])
-    best_adapter = scores[best][1]
+    best = max(scores, key=lambda k: scores[k])
     out = Path(args.out)
-    model.set_adapter(best_adapter)
-    policy.save_adapter(str(out / "best"), adapter_name=best_adapter)
-    (out / "best.json").write_text(json.dumps({"best": best, "net_utility": scores[best][0],
-                                               "all": {k: v[0] for k, v in scores.items()}}, indent=2))
-    print(f"best: {best} -> saved to {out / 'best'}")
+    dest = out / "best"
+    if dest.exists():
+        shutil.rmtree(dest)
+    if best in ("agentic_only", "grounding_only"):  # an unmerged adapter wins: copy its files
+        shutil.copytree(args.agentic if best == "agentic_only" else args.grounding, dest)
+    else:
+        name, kind, weights, density = next(c for c in CANDIDATES if c[0] == best)
+        build(name, kind, weights, density)
+        model.set_adapter(name)
+        policy.save_adapter(str(dest), adapter_name=name)
+    (out / "best.json").write_text(json.dumps({"best": best, "net_utility": scores[best], "all": scores}, indent=2))
+    print(f"best: {best} (net utility {scores[best]:.3f}) -> saved to {dest}")
 
 
 if __name__ == "__main__":
