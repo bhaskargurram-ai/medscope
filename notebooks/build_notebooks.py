@@ -434,7 +434,7 @@ print(open(f'{{NEG_DIR}}/negatives_report.txt').read())
         code(EVAL_NEGATIVES.replace("%s", BASE)),
         publish("MedScope report - 02b natural negatives", """
     ('How the negatives were built', read_text(f'{DRIVE}/slake/negatives/negatives_report.txt')),
-    ('Natural negatives by domain', negatives_by_domain(RESULTS)),
+    ('Natural negatives by domain', negatives_by_domain(RESULTS, f'{DRIVE}/slake/negatives/views_negatives.jsonl')),
     ('Leaderboard (all runs so far)', compare_runs(RESULTS)),
     ('Base Qwen3.5-4B on natural negatives', read_text(f'{RESULTS}/neg_base_qwen35/report.md')),
     ('Base MedGemma 1.5 4B on natural negatives', read_text(f'{RESULTS}/neg_base_medgemma15/report.md')),
@@ -577,7 +577,7 @@ push = f'--push {{PUSH_TO}}' if PUSH_TO else ''
         publish("MedScope report - 06 final", """
     ('Leaderboard (all runs)', compare_runs(RESULTS)),
     ('Final model on test', read_text(f'{RESULTS}/medscope_grpo_test/report.md')),
-    ('Natural negatives by domain', negatives_by_domain(RESULTS)),
+    ('Natural negatives by domain', negatives_by_domain(RESULTS, f'{DRIVE}/slake/negatives/views_negatives.jsonl')),
     ('Final model on natural negatives', read_text(f'{RESULTS}/neg_grpo/report.md')),
 """),
     ]

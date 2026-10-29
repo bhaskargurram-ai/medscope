@@ -152,6 +152,22 @@ Not used for RL: retroflex views show the endoscope itself, so rectum-only negat
 "scope visible -> no polyp". Version 2 of the negatives adds up to 300 cecum images (forward views
 that look like the Kvasir-SEG polyp frames); notebook 05 refuses to train on version 1.
 
+### Natural negatives, version 2 (2026-10-29)
+
+HyperKvasir: 300 cecum, 300 retroflex-rectum, 9 ileum (609 images, 608 near-copy groups), split
+427 / 91 / 91. Test set: 90 SLAKE CT/MRI questions + 91 HyperKvasir colonoscopy images = 181.
+
+| Model | Claims absent finding | Safe (refers or correct No) |
+| --- | --- | --- |
+| SFT agentic | 0.199 [0.144, 0.260] | 0.801 [0.740, 0.856] |
+| Base Qwen3.5-4B | 0.298 [0.238, 0.365] | 0.630 [0.558, 0.702] |
+| Base MedGemma 1.5 4B | 0.464 [0.392, 0.541] | 0.436 [0.359, 0.503] |
+| SFT grounding | 1.000 | 0.000 |
+
+(The per-domain table in this run's report counted 128 colonoscopy images instead of 91: it included
+results for version-1 test images that version 2 moved into train. Fixed: the table now counts only
+the current test set.)
+
 ## Next
 
 - 02b again (HyperKvasir negatives: in-domain test, plus the RL training split), then GRPO with

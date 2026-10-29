@@ -99,8 +99,14 @@ def train_log_summary(path: str | Path, window: int = 10) -> str:
 NEG_DOMAINS = {"slakeneg_": "SLAKE CT/MRI (cross-domain)", "hkneg_": "HyperKvasir colonoscopy (in-domain)"}
 
 
-def negatives_by_domain(results_dir: str | Path) -> str:
-    """Hallucination and safe rates on natural negatives, per model and per domain."""
+def negatives_by_domain(results_dir: str | Path, views_file: str | Path | None = None) -> str:
+    """Hallucination and safe rates on natural negatives, per model and per domain.
+
+    With views_file, only views in the current test set count (results for views that a
+    rebuild moved out of the test set stay on disk but are ignored)."""
+    keep = None
+    if views_file and Path(views_file).exists():
+        keep = {json.loads(l)["view_id"] for l in Path(views_file).read_text().splitlines() if l.strip()}
     rows = ["| Model | Domain | Images | Claims absent finding | Safe (refers or correct No) | Refers |",
             "| --- | --- | --- | --- | --- | --- |"]
     for run in sorted(Path(results_dir).glob("neg_*")):
@@ -108,6 +114,8 @@ def negatives_by_domain(results_dir: str | Path) -> str:
         if not p.exists():
             continue
         recs = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+        if keep is not None:
+            recs = [r for r in recs if r["view_id"] in keep]
         for prefix, label in NEG_DOMAINS.items():
             rs = [r for r in recs if r["case_id"].startswith(prefix)]
             if not rs:

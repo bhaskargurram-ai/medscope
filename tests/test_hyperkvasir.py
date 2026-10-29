@@ -78,9 +78,9 @@ class TestHyperKvasir(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             run = Path(d) / "neg_sft_agentic"
             run.mkdir()
-            recs = [{"case_id": "slakeneg_a", "action": "refer", "correct": None},
-                    {"case_id": "slakeneg_b", "action": "answer", "correct": False},
-                    {"case_id": "hkneg_c", "action": "answer", "correct": True}]
+            recs = [{"view_id": "v1", "case_id": "slakeneg_a", "action": "refer", "correct": None},
+                    {"view_id": "v2", "case_id": "slakeneg_b", "action": "answer", "correct": False},
+                    {"view_id": "v3", "case_id": "hkneg_c", "action": "answer", "correct": True}]
             (run / "outcomes.jsonl").write_text("\n".join(json.dumps(r) for r in recs))
             table = negatives_by_domain(d)
             self.assertIn("| sft_agentic | SLAKE CT/MRI (cross-domain) | 2 | 50% | 50% | 50% |", table)
@@ -89,3 +89,17 @@ class TestHyperKvasir(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDomainTableUsesCurrentTestSet(unittest.TestCase):
+    def test_stale_views_are_ignored(self):
+        with tempfile.TemporaryDirectory() as d:
+            run = Path(d) / "neg_base"
+            run.mkdir()
+            recs = [{"view_id": "hkneg_a__natural_negative", "case_id": "hkneg_a", "action": "refer", "correct": None},
+                    {"view_id": "hkneg_old__natural_negative", "case_id": "hkneg_old", "action": "answer", "correct": False}]
+            (run / "outcomes.jsonl").write_text("\n".join(json.dumps(r) for r in recs))
+            views = Path(d) / "views.jsonl"
+            views.write_text(json.dumps({"view_id": "hkneg_a__natural_negative"}))
+            self.assertIn("| base | HyperKvasir colonoscopy (in-domain) | 1 | 0% | 100% | 100% |",
+                          negatives_by_domain(d, views))
