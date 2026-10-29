@@ -9,6 +9,11 @@ Because each batch is used for exactly one update right after it is sampled, the
 importance ratio is 1 and no clipping is needed. Groups where every episode got
 the same reward carry no signal and are skipped. An optional KL penalty keeps the
 policy near its starting adapter (loaded as a frozen "ref" adapter).
+
+Dynamic sampling (max_draws > views_per_step, as in DAPO): a confident SFT policy often
+makes the same choice in every episode of a group, so most groups carry no signal. Groups
+are then drawn one view at a time until views_per_step of them have signal, or max_draws
+groups have been rolled out; only the groups with signal are trained on.
 """
 
 from __future__ import annotations
@@ -45,6 +50,29 @@ def episode_tokens(ep: Episode) -> int:
     return sum(len(t.extra["gen_ids"]) for t in ep.turns if t.extra is not None)
 
 
+def collect_groups(rollout: Callable[[int], list], rewards: Callable[[list], list[float]],
+                   cursor: int, want: int, max_draws: int = 0) -> tuple[list[tuple[list, list[float]]], int]:
+    """Roll out groups for one step, starting at position `cursor` of the view order.
+
+    max_draws <= want: exactly `want` groups (plain GRPO). Otherwise keep drawing until `want`
+    groups have signal (non-zero advantages) or `max_draws` groups were drawn.
+    Returns every drawn group with its advantages, and the next cursor."""
+    groups: list[tuple[list, list[float]]] = []
+    if max_draws <= want:
+        for i in range(want):
+            eps_ = rollout(cursor + i)
+            groups.append((eps_, group_advantages(rewards(eps_))))
+        return groups, cursor + want
+    with_signal = 0
+    while with_signal < want and len(groups) < max_draws:
+        eps_ = rollout(cursor)
+        cursor += 1
+        advs = group_advantages(rewards(eps_))
+        groups.append((eps_, advs))
+        with_signal += any(a != 0 for a in advs)
+    return groups, cursor
+
+
 def train_grpo(
     policy,
     views: list[View],
@@ -61,6 +89,7 @@ def train_grpo(
     log: Callable[[str], None] = print,
     eval_every: int = 0,
     eval_fn: Optional[Callable[[int], dict]] = None,
+    max_draws: int = 0,
 ) -> Path:
     import torch
 
@@ -94,15 +123,17 @@ def train_grpo(
         log(f"resuming GRPO at step {start}")
 
     rng = np.random.default_rng(seed)
-    order = rng.permutation(len(views)).tolist() * (steps * views_per_step // max(1, len(views)) + 2)
+    per_step = max(views_per_step, max_draws)
+    order = rng.permutation(len(views)).tolist() * (steps * per_step // max(1, len(views)) + 2)
+    cursor = state.get("cursor", start * views_per_step)
+
+    def rollout(pos: int) -> list[Episode]:
+        return run_group(policy, views[order[pos]], cfg, group_size, sample=True)
 
     for step in range(start, steps):
         t0 = time.time()
-        batch = [views[i] for i in order[step * views_per_step:(step + 1) * views_per_step]]
-        groups: list[tuple[list[Episode], list[float]]] = []
-        for v in batch:
-            eps_ = run_group(policy, v, cfg, group_size, sample=True)
-            groups.append((eps_, group_advantages([e.outcome.reward for e in eps_])))
+        groups, cursor = collect_groups(rollout, lambda eps_: [e.outcome.reward for e in eps_],
+                                        cursor, views_per_step, max_draws)
 
         model.train()
         opt.zero_grad(set_to_none=True)
@@ -143,6 +174,7 @@ def train_grpo(
             "actions": dict(Counter(e.outcome.action or "malformed" for e in all_eps)),
             "tool_calls": float(np.mean([e.tool_calls for e in all_eps])),
             "groups_with_signal": sum(1 for _, a in groups if any(x != 0 for x in a)),
+            "groups_drawn": len(groups),
             "tokens": n_tok_total,
             "kl": kl_total / max(1, n_tok_total) if use_kl else None,
             "secs": round(time.time() - t0, 1),
@@ -154,7 +186,7 @@ def train_grpo(
         if (step + 1) % save_every == 0 or step + 1 == steps:
             policy.save_adapter(str(checkpoint_path(out)))
             save_optimizer(opt, out)
-            write_state(out, {"step": step + 1, "steps": steps})
+            write_state(out, {"step": step + 1, "steps": steps, "cursor": cursor})
         if eval_fn and eval_every and (step + 1) % eval_every == 0:
             summary = eval_fn(step + 1)
             append_log(out, {"step": step + 1, "eval_net_utility": summary["metrics"]["net_utility"]["value"]})

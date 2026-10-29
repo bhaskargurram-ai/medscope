@@ -375,7 +375,8 @@ NEG = f'{DRIVE}/slake/negatives/views_negatives.jsonl'
 # most informative first: the base model and the agentic adapter answer the shortcut question
 candidates = [('neg_base_qwen35', 'base-qwen3.5-4b', '%s', None),
               ('neg_sft_agentic', 'sft-agentic', '%s', f'{ADAPTERS}/sft_agentic/final'),
-              ('neg_grpo', 'medscope-grpo', '%s', f'{ADAPTERS}/grpo/final'),
+              ('neg_grpo_v2', 'medscope-grpo', '%s', f'{ADAPTERS}/grpo_v2/final'),
+              ('neg_grpo', 'grpo-plain', '%s', f'{ADAPTERS}/grpo/final'),
               ('neg_merged', 'medscope-sft-merged', '%s', f'{ADAPTERS}/merged/best'),
               ('neg_sft_grounding', 'sft-grounding', '%s', f'{ADAPTERS}/sft_grounding/final'),
               ('neg_base_medgemma15', 'base-medgemma-1.5-4b', '%m', None)]
@@ -507,14 +508,20 @@ def nb05() -> list[dict]:
 Starts from the best merged adapter and trains with the cost-matrix reward: the agent samples groups of
 episodes per image (zooming as it likes), rewards are compared within each group, and the policy is
 pushed toward the better episodes. A validation check (15 counterfactual cases + 30 natural negatives)
-runs every 50 steps.
+runs at the end.
+
+**Dynamic sampling (run 2).** The first run (plain GRPO, 4 episodes per image, 2 images per step) barely
+moved the model: the SFT agent makes the same choice in nearly every episode, so only about 1 in 5 groups
+had any signal, and validation at steps 50 and 100 was identical. This run samples 8 episodes per image
+and keeps drawing images (up to 6 per step) until 2 of them have signal, so every step trains on
+disagreement. It saves to `adapters/grpo_v2`; the first run stays in `adapters/grpo` as the comparison.
 
 20% of training images are **natural negatives** (unedited HyperKvasir colonoscopy with no polyp, built
 by notebook 02b). Claiming the finding costs the same on them as on lesion-removed images, and refusing
 pays the same, so the agent can't profit from detecting edits.
 
-**Runtime:** A100 recommended (L4 works, slower). 150 steps is several hours; checkpoints every 10 steps,
-so rerunning resumes. Watch the printed reward: it should rise and "malformed" should fall.
+**Runtime:** A100 recommended. About 4-5 hours (50 steps of up to 6 groups); checkpoints every 5 steps,
+so rerunning resumes. Each line reads `signal 2/5`: 2 of the 5 groups drawn that step had signal.
 """ + SECRETS_NOTE),
         code(SETUP), code(GPU_STACK), code(RESTORE_VIEWS),
         code("""
@@ -524,14 +531,27 @@ if not os.path.exists(marker) or open(marker).read().strip() != '2':
     raise SystemExit('Natural-negative training images are missing or outdated (no cecum views): '
                      'run notebook 02b first, it builds them.')
 print(open(f'{NEG_DIR}/negatives_report.txt').read())
-STEPS = 150
+
+# run 1 (plain GRPO) may have been stopped during its final validation, after its step-150 checkpoint
+# was saved: that checkpoint is its final adapter
+import shutil
+v1 = f'{ADAPTERS}/grpo'
+if not os.path.exists(f'{v1}/final/adapter_config.json') and os.path.exists(f'{v1}/checkpoint/adapter_config.json'):
+    state = json.load(open(f'{v1}/state.json'))
+    if state.get('step') == state.get('steps'):
+        shutil.copytree(f'{v1}/checkpoint', f'{v1}/final')
+        print(f"run 1 finished all {state['steps']} steps; its checkpoint is now {v1}/final")
+STEPS = 50
 """),
         code(f"!python scripts/train_grpo.py --model {BASE} --init {{ADAPTERS}}/merged/best "
-             "--views {VIEWS}/train/views_clean.jsonl --out {ADAPTERS}/grpo --steps {STEPS} "
+             "--views {VIEWS}/train/views_clean.jsonl --out {ADAPTERS}/grpo_v2 --steps {STEPS} "
+             "--group-size 8 --views-per-step 2 --max-draws 6 --lr 2e-5 --save-every 5 "
              "--negatives {NEG_DIR}/views_negatives_train.jsonl --eval-negatives {NEG_DIR}/views_negatives_val.jsonl "
-             "--eval-views {VIEWS}/validation/views_clean.jsonl --eval-every 50 --results {RESULTS}"),
+             "--eval-views {VIEWS}/validation/views_clean.jsonl --eval-every {STEPS} --results {RESULTS}/grpo_v2"),
         publish("MedScope report - 05 RL", """
-    ('Training curve (per 10 steps)', train_log_summary(f'{ADAPTERS}/grpo/train_log.jsonl')),
+    ('Run 2 (dynamic sampling): training curve (per 5 steps)', train_log_summary(f'{ADAPTERS}/grpo_v2/train_log.jsonl', window=5)),
+    ('Run 2: validation at the end', read_text(f'{RESULTS}/grpo_v2/grpo_val_step{STEPS:04d}/report.md')),
+    ('Run 1 (plain GRPO): training curve (per 10 steps)', train_log_summary(f'{ADAPTERS}/grpo/train_log.jsonl')),
     ('Leaderboard (all runs so far)', compare_runs(RESULTS)),
 """),
     ]
@@ -552,7 +572,8 @@ optional and private by default.
         code(f"""
 # every model on the FULL test split with the same scoring rules: the paper's main table.
 # Runs that finished earlier on a subset (e.g. the 40-case baseline pilot) carry over.
-runs = [('medscope_grpo_test', 'medscope-grpo', {BASE!r}, f'{{ADAPTERS}}/grpo/final'),
+runs = [('medscope_grpo_v2_test', 'medscope-grpo', {BASE!r}, f'{{ADAPTERS}}/grpo_v2/final'),
+        ('grpo_plain_test', 'grpo-plain', {BASE!r}, f'{{ADAPTERS}}/grpo/final'),
         ('medscope_merged_test', 'medscope-sft-merged', {BASE!r}, f'{{ADAPTERS}}/merged/best'),
         ('medscope_sft_agentic_test', 'medscope-sft-agentic', {BASE!r}, f'{{ADAPTERS}}/sft_agentic/final'),
         ('base_qwen35_test', 'base-qwen3.5-4b', {BASE!r}, None),
@@ -572,13 +593,13 @@ else:
         code("PUSH_TO = ''   # e.g. 'your-hf-username/MedScope-4B' to also upload (private)"),
         code(f"""
 push = f'--push {{PUSH_TO}}' if PUSH_TO else ''
-!python scripts/export_model.py --model {BASE} --adapter {{ADAPTERS}}/grpo/final --out {{DRIVE}}/export/MedScope-4B --summary {{RESULTS}}/medscope_grpo_test/summary.json {{push}}
+!python scripts/export_model.py --model {BASE} --adapter {{ADAPTERS}}/grpo_v2/final --out {{DRIVE}}/export/MedScope-4B --summary {{RESULTS}}/medscope_grpo_v2_test/summary.json {{push}}
 """),
         publish("MedScope report - 06 final", """
     ('Leaderboard (all runs)', compare_runs(RESULTS)),
-    ('Final model on test', read_text(f'{RESULTS}/medscope_grpo_test/report.md')),
+    ('Final model on test', read_text(f'{RESULTS}/medscope_grpo_v2_test/report.md')),
     ('Natural negatives by domain', negatives_by_domain(RESULTS, f'{DRIVE}/slake/negatives/views_negatives.jsonl')),
-    ('Final model on natural negatives', read_text(f'{RESULTS}/neg_grpo/report.md')),
+    ('Final model on natural negatives', read_text(f'{RESULTS}/neg_grpo_v2/report.md')),
 """),
     ]
 

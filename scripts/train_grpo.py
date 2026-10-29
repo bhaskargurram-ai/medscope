@@ -37,6 +37,9 @@ def main() -> None:
     ap.add_argument("--steps", type=int, default=150)
     ap.add_argument("--views-per-step", type=int, default=2)
     ap.add_argument("--group-size", type=int, default=4)
+    ap.add_argument("--max-draws", type=int, default=0,
+                    help="dynamic sampling: roll out up to this many groups per step until --views-per-step "
+                         "of them have signal (0 = off, plain GRPO)")
     ap.add_argument("--lr", type=float, default=1e-5)
     ap.add_argument("--beta", type=float, default=0.0, help="KL weight to the starting adapter (0 = off)")
     ap.add_argument("--max-new-tokens", type=int, default=256)
@@ -79,7 +82,8 @@ def main() -> None:
     train_grpo(policy, views, cfg, args.out, steps=args.steps,
                views_per_step=args.views_per_step, group_size=args.group_size, lr=args.lr,
                beta=args.beta, ref_adapter=args.init if args.beta > 0 else None,
-               save_every=args.save_every, eval_every=args.eval_every, eval_fn=eval_fn)
+               save_every=args.save_every, eval_every=args.eval_every, eval_fn=eval_fn,
+               max_draws=args.max_draws)
 
 
 if __name__ == "__main__":

@@ -168,7 +168,35 @@ HyperKvasir: 300 cecum, 300 retroflex-rectum, 9 ileum (609 images, 608 near-copy
 results for version-1 test images that version 2 moved into train. Fixed: the table now counts only
 the current test set.)
 
+## RL, run 1: plain GRPO (notebook 05, 2026-10-29)
+
+Started from the SFT agentic adapter. 150 steps, 2 images per step, 4 sampled episodes per image,
+lr 1e-5, no KL, 20% HyperKvasir natural negatives in the training mix (7,540 views, 1,508 negatives).
+
+The model barely moved. Only 47 of the first 240 groups (20%) had any reward difference between their
+4 episodes, so 4 in 5 groups gave no gradient: the SFT agent makes the same choice in nearly every
+sample (temperature 1.0), including when all 4 are wrong. Validation (15 cases + 30 natural negatives)
+was identical at steps 50 and 100:
+
+| Validation metric | Step 50 | Step 100 |
+| --- | --- | --- |
+| Net clinical utility | 0.844 [0.503, 1.060] | 0.844 |
+| Refers when lesion removed / after random edit | 0.867 / 0.000 | 0.867 / 0.000 |
+| Accuracy when answering | 0.933 | 0.933 |
+| Asks to clarify on degraded input | 0.667 | 0.667 |
+| Natural negatives (HyperKvasir val): claims finding / refers | 0.000 / 1.000 | 0.000 / 1.000 |
+
+Step-to-step swings in the mean reward reflect which view kinds were drawn, not learning. The final
+validation at step 150 was skipped (same weights in effect); the step-150 checkpoint is the final adapter.
+
+Finding for the paper: plain GRPO adds nothing to a confident SFT agent, because group-relative
+advantages vanish when the policy agrees with itself.
+
+Run 2 (dynamic sampling, as in DAPO): 8 episodes per image, images drawn one at a time until 2 groups
+with signal (at most 6 groups per step), lr 2e-5, 50 steps, saved to adapters/grpo_v2. Run 1 stays as
+the "plain GRPO" comparison in notebooks 02b and 06.
+
 ## Next
 
-- 02b again (HyperKvasir negatives: in-domain test, plus the RL training split), then GRPO with
-  natural negatives (05), then final evaluation on the full test split and both negative sets (06).
+- RL run 2 (05), then 02b (adds both RL models on natural negatives), then the final evaluation on the
+  full test split (06).

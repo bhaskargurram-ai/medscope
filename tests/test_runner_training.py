@@ -11,7 +11,7 @@ from medscope.data.views import build_views
 from medscope.eval.runner import compare_runs, evaluate, load_views, remaining, select_cases
 from medscope.rewards import load_config
 from medscope.train.common import lr_at
-from medscope.train.grpo import group_advantages
+from medscope.train.grpo import collect_groups, group_advantages
 from medscope.train.sft import estimate_samples, mode_views, samples_for, view_order
 from tests.helpers import synthetic_case
 
@@ -136,6 +136,26 @@ class TestTrainingPieces(unittest.TestCase):
         self.assertAlmostEqual(sum(adv), 0.0)
         self.assertGreater(adv[0], 0)
         self.assertLess(adv[1], 0)
+
+    def test_collect_groups_plain_and_dynamic(self):
+        # rewards per view position: positions 0,1,3 give identical rewards (no signal), 2 and 4 differ
+        table = {0: [1, 1], 1: [0, 0], 2: [1, -2], 3: [1, 1], 4: [0, 1], 5: [1, -1]}
+        calls = []
+
+        def rollout(pos):
+            calls.append(pos)
+            return table[pos]
+
+        groups, cur = collect_groups(rollout, lambda r: r, 0, want=2)          # plain: exactly 2 groups
+        self.assertEqual((len(groups), cur, calls), (2, 2, [0, 1]))
+        calls.clear()
+        groups, cur = collect_groups(rollout, lambda r: r, 0, want=2, max_draws=10)
+        self.assertEqual(calls, [0, 1, 2, 3, 4])                               # stops at 2 with signal
+        self.assertEqual(cur, 5)
+        self.assertEqual(sum(any(a != 0 for a in adv) for _, adv in groups), 2)
+        calls.clear()
+        groups, cur = collect_groups(rollout, lambda r: r, 0, want=2, max_draws=3)
+        self.assertEqual((calls, cur), ([0, 1, 2], 3))                         # capped
 
     def test_lr_schedule(self):
         lrs = [lr_at(s, 100, 1e-4) for s in range(100)]

@@ -91,7 +91,9 @@ def train_log_summary(path: str | Path, window: int = 10) -> str:
         rows.append(
             f"| {chunk[0]['step']}-{chunk[-1]['step']} | {np.mean([r['reward'] for r in chunk]):+.3f} | "
             + " | ".join(f"{acts[a] / total:.0%}" for a in ("answer", "refer", "clarify", "malformed"))
-            + f" | {np.mean([r['tool_calls'] for r in chunk]):.2f} | {np.mean([r['groups_with_signal'] for r in chunk]):.1f} | "
+            + f" | {np.mean([r['tool_calls'] for r in chunk]):.2f} | {np.mean([r['groups_with_signal'] for r in chunk]):.1f}"
+            + (f" of {np.mean([r['groups_drawn'] for r in chunk]):.1f}" if all("groups_drawn" in r for r in chunk) else "")
+            + " | "
             f"{np.mean([r['secs'] for r in chunk]):.0f} |")
     return "\n".join(rows)
 

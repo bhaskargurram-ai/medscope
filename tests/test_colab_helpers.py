@@ -20,6 +20,9 @@ class TestColabHelpers(unittest.TestCase):
             self.assertIn("| 1-10 |", table)
             self.assertIn("75%", table)
             self.assertIn("no training log", train_log_summary(Path(d) / "missing.jsonl"))
+            g.write_text(json.dumps({"step": 1, "reward": 1.0, "actions": {"refer": 8}, "tool_calls": 0.5,
+                                     "groups_with_signal": 2, "groups_drawn": 5, "secs": 200}))
+            self.assertIn("| 2.0 of 5.0 |", train_log_summary(g))
 
     def test_build_report(self):
         r = build_report("MedScope report - test", [("Section", "body"), ("Missing", read_text("/nope"))])
