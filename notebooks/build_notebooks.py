@@ -415,9 +415,7 @@ the first time (HyperKvasir download is about 4 GB), much less on reruns.
         code("""
 from medscope.data.loaders.hyperkvasir import fetch_landmarks
 HK = f'{DRIVE}/raw/hyperkvasir_landmarks'
-if not os.path.exists(f'{HK}/done'):
-    fetch_landmarks(HK)
-    open(f'{HK}/done', 'w').close()
+fetch_landmarks(HK)   # incremental: only downloads classes that are still short (e.g. cecum)
 for c in sorted(os.listdir(HK)):
     if os.path.isdir(f'{HK}/{c}'):
         print(c, len(os.listdir(f'{HK}/{c}')), 'images')
@@ -425,8 +423,11 @@ for c in sorted(os.listdir(HK)):
         md("## Build the natural negatives (once; saved to Drive)"),
         code(f"""
 NEG_DIR = f'{NEGATIVES}'
-if not os.path.exists(f'{{NEG_DIR}}/views_negatives_train.jsonl'):
+NEG_VERSION = '2'   # 2 = SLAKE + HyperKvasir with cecum (version 1 had rectum and ileum only)
+marker = f'{{NEG_DIR}}/NEG_VERSION'
+if not os.path.exists(marker) or open(marker).read().strip() != NEG_VERSION:
     sh(f"python scripts/build_negatives.py --slake {{RAW}} --out {{NEG_DIR}} --dedup-against {{VIEWS}}/train/views.jsonl --hyperkvasir {{HK}}")
+    open(marker, 'w').write(NEG_VERSION)
 print(open(f'{{NEG_DIR}}/negatives_report.txt').read())
 """),
         md("## Evaluate"),
@@ -518,8 +519,11 @@ so rerunning resumes. Watch the printed reward: it should rise and "malformed" s
         code(SETUP), code(GPU_STACK), code(RESTORE_VIEWS),
         code("""
 NEG_DIR = f'{DRIVE}/slake/negatives'
-if not os.path.exists(f'{NEG_DIR}/views_negatives_train.jsonl'):
-    raise SystemExit('Natural-negative training images are missing: run notebook 02b first (it builds them).')
+marker = f'{NEG_DIR}/NEG_VERSION'
+if not os.path.exists(marker) or open(marker).read().strip() != '2':
+    raise SystemExit('Natural-negative training images are missing or outdated (no cecum views): '
+                     'run notebook 02b first, it builds them.')
+print(open(f'{NEG_DIR}/negatives_report.txt').read())
 STEPS = 150
 """),
         code(f"!python scripts/train_grpo.py --model {BASE} --init {{ADAPTERS}}/merged/best "

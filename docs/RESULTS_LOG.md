@@ -134,6 +134,24 @@ Change for RL: 20% of RL training views are natural negatives from HyperKvasir n
 landmarks (cecum, rectum, ileum; same hospital as Kvasir-SEG), split by near-copy groups into
 train / validation / in-domain test. SLAKE negatives stay a cross-domain test only.
 
+### HyperKvasir negatives, first build (2026-10-29)
+
+Only 309 HyperKvasir landmark images were found (300 retroflex-rectum, 9 ileum): the cecum folder is
+named "cecum" in the Hugging Face copy, not "normal-cecum". Split 217 / 46 / 46.
+
+| Model | SLAKE CT/MRI: claims absent finding | HyperKvasir colonoscopy: claims absent finding | All 136: safe |
+| --- | --- | --- | --- |
+| Base Qwen3.5-4B | 33% | 20% | 0.618 [0.537, 0.691] |
+| Base MedGemma 1.5 4B | 30% | 48% | 0.537 [0.456, 0.618] |
+| SFT grounding | 100% | 100% | 0.000 |
+| SFT agentic | 23% | 13% | 0.801 [0.735, 0.868] |
+
+Overall hallucination: SFT agentic 0.199 [0.132, 0.265] vs base Qwen 0.287 [0.213, 0.368].
+
+Not used for RL: retroflex views show the endoscope itself, so rectum-only negatives could teach
+"scope visible -> no polyp". Version 2 of the negatives adds up to 300 cecum images (forward views
+that look like the Kvasir-SEG polyp frames); notebook 05 refuses to train on version 1.
+
 ## Next
 
 - 02b again (HyperKvasir negatives: in-domain test, plus the RL training split), then GRPO with

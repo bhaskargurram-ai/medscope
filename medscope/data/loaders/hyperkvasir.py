@@ -2,7 +2,7 @@
 
 HyperKvasir (Borgli et al., Scientific Data 2020; CC BY 4.0, research and education) comes
 from the same hospital and lab as Kvasir-SEG. Its labelled anatomical-landmark classes
-("normal-cecum", "retroflex-rectum", "ileum") are colonoscopy frames of normal anatomy:
+("cecum", "retroflex-rectum", "ileum") are colonoscopy frames of normal anatomy:
 unedited images where "Is there a polyp?" has the answer No.
 
 `fetch_landmarks` runs on Colab (needs huggingface_hub). It works with either layout the
@@ -20,7 +20,9 @@ import numpy as np
 from PIL import Image
 
 REPO = "SimulaMet-HOST/HyperKvasir"
-CLASSES = ("normal-cecum", "retroflex-rectum", "ileum")
+# folder names -> class; the Hugging Face copy names the cecum folder "cecum", the paper "normal-cecum"
+FOLDERS = {"cecum": "cecum", "normal-cecum": "cecum", "retroflex-rectum": "retroflex-rectum", "ileum": "ileum"}
+CLASSES = ("cecum", "retroflex-rectum", "ileum")
 IMAGE_EXTS = (".jpg", ".jpeg", ".png")
 QUESTIONS = [
     ("polyp", "Is there a polyp in this image?", "No"),
@@ -30,11 +32,16 @@ QUESTIONS = [
 
 def class_of(path: str) -> str | None:
     """The landmark class named by a folder in this path, if any."""
-    parts = [p.lower() for p in Path(path).parts[:-1]]
-    for c in CLASSES:
-        if c in parts:
-            return c
+    for part in (p.lower() for p in Path(path).parts[:-1]):
+        if part in FOLDERS:
+            return FOLDERS[part]
+        if "cecum" in part or "caecum" in part:
+            return "cecum"
     return None
+
+
+def folder_names(files: list[str]) -> list[str]:
+    return sorted({p for f in files for p in Path(f).parts[:-1]})
 
 
 def fetch_landmarks(out_dir: str | Path, max_per_class: int = 300, log=print) -> Path:
@@ -44,7 +51,11 @@ def fetch_landmarks(out_dir: str | Path, max_per_class: int = 300, log=print) ->
     out = Path(out_dir)
     files = HfApi().list_repo_files(REPO, repo_type="dataset")
     loose = [f for f in files if f.lower().endswith(IMAGE_EXTS) and class_of(f)]
-    counts: Counter = Counter()
+    # incremental: images already downloaded count toward each class's cap
+    counts: Counter = Counter({c: len(list((out / c).glob("*"))) for c in CLASSES if (out / c).is_dir()})
+    if all(counts[c] >= max_per_class for c in ("cecum", "retroflex-rectum")):
+        log(f"already have {dict(counts)}")
+        return out
     if loose:
         log(f"{len(loose)} landmark images stored as loose files")
         for f in sorted(loose):
@@ -55,7 +66,12 @@ def fetch_landmarks(out_dir: str | Path, max_per_class: int = 300, log=print) ->
             if not dest.exists():
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy(hf_hub_download(REPO, f, repo_type="dataset"), dest)
-            counts[c] += 1
+                counts[c] += 1
+        log(f"landmark images: {dict(counts)}")
+        if not counts["cecum"]:
+            # rectum views alone would teach "scope visible in a retroflex view -> no polyp"
+            raise FileNotFoundError(
+                "no cecum images found. Folder names in the repo: " + ", ".join(folder_names(files)[:80]))
         return out
 
     zips = [f for f in files if f.lower().endswith(".zip") and "label" in f.lower()]

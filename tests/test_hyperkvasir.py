@@ -20,7 +20,7 @@ from train_grpo import mix_in  # noqa: E402
 
 def make_landmarks(root: Path, n: int = 12):
     for i in range(n):
-        c = ("normal-cecum", "retroflex-rectum", "ileum")[i % 3]
+        c = ("cecum", "retroflex-rectum", "ileum")[i % 3]
         d = root / "labeled-images" / "lower-gi-tract" / "anatomical-landmarks" / c
         d.mkdir(parents=True, exist_ok=True)
         img, _ = synthetic_case(size=300, seed=200 + i)
@@ -34,7 +34,9 @@ def make_landmarks(root: Path, n: int = 12):
 
 class TestHyperKvasir(unittest.TestCase):
     def test_class_of(self):
-        self.assertEqual(class_of("labeled-images/lower-gi-tract/anatomical-landmarks/normal-cecum/x.jpg"), "normal-cecum")
+        self.assertEqual(class_of("labeled-images/lower-gi-tract/anatomical-landmarks/normal-cecum/x.jpg"), "cecum")
+        self.assertEqual(class_of("lower-gi-tract/anatomical-landmarks/cecum/x.jpg"), "cecum")
+        self.assertEqual(class_of("a/retroflex-rectum/x.jpg"), "retroflex-rectum")
         self.assertIsNone(class_of("labeled-images/lower-gi-tract/pathological-findings/polyps/x.jpg"))
 
     def test_scan_skips_polyps_and_downscales(self):
