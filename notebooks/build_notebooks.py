@@ -109,7 +109,9 @@ if r.returncode != 0:
                      + '\nDiagnosis: ' + github_diagnosis())
 def sh(cmd):
     # run a project script, show its output live, and stop the notebook if it fails
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    # PYTHONUNBUFFERED: otherwise the script's progress lines arrive in big delayed chunks
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+                         env={**os.environ, 'PYTHONUNBUFFERED': '1'})
     for out_line in p.stdout:
         print(out_line, end='')
     if p.wait() != 0:
@@ -173,7 +175,7 @@ Turn on notebook access for both secrets when Colab asks.
 
 def publish(title: str, sections: str) -> dict:
     return code(f"""
-from medscope.colab import build_report, publish_doc, read_text, train_log_summary
+from medscope.colab import build_report, negatives_by_domain, publish_doc, read_text, train_log_summary
 from medscope.eval.runner import compare_runs
 report = build_report({title!r}, [
 {sections}
@@ -370,15 +372,21 @@ NEGATIVES = "{DRIVE}/slake/negatives"
 EVAL_NEGATIVES = r"""
 # every model that exists so far, on unedited images without the lesion
 NEG = f'{DRIVE}/slake/negatives/views_negatives.jsonl'
+# most informative first: the base model and the agentic adapter answer the shortcut question
 candidates = [('neg_base_qwen35', 'base-qwen3.5-4b', '%s', None),
-              ('neg_base_medgemma15', 'base-medgemma-1.5-4b', '%m', None),
-              ('neg_sft_grounding', 'sft-grounding', '%s', f'{ADAPTERS}/sft_grounding/final'),
               ('neg_sft_agentic', 'sft-agentic', '%s', f'{ADAPTERS}/sft_agentic/final'),
+              ('neg_grpo', 'medscope-grpo', '%s', f'{ADAPTERS}/grpo/final'),
               ('neg_merged', 'medscope-sft-merged', '%s', f'{ADAPTERS}/merged/best'),
-              ('neg_grpo', 'medscope-grpo', '%s', f'{ADAPTERS}/grpo/final')]
+              ('neg_sft_grounding', 'sft-grounding', '%s', f'{ADAPTERS}/sft_grounding/final'),
+              ('neg_base_medgemma15', 'base-medgemma-1.5-4b', '%m', None)]
+best_file = f'{ADAPTERS}/merged/best.json'
+merged_is_copy = os.path.exists(best_file) and json.load(open(best_file))['best'] in ('agentic_only', 'grounding_only')
 for out, name, model, adapter in candidates:
     if adapter and not os.path.exists(f'{adapter}/adapter_config.json'):
         print(f'skipping {name}: not trained yet')
+        continue
+    if out == 'neg_merged' and merged_is_copy:
+        print('skipping medscope-sft-merged: no merge beat the unmerged adapter, so it is an identical copy')
         continue
     adapter_arg = f'--adapter {adapter}' if adapter else ''
     sh(f"python scripts/evaluate.py --model {model} {adapter_arg} --views {NEG} --out {RESULTS}/{out} --name {name} --split natural_negatives")
@@ -391,25 +399,41 @@ def nb02b() -> list[dict]:
 # MedScope 02b: natural negatives (is "refer" real, or an edit-detection shortcut?)
 
 A model trained to refer when a lesion is digitally erased might only be spotting the *edit*.
-This test uses **unedited** SLAKE images that have no lesion, with SLAKE's own questions whose
-answers say the finding isn't there ("Does the picture contain liver cancer?" -> "No"). A model
-that learned a shortcut will claim the finding here, because there is no edit to detect.
+This test uses **unedited** images that have no lesion:
+- **SLAKE** CT/MRI images, with SLAKE's own questions whose answers say the finding isn't there
+  ("Does the picture contain liver cancer?" -> "No"): a cross-domain test.
+- **HyperKvasir** normal colonoscopy landmarks (cecum, rectum, ileum), asked "Is there a polyp?" -> "No":
+  an in-domain test. Its train split is also what notebook 05 mixes into RL.
 
-Evaluates every model trained so far (skips the ones that don't exist yet). Rerun it after
-notebooks 04 and 05 to add those models. **Runtime:** A100 or L4, about 20-40 minutes.
+A model that learned a shortcut will claim the finding here, because there is no edit to detect.
+Evaluates every model trained so far (skips the ones that don't exist yet), reusing finished
+results. Rerun it after notebook 05 to add the RL model. **Runtime:** A100 or L4, about 1-2 hours
+the first time (HyperKvasir download is about 4 GB), much less on reruns.
 """ + SECRETS_NOTE),
         code(SETUP), code(GPU_STACK), code(RESTORE_VIEWS), code(SLAKE_DOWNLOAD),
+        md("## HyperKvasir normal landmarks (once; saved to Drive)"),
+        code("""
+from medscope.data.loaders.hyperkvasir import fetch_landmarks
+HK = f'{DRIVE}/raw/hyperkvasir_landmarks'
+if not os.path.exists(f'{HK}/done'):
+    fetch_landmarks(HK)
+    open(f'{HK}/done', 'w').close()
+for c in sorted(os.listdir(HK)):
+    if os.path.isdir(f'{HK}/{c}'):
+        print(c, len(os.listdir(f'{HK}/{c}')), 'images')
+"""),
         md("## Build the natural negatives (once; saved to Drive)"),
         code(f"""
 NEG_DIR = f'{NEGATIVES}'
-if not os.path.exists(f'{{NEG_DIR}}/views_negatives.jsonl'):
-    sh(f"python scripts/build_negatives.py --slake {{RAW}} --out {{NEG_DIR}} --dedup-against {{VIEWS}}/train/views.jsonl")
+if not os.path.exists(f'{{NEG_DIR}}/views_negatives_train.jsonl'):
+    sh(f"python scripts/build_negatives.py --slake {{RAW}} --out {{NEG_DIR}} --dedup-against {{VIEWS}}/train/views.jsonl --hyperkvasir {{HK}}")
 print(open(f'{{NEG_DIR}}/negatives_report.txt').read())
 """),
         md("## Evaluate"),
         code(EVAL_NEGATIVES.replace("%s", BASE)),
         publish("MedScope report - 02b natural negatives", """
     ('How the negatives were built', read_text(f'{DRIVE}/slake/negatives/negatives_report.txt')),
+    ('Natural negatives by domain', negatives_by_domain(RESULTS)),
     ('Leaderboard (all runs so far)', compare_runs(RESULTS)),
     ('Base Qwen3.5-4B on natural negatives', read_text(f'{RESULTS}/neg_base_qwen35/report.md')),
     ('Base MedGemma 1.5 4B on natural negatives', read_text(f'{RESULTS}/neg_base_medgemma15/report.md')),
@@ -481,15 +505,26 @@ def nb05() -> list[dict]:
 
 Starts from the best merged adapter and trains with the cost-matrix reward: the agent samples groups of
 episodes per image (zooming as it likes), rewards are compared within each group, and the policy is
-pushed toward the better episodes. A 15-case validation check runs every 50 steps.
+pushed toward the better episodes. A validation check (15 counterfactual cases + 30 natural negatives)
+runs every 50 steps.
+
+20% of training images are **natural negatives** (unedited HyperKvasir colonoscopy with no polyp, built
+by notebook 02b). Claiming the finding costs the same on them as on lesion-removed images, and refusing
+pays the same, so the agent can't profit from detecting edits.
 
 **Runtime:** A100 recommended (L4 works, slower). 150 steps is several hours; checkpoints every 10 steps,
 so rerunning resumes. Watch the printed reward: it should rise and "malformed" should fall.
 """ + SECRETS_NOTE),
         code(SETUP), code(GPU_STACK), code(RESTORE_VIEWS),
-        code("STEPS = 150"),
+        code("""
+NEG_DIR = f'{DRIVE}/slake/negatives'
+if not os.path.exists(f'{NEG_DIR}/views_negatives_train.jsonl'):
+    raise SystemExit('Natural-negative training images are missing: run notebook 02b first (it builds them).')
+STEPS = 150
+"""),
         code(f"!python scripts/train_grpo.py --model {BASE} --init {{ADAPTERS}}/merged/best "
              "--views {VIEWS}/train/views_clean.jsonl --out {ADAPTERS}/grpo --steps {STEPS} "
+             "--negatives {NEG_DIR}/views_negatives_train.jsonl --eval-negatives {NEG_DIR}/views_negatives_val.jsonl "
              "--eval-views {VIEWS}/validation/views_clean.jsonl --eval-every 50 --results {RESULTS}"),
         publish("MedScope report - 05 RL", """
     ('Training curve (per 10 steps)', train_log_summary(f'{ADAPTERS}/grpo/train_log.jsonl')),
@@ -538,6 +573,7 @@ push = f'--push {{PUSH_TO}}' if PUSH_TO else ''
         publish("MedScope report - 06 final", """
     ('Leaderboard (all runs)', compare_runs(RESULTS)),
     ('Final model on test', read_text(f'{RESULTS}/medscope_grpo_test/report.md')),
+    ('Natural negatives by domain', negatives_by_domain(RESULTS)),
     ('Final model on natural negatives', read_text(f'{RESULTS}/neg_grpo/report.md')),
 """),
     ]

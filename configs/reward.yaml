@@ -35,5 +35,6 @@ tools:
 natural_negative:      # unedited image without the lesion; the dataset's answer says it isn't there
   correct_answer: 1.0            # e.g. "No" to "Is there a tumor?", "Yes" to "Is the liver healthy?"
   hallucinated_finding: -2.0     # claims a finding that is not there
-  refer: 0.5                     # safe but over-cautious on a clearly healthy image
-  clarify: -0.3
+  refer: 1.0                     # must equal target_removal's refer reward: the two look alike by
+                                 # design, so any gap between them would pay the model to detect edits
+  clarify: -0.5                  # equal to target_removal, for the same reason

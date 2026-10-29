@@ -7,9 +7,14 @@ hallucinate the finding here.
 
 Images that are near-copies of a training image are left out (--dedup-against).
 
+Outputs:
+  views_negatives.jsonl        test: all SLAKE negatives (cross-domain CT/MRI) + HyperKvasir test split
+  views_negatives_train.jsonl  HyperKvasir train split, mixed into RL (with --hyperkvasir)
+  views_negatives_val.jsonl    HyperKvasir validation split (with --hyperkvasir)
+
 Usage:
     python scripts/build_negatives.py --slake data/raw/slake --out data/views/negatives \
-        --dedup-against data/views/train/views.jsonl
+        --dedup-against data/views/train/views.jsonl [--hyperkvasir data/raw/hyperkvasir]
 """
 
 from __future__ import annotations
@@ -22,6 +27,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from medscope.data.loaders.common import assign_splits, near_duplicate_groups  # noqa: E402
+from medscope.data.loaders.hyperkvasir import is_dark_or_blank, question_for, scan_landmarks  # noqa: E402
 from medscope.data.loaders.slake import scan_natural_negatives  # noqa: E402
 from medscope.data.quality import correlation, dhash, hamming  # noqa: E402
 from medscope.data.schema import View, ViewKind  # noqa: E402
@@ -35,6 +42,9 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--dedup-against", default=None, help="training views.jsonl")
     ap.add_argument("--min-correlation", type=float, default=0.98)
+    ap.add_argument("--hyperkvasir", default=None,
+                    help="folder of HyperKvasir landmark images (normal-cecum/, retroflex-rectum/, ileum/)")
+    ap.add_argument("--seed", type=int, default=2026)
     args = ap.parse_args()
 
     out = Path(args.out)
@@ -69,11 +79,37 @@ def main() -> None:
                           question=q["question"], answer=str(q["answer"]), answer_aliases=[], lesion_box=None,
                           critical=False, meta={"modality": str(q.get("modality", "")).lower()}))
 
-    with open(out / "views_negatives.jsonl", "w") as f:
-        for v in views:
-            f.write(json.dumps(v.to_dict()) + "\n")
-    stats["views written"] = len(views)
-    stats["by answer"] = dict(Counter(v.answer for v in views))
+    stats["SLAKE views (test, cross-domain CT/MRI)"] = len(views)
+    stats["SLAKE by answer"] = dict(Counter(v.answer for v in views))
+    splits = {"train": [], "validation": [], "test": views}
+
+    if args.hyperkvasir:
+        hk_items, hk_stats = scan_landmarks(args.hyperkvasir, out / "hyperkvasir")
+        stats["HyperKvasir landmark images"] = dict(hk_stats)
+        hk_items = [it for it in hk_items if not is_dark_or_blank(it[1])]
+        stats["HyperKvasir after dropping dark frames"] = len(hk_items)
+        groups = near_duplicate_groups([p for _, p, _ in hk_items])
+        split_of = assign_splits(groups, seed=args.seed)
+        stats["HyperKvasir near-copy groups"] = len(set(groups))
+        for (key, path, cls), g in zip(hk_items, groups):
+            tag, question, answer = question_for(key)
+            case_id = f"hkneg_{key}_{tag}"
+            splits[split_of[g]].append(View(
+                view_id=f"{case_id}__natural_negative", case_id=case_id, patient_id=f"hkneg_g{g}",
+                kind=ViewKind.NATURAL_NEGATIVE, image_path=path, question=question, answer=answer,
+                answer_aliases=[], lesion_box=None, critical=False,
+                meta={"modality": "endoscopy", "landmark": cls}))
+        stats["HyperKvasir views per split (in-domain colonoscopy)"] = {
+            s: sum(1 for v in vs if v.case_id.startswith("hkneg_")) for s, vs in splits.items()}
+
+    names = {"test": "views_negatives.jsonl", "train": "views_negatives_train.jsonl",
+             "validation": "views_negatives_val.jsonl"}
+    for split, vs in splits.items():
+        if split != "test" and not args.hyperkvasir:
+            continue
+        with open(out / names[split], "w") as f:
+            for v in vs:
+                f.write(json.dumps(v.to_dict()) + "\n")
     summary = "\n".join(f"{k}: {v}" for k, v in stats.items())
     (out / "negatives_report.txt").write_text(summary + "\n")
     print(summary)

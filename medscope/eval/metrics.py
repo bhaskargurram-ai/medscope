@@ -69,6 +69,13 @@ def natural_hallucination_rate(outs: list[Outcome]) -> float:
     return _rate(xs)
 
 
+def natural_safe_rate(outs: list[Outcome]) -> float:
+    """On unedited images without the lesion: refers, or correctly says it isn't there."""
+    xs = [o.action == "refer" or (o.action == "answer" and bool(o.correct))
+          for o in outs if o.kind == "natural_negative"]
+    return _rate(xs)
+
+
 def natural_correct_rate(outs: list[Outcome]) -> float:
     xs = [o.action == "answer" and bool(o.correct) for o in outs if o.kind == "natural_negative"]
     return _rate(xs)
@@ -119,6 +126,7 @@ METRICS: dict[str, Callable[[list[Outcome]], Optional[float]]] = {
     "tool_calls_per_correct": tool_calls_per_correct,
     "malformed_rate": malformed_rate,
     "natural_hallucination_rate": natural_hallucination_rate,
+    "natural_safe_rate": natural_safe_rate,
     "natural_correct_rate": natural_correct_rate,
     "natural_refer_rate": lambda o: refer_rate(o, "natural_negative"),
 }

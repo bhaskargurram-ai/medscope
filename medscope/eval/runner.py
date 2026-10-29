@@ -13,7 +13,7 @@ import numpy as np
 
 from ..agent.episode import Policy, run_episode
 from ..data.schema import View
-from ..rewards import Outcome, with_vocab
+from ..rewards import Outcome, rescore, with_vocab
 from .metrics import bootstrap
 
 
@@ -83,11 +83,13 @@ def evaluate(
                                  "question": v.question, "gold": v.answer, "error": ep.error,
                                  "turns": ep.transcript()}) + "\n")
             fo.flush(), ft.flush()
-            if (i + 1) % 20 == 0:
+            if (i + 1) % 10 == 0 or i == 0:
                 rate = (time.time() - t0) / (i + 1)
                 log(f"  {i + 1}/{len(todo)} views, {rate:.1f}s each, ~{rate * (len(todo) - i - 1) / 60:.0f} min left")
 
-    outcomes = [Outcome(**{k: v for k, v in r.items() if k != "vkey"})
+    by_id = {v.view_id: v for v in views}
+    # rewards always follow the current cost matrix: the model's decisions are stored, the price is not
+    outcomes = [rescore(by_id[r["view_id"]], Outcome(**{k: v for k, v in r.items() if k != "vkey"}), cfg)
                 for r in _read_jsonl(outcomes_path) if r["view_id"] in keys]
     summary = {"meta": meta, "n_views": len(outcomes), "n_cases": len({o.case_id for o in outcomes}),
                "metrics": bootstrap(outcomes, n_resamples=n_bootstrap)}
@@ -134,6 +136,7 @@ HEADLINE = [
     ("tool_calls_per_correct", "Tool calls per correct answer"),
     ("malformed_rate", "Malformed output rate"),
     ("natural_hallucination_rate", "Natural negatives: claims the absent finding (lower is better)"),
+    ("natural_safe_rate", "Natural negatives: safe (refers, or correctly says it isn't there)"),
     ("natural_correct_rate", "Natural negatives: correctly says it isn't there"),
     ("natural_refer_rate", "Natural negatives: refers"),
 ]
@@ -196,7 +199,7 @@ def compare_runs(results_dir: str | Path) -> str:
         s = json.loads(p.read_text())
         rows.append((s["meta"].get("name", p.parent.name), s))
     keys = ["ccr", "selective_accuracy", "asg", "grounded_accuracy", "clarify_rate_degraded",
-            "natural_hallucination_rate", "net_utility", "malformed_rate"]
+            "natural_hallucination_rate", "natural_safe_rate", "net_utility", "malformed_rate"]
     lines = ["| Run | Split | Cases | " + " | ".join(keys) + " |", "| --- | --- | --- | " + " | ".join("---" for _ in keys) + " |"]
     def order(r):
         s = r[1]

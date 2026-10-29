@@ -98,7 +98,43 @@ grounding weight rises (0.89 → 0.70 → 0.21). Merging a grounding expert into
 agent dilutes the abstention behaviour: evidence for contribution 2 ("merging damages abstention").
 Per-metric breakdown (refer rates, grounding) is in results/merge_*/summary.json.
 
+DARE-TIES-SVD (density 0.5) finished on the rerun: 0.219. Best: agentic only (no merge beat it).
+Abstention specificity gap falls with grounding weight: agentic 0.900, SVD 70/30 0.625,
+concatenation 0.325, TIES-SVD 0.025, DARE-TIES-SVD 0.000, SVD 50/50 0.000, grounding 0.000,
+while grounded accuracy stays 0.85-0.93 for every merge. Merging keeps perception and destroys abstention.
+
+## Natural negatives (notebook 02b, 2026-10-28)
+
+90 questions on 74 unedited, lesion-free SLAKE CT/MRI images (dataset answers: 74 "Yes" to
+"is it healthy?", 16 "No" to "is there X?"), scored with the cost matrix of 2026-10-28.
+
+| Model | Claims the absent finding | Correctly says it isn't there | Refers |
+| --- | --- | --- | --- |
+| Base Qwen3.5-4B | 0.333 [0.233, 0.433] | 0.522 | 0.000 |
+| Base MedGemma 1.5 4B | 0.300 [0.211, 0.400] | 0.633 | 0.000 |
+| SFT grounding | 1.000 | 0.000 | 0.000 |
+| SFT agentic | 0.233 [0.156, 0.322] | 0.000 | 0.767 |
+
+Observations:
+- Not a pure edit-detection shortcut: on untouched lesion-free images the agentic adapter refers on
+  77%, where an edit detector would claim the finding (as the grounding adapter does, 100%).
+- It never answers "No"/"healthy": all training questions presumed the finding, so "refer" is its only
+  way to express absence. Its 23% hallucination rate (vs 12.5% on lesion-removed validation views)
+  leaves room for a partial edit or domain effect (training is ~80% colonoscopy; these are CT/MRI).
+- Positive-only supervision gives a strong "Yes" bias (grounding adapter: 100% hallucination).
+
+Cost-matrix fix (applies to all results through rescoring, no rerun needed): lesion-removed and
+natural-negative images look alike by design, so refer and clarify must pay the same on both
+(refer +1.0, clarify -0.5). With the old natural-negative refer reward of +0.5, a model able to
+detect edits would have earned more by answering "No" on unedited images and referring on edited
+ones, i.e. RL would have rewarded the shortcut. Rewards are now recomputed from stored decisions,
+so the matrix can also be varied for a sensitivity analysis.
+
+Change for RL: 20% of RL training views are natural negatives from HyperKvasir normal lower-GI
+landmarks (cecum, rectum, ileum; same hospital as Kvasir-SEG), split by near-copy groups into
+train / validation / in-domain test. SLAKE negatives stay a cross-domain test only.
+
 ## Next
 
-- Merging (04), natural negatives (02b), then GRPO (05) — with natural negatives added to RL
-  training if 02b shows an edit-detection shortcut — and final evaluation (06).
+- 02b again (HyperKvasir negatives: in-domain test, plus the RL training split), then GRPO with
+  natural negatives (05), then final evaluation on the full test split and both negative sets (06).

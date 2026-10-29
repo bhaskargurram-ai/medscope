@@ -19,6 +19,15 @@ from medscope.rewards import load_config, with_vocab  # noqa: E402
 from medscope.train.grpo import train_grpo  # noqa: E402
 
 
+def mix_in(views: list, negatives: list, share: float) -> list:
+    """views + negatives, with negatives repeated (deterministically) to make up `share` of the total."""
+    if not negatives or share <= 0:
+        return list(views)
+    want = int(round(share * len(views) / (1 - share)))
+    reps = [negatives[i % len(negatives)] for i in range(max(want, len(negatives)))]
+    return list(views) + reps
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True)
@@ -36,23 +45,38 @@ def main() -> None:
     ap.add_argument("--eval-every", type=int, default=0)
     ap.add_argument("--eval-cases", type=int, default=15)
     ap.add_argument("--results", default=None)
+    ap.add_argument("--negatives", default=None,
+                    help="natural-negative training views (unedited, lesion-free) to mix in")
+    ap.add_argument("--negative-share", type=float, default=0.2,
+                    help="share of training views that are natural negatives (repeated if needed)")
+    ap.add_argument("--eval-negatives", default=None, help="natural-negative validation views")
+    ap.add_argument("--eval-negative-cases", type=int, default=30)
     args = ap.parse_args()
 
     from medscope.train.hf_policy import HFPolicy
 
-    cfg = with_vocab(load_config(), load_views(args.views))
+    views = load_views(args.views)
+    if args.negatives:
+        # Natural negatives guard against the edit-detection shortcut: on them, claiming the
+        # finding costs as much as on lesion-removed images, and refusing pays the same.
+        views = mix_in(views, load_views(args.negatives), args.negative_share)
+        print(f"training on {len(views)} views, {sum(v.kind.value == 'natural_negative' for v in views)} "
+              f"of them natural negatives")
+    cfg = with_vocab(load_config(), views)
     policy = HFPolicy(args.model, adapter=args.init, trainable=True, max_new_tokens=args.max_new_tokens)
 
     eval_fn = None
     if args.eval_views and args.eval_every and args.results:
         eval_views = select_cases(load_views(args.eval_views), args.eval_cases, seed=2)
+        if args.eval_negatives:
+            eval_views += select_cases(load_views(args.eval_negatives), args.eval_negative_cases, seed=2)
 
         def eval_fn(step: int) -> dict:
             return evaluate(policy, eval_views, cfg, Path(args.results) / f"grpo_val_step{step:04d}",
                             {"name": f"grpo_val_step{step}", "model": args.model, "split": "validation"},
                             n_bootstrap=200)
 
-    train_grpo(policy, load_views(args.views), cfg, args.out, steps=args.steps,
+    train_grpo(policy, views, cfg, args.out, steps=args.steps,
                views_per_step=args.views_per_step, group_size=args.group_size, lr=args.lr,
                beta=args.beta, ref_adapter=args.init if args.beta > 0 else None,
                save_every=args.save_every, eval_every=args.eval_every, eval_fn=eval_fn)

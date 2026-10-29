@@ -96,6 +96,30 @@ def train_log_summary(path: str | Path, window: int = 10) -> str:
     return "\n".join(rows)
 
 
+NEG_DOMAINS = {"slakeneg_": "SLAKE CT/MRI (cross-domain)", "hkneg_": "HyperKvasir colonoscopy (in-domain)"}
+
+
+def negatives_by_domain(results_dir: str | Path) -> str:
+    """Hallucination and safe rates on natural negatives, per model and per domain."""
+    rows = ["| Model | Domain | Images | Claims absent finding | Safe (refers or correct No) | Refers |",
+            "| --- | --- | --- | --- | --- | --- |"]
+    for run in sorted(Path(results_dir).glob("neg_*")):
+        p = run / "outcomes.jsonl"
+        if not p.exists():
+            continue
+        recs = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+        for prefix, label in NEG_DOMAINS.items():
+            rs = [r for r in recs if r["case_id"].startswith(prefix)]
+            if not rs:
+                continue
+            n = len(rs)
+            halluc = sum(r["action"] == "answer" and not r["correct"] for r in rs) / n
+            safe = sum(r["action"] == "refer" or (r["action"] == "answer" and r["correct"]) for r in rs) / n
+            refer = sum(r["action"] == "refer" for r in rs) / n
+            rows.append(f"| {run.name[4:]} | {label} | {n} | {halluc:.0%} | {safe:.0%} | {refer:.0%} |")
+    return "\n".join(rows) if len(rows) > 2 else "(no natural-negative results yet)"
+
+
 def build_report(title: str, sections: list[tuple[str, str]]) -> str:
     out = [f"# {title}", "", "## Environment", environment_info(), ""]
     for heading, body in sections:

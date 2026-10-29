@@ -73,7 +73,7 @@ class TestNaturalNegatives(unittest.TestCase):
         refer = parse('<final>{"action": "refer"}</final>').final
         self.assertEqual(score(neg_view(), no, CFG).reward, 1.0)
         self.assertEqual(score(neg_view(), yes, CFG).reward, -2.0)       # hallucinated finding
-        self.assertEqual(score(neg_view(), refer, CFG).reward, 0.5)
+        self.assertEqual(score(neg_view(), refer, CFG).reward, 1.0)
 
     def test_end_to_end_always_yes_model_hallucinates(self):
         with tempfile.TemporaryDirectory() as d:
@@ -95,3 +95,21 @@ class TestNaturalNegatives(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNoIncentiveToDetectEdits(unittest.TestCase):
+    """Lesion-removed and natural negative images look alike by design. If any non-answer action
+    paid differently on the two, a model would gain reward by learning to detect edits."""
+
+    def test_cost_matrix_pays_the_same_on_look_alike_kinds(self):
+        nn, er = CFG["natural_negative"], CFG["evidence_removed"]
+        self.assertEqual(nn["refer"], er["refer"])
+        self.assertEqual(nn["clarify"], er["clarify"])
+        self.assertGreaterEqual(er["refer"], nn["correct_answer"])  # refusing is never worse than "No"
+
+    def test_rescore_follows_the_current_matrix(self):
+        from medscope.rewards import rescore
+        refer = parse('<final>{"action": "refer"}</final>').final
+        old = score(neg_view(), refer, {**CFG, "natural_negative": {**CFG["natural_negative"], "refer": 0.5}})
+        self.assertEqual(old.reward, 0.5)
+        self.assertEqual(rescore(neg_view(), old, CFG).reward, 1.0)
