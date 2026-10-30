@@ -51,3 +51,30 @@ class TestByDataset(unittest.TestCase):
             (run / "outcomes.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
             t = by_dataset(d, ["m_test", "missing"])
             self.assertIn("| m_test | Brain MRI (LGG) | 1 | 1.00 | 1.00 | 0.00 | n/a | 1.00 |", t)
+
+
+class TestVqa(unittest.TestCase):
+    def test_slake_test_questions_and_table(self):
+        import sys
+        from PIL import Image
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        from build_vqa import from_slake
+        from medscope.colab import vqa_table
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / "imgs" / "xmlab1").mkdir(parents=True)
+            Image.new("RGB", (8, 8)).save(d / "imgs" / "xmlab1" / "source.jpg")
+            qs = [{"q_lang": "en", "img_name": "xmlab1/source.jpg", "question": "Is this a CT?", "answer": "Yes"},
+                  {"q_lang": "zh", "img_name": "xmlab1/source.jpg", "question": "x", "answer": "y"},
+                  {"q_lang": "en", "img_name": "xmlab1/source.jpg", "question": "Which organ?", "answer": "Liver"}]
+            (d / "test.json").write_text(json.dumps(qs))
+            views = from_slake(d, d, None)
+            self.assertEqual(len(views), 2)
+            run = d / "res" / "m_vqa"
+            run.mkdir(parents=True)
+            (run / "outcomes.jsonl").write_text("\n".join(json.dumps(
+                {"view_id": v.view_id, "case_id": v.case_id, "action": "answer", "correct": i == 0}) for i, v in enumerate(views)))
+            (run / "transcripts.jsonl").write_text("\n".join(json.dumps(
+                {"view_id": v.view_id, "gold": v.answer}) for v in views))
+            t = vqa_table(d / "res", ["m_vqa"])
+            self.assertIn("| m_vqa | SLAKE test (VQA) | 1.000 | 0.000 | 0.500 | 2 |", t)
