@@ -308,7 +308,9 @@ def answer_matches(pred: Optional[str], gold: str, aliases: list[str] | None = N
     if not any(_mentions(words, x) for x in golds):
         return False
     own = {normalise_answer(x) for x in golds}
-    return not any(_mentions(words, r) for r in (rivals or set()) if normalise_answer(r) not in own)
+    # a rival that is part of the gold phrase ("lung" in "left lung") is not a competing answer
+    return not any(_mentions(words, r) for r in (rivals or set())
+                   if normalise_answer(r) not in own and not any(normalise_answer(r) in o for o in own))
 
 
 def answer_vocabulary(golds) -> set[str]:

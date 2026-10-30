@@ -175,8 +175,9 @@ Turn on notebook access for both secrets when Colab asks.
 
 def publish(title: str, sections: str) -> dict:
     return code(f"""
-from medscope.colab import build_report, by_dataset, negatives_by_domain, publish_doc, read_text, train_log_summary
+from medscope.colab import build_report, by_dataset, negatives_by_domain, publish_doc, read_text, train_log_summary, vqa_table
 from medscope.eval.runner import compare_runs
+from medscope.eval.compare import significance_table
 report = build_report({title!r}, [
 {sections}
 ])
@@ -847,6 +848,8 @@ print('failed:', failed or 'none')
 if failed and 'medscope-4b' in failed:
     raise SystemExit('The MedScope run failed: copy the error above into the chat.')
 """),
+        md("## Are the edits detectable? A learned detector (about 20 minutes)"),
+        code("!python scripts/edit_detector.py --train {TRAIN_VIEWS} --test {TEST_VIEWS} --out {RESULTS}/v2_edit_detector"),
         md("## Export the final model"),
         code("PUSH_TO = ''   # e.g. 'your-hf-username/MedScope-4B' to also upload (private)"),
         code(f"""
@@ -854,8 +857,10 @@ push = f'--push {{PUSH_TO}}' if PUSH_TO else ''
 !python scripts/export_model.py --model {BASE} --adapter {{FINAL}} --out {{DRIVE}}/export/MedScope-4B --summary {{RESULTS}}/v2_medscope_test/summary.json {{push}}
 """),
         publish("MedScope report - 10 final", f"""
-    ('Leaderboard (test)', compare_runs(RESULTS)),
+    ('Leaderboard (test)', compare_runs(RESULTS, 'v2_*_test')),
+    ('MedScope vs each model (paired bootstrap over cases)', significance_table(RESULTS, 'v2_medscope_test', {all_runs[1:]!r})),
     ('By imaging type', by_dataset(RESULTS, {all_runs!r})),
+    ('Learned edit detector', read_text(f'{{RESULTS}}/v2_edit_detector/edit_detector.md')),
     ('MedScope on test', read_text(f'{{RESULTS}}/v2_medscope_test/report.md')),
 """),
     ]
@@ -905,6 +910,58 @@ print('done. On the GPU machine set:  HF_WORK_REPO=' + REPO)
     ]
 
 
+def nb12_frontier() -> list[dict]:
+    return [
+        md("""
+# MedScope 12: frontier models (GPT, Gemini) on MedScope-Bench
+
+The same agent prompt, images, tools and scoring as every other model, sent through the OpenAI and
+Gemini APIs, on a fixed random subset of the test set (the same subset for both). The comparison
+with MedScope is paired on exactly these cases.
+
+**Runtime: CPU is fine** (no GPU credits): the models run on the providers' servers.
+**Cost:** roughly 500 API requests per model with images; with the default 150 cases expect about
+$10-25 per model (check your provider's current prices). Set `N_CASES` lower for a cheaper first run.
+
+**Before you start:** add Colab secrets `OPENAI_API_KEY` and/or `GEMINI_API_KEY` (key icon). Only the
+providers with a key are run. Images from the five datasets are sent to the provider for this
+research evaluation; the datasets' licences allow research use.
+"""),
+        code(SETUP),
+        code("!pip install -q -U openai google-genai"),
+        code(RESTORE_ALL),
+        code(r"""
+from medscope.api_policy import available_models
+for name in ('OPENAI_API_KEY', 'GEMINI_API_KEY'):
+    if secret(name):
+        os.environ[name] = secret(name)
+PROVIDERS = [p for p, k in (('openai', 'OPENAI_API_KEY'), ('gemini', 'GEMINI_API_KEY')) if os.environ.get(k)]
+print('providers with a key:', PROVIDERS)
+for p in PROVIDERS:
+    names = available_models(p) or []
+    print(p, [n for n in names if ('gpt' in n or 'gemini' in n) and 'audio' not in n and 'tts' not in n][-25:])
+"""),
+        md("Model ids below were the newest flagships with image input in October 2026; change them if the list above shows newer ones."),
+        code(r"""
+MODELS = {'openai': 'gpt-6-sol', 'gemini': 'gemini-4-argon'}
+N_CASES = 150
+for p in PROVIDERS:
+    m = MODELS[p]
+    try:
+        !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases {N_CASES} --out {RESULTS}/v2_{p}_test --name {p}-{m} --split test --batch-size 8
+    except SystemExit:
+        print(f'{p} failed: see the error above')
+"""),
+        publish("MedScope report - 12 frontier", """
+    ('Leaderboard (test; frontier rows are on a subset)', compare_runs(RESULTS, 'v2_*_test')),
+    ('MedScope vs frontier models on the same cases (paired bootstrap)', significance_table(RESULTS, 'v2_medscope_test', ['v2_openai_test', 'v2_gemini_test'])),
+    ('By imaging type', by_dataset(RESULTS, ['v2_medscope_test', 'v2_openai_test', 'v2_gemini_test'])),
+    ('OpenAI model on test', read_text(f'{RESULTS}/v2_openai_test/report.md')),
+    ('Gemini model on test', read_text(f'{RESULTS}/v2_gemini_test/report.md')),
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -917,6 +974,7 @@ NOTEBOOKS = {
     "08_sft_v2.ipynb": nb08,
     "09_rejection_sampling.ipynb": nb09,
     "10_final_eval_export.ipynb": nb10,
+    "12_frontier_models.ipynb": nb12_frontier,
 }
 
 

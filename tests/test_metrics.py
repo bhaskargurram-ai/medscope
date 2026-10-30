@@ -119,3 +119,32 @@ class TestRejudgeFromTranscripts(unittest.TestCase):
             self.assertEqual(m["target_absent_rate"]["value"], 1.0)     # "No" on the erased lesion: right
             self.assertEqual(m["random_denial_rate"]["value"], 1.0)     # "No polyp" with it intact: denial
             self.assertEqual(m["esg"]["value"], 0.0)
+
+
+class TestTokenConfidence(unittest.TestCase):
+    def test_answer_prob_covers_only_the_answer_tokens(self):
+        from medscope.confidence import answer_prob
+        pieces = ["Looks", " fine.", " <final>", '{"action": "answer", "answer": "', "Ye", "s", '", "confidence": 0.8}', "</final>"]
+        probs = [0.1, 0.1, 0.9, 0.9, 0.5, 0.8, 0.99, 0.99]
+        self.assertAlmostEqual(answer_prob(pieces, probs), (0.5 * 0.8) ** 0.5, places=6)
+        self.assertIsNone(answer_prob(["<final>", '{"action": "refer"}', "</final>"], [0.9, 0.9, 0.9]))
+
+    def test_aurc_prob_ranks_by_probability(self):
+        from medscope.eval.metrics import aurc_prob
+        good = out("a", "original", "answer", True); good.answer_prob = 0.9
+        bad = out("b", "original", "answer", False); bad.answer_prob = 0.2
+        self.assertAlmostEqual(aurc_prob([good, bad]), (0 + 0.5) / 2)
+        bad.answer_prob = None
+        self.assertIsNone(aurc_prob([good, bad]))
+
+
+class TestPairedBootstrap(unittest.TestCase):
+    def test_clear_difference_is_significant(self):
+        from medscope.eval.compare import paired_bootstrap
+        good = [out(f"c{i}", "original", "answer", True, reward=1.0) for i in range(40)]
+        bad = [out(f"c{i}", "original", "answer", i % 4 == 0, reward=1.0 if i % 4 == 0 else -2.0) for i in range(40)]
+        r = paired_bootstrap(good, bad, "net_utility", n=300)
+        self.assertGreater(r["diff"], 0)
+        self.assertLess(r["p"], 0.01)
+        same = paired_bootstrap(good, good, "ccr", n=100)
+        self.assertEqual(same["diff"], 0.0)

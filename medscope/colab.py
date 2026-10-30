@@ -133,7 +133,8 @@ def negatives_by_domain(results_dir: str | Path, views_file: str | Path | None =
 DATASET_PREFIXES = (("slakeneg", "SLAKE CT/MRI"), ("slake", "SLAKE CT/MRI"),
                     ("hkneg", "Colonoscopy (Kvasir-SEG, HyperKvasir)"), ("kvasir", "Colonoscopy (Kvasir-SEG, HyperKvasir)"),
                     ("chestxdet", "Chest X-ray (ChestX-Det)"), ("busi", "Breast ultrasound (BUSI)"),
-                    ("lgg", "Brain MRI (LGG)"))
+                    ("lgg", "Brain MRI (LGG)"), ("vqarad", "VQA-RAD"), ("slaketest", "SLAKE test (VQA)"),
+                    ("pathvqa", "PathVQA"))
 
 
 def dataset_of(case_id: str) -> str:
@@ -170,6 +171,27 @@ def by_dataset(results_dir: str | Path, runs: list[str]) -> str:
                 vals.append("n/a" if v is None or v != v else f"{v:.2f}")
             rows.append(f"| {run} | {ds} | {len({o.case_id for o in os_})} | " + " | ".join(vals) + " |")
     return "\n".join(rows) if len(rows) > 2 else "(no results yet)"
+
+
+def vqa_table(results_dir: str | Path, runs: list[str]) -> str:
+    """Standard medical VQA accuracy per model and benchmark, closed (yes/no) and open questions."""
+    from .eval.runner import read_jsonl
+    rows = ["| Model | Benchmark | Closed (yes/no) | Open | All | Questions |", "| --- | --- | --- | --- | --- | --- |"]
+    for run in runs:
+        d = Path(results_dir) / run
+        outs = read_jsonl(d / "outcomes.jsonl")
+        if not outs:
+            continue
+        gold = {t["view_id"]: str(t["gold"]).strip().lower() for t in read_jsonl(d / "transcripts.jsonl")}
+        groups: dict[str, list] = {}
+        for o in outs:
+            groups.setdefault(dataset_of(o["case_id"]), []).append(o)
+        for ds, os_ in sorted(groups.items()):
+            ok = lambda xs: sum(o["action"] == "answer" and bool(o["correct"]) for o in xs) / len(xs) if xs else float("nan")  # noqa: E731
+            closed = [o for o in os_ if gold.get(o["view_id"]) in ("yes", "no")]
+            open_ = [o for o in os_ if gold.get(o["view_id"]) not in ("yes", "no")]
+            rows.append(f"| {run} | {ds} | {ok(closed):.3f} | {ok(open_):.3f} | {ok(os_):.3f} | {len(os_)} |")
+    return "\n".join(rows) if len(rows) > 2 else "(no VQA results yet)"
 
 
 def build_report(title: str, sections: list[tuple[str, str]]) -> str:

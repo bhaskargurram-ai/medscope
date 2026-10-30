@@ -146,6 +146,17 @@ def aurc(outs: list[Outcome]) -> Optional[float]:
     return float(np.mean(risks))
 
 
+def aurc_prob(outs: list[Outcome]) -> Optional[float]:
+    """AURC ranked by the model's own answer-token probability instead of its stated confidence."""
+    items = [o for o in outs if o.kind in ANSWERABLE]
+    if not items or any(o.action == "answer" and o.answer_prob is None for o in items):
+        return None
+    conf = np.array([o.answer_prob if o.action == "answer" else 0.0 for o in items])
+    err = np.array([0.0 if (o.action == "answer" and o.correct) else 1.0 for o in items])
+    order = np.argsort(-conf, kind="stable")
+    return float(np.mean(np.cumsum(err[order]) / np.arange(1, len(items) + 1)))
+
+
 METRICS: dict[str, Callable[[list[Outcome]], Optional[float]]] = {
     "coverage": coverage,
     "selective_accuracy": selective_accuracy,
@@ -162,6 +173,7 @@ METRICS: dict[str, Callable[[list[Outcome]], Optional[float]]] = {
     "clarify_rate_degraded": clarify_rate_on_degraded,
     "net_utility": net_utility,
     "aurc": aurc,
+    "aurc_prob": aurc_prob,
     "tool_calls_per_correct": tool_calls_per_correct,
     "malformed_rate": malformed_rate,
     "natural_hallucination_rate": natural_hallucination_rate,

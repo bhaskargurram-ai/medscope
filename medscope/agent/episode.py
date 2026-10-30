@@ -89,6 +89,8 @@ class _State:
             self.malformed, self.error = True, "no final action within the turn limit"
         outcome = score(self.view, self.final, cfg, tool_calls=self.env.calls, refused_calls=self.env.refused,
                         malformed=self.malformed or self.final is None)
+        if outcome.action == "answer" and self.turns and isinstance(self.turns[-1].extra, dict):
+            outcome.answer_prob = self.turns[-1].extra.get("answer_prob")
         return Episode(self.view, self.messages, self.turns, self.final, self.malformed, self.error,
                        self.env.calls, self.env.refused, outcome, self.env.log)
 

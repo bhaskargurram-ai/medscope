@@ -184,6 +184,32 @@ class HFPolicy:
                 break
         return self.torch.tensor(out, dtype=self.torch.long)
 
+    def _finish(self, out, prompt_len: int, recorder) -> list[Generation]:
+        """Generations from generate() output; with a recorder (greedy), also the answer's probability."""
+        from ..confidence import answer_prob
+        gens = []
+        for i, row in enumerate(out[:, prompt_len:]):
+            ids = self._trim(row.cpu())
+            extra = {"gen_ids": ids}
+            if recorder is not None:
+                pieces = [self.tokenizer.decode([int(t)], skip_special_tokens=False) for t in ids]
+                extra["answer_prob"] = answer_prob(pieces, recorder.row(i, len(ids)))
+            gens.append(Generation(self.decode(ids), extra))
+        return gens
+
+    def _generate(self, inputs, sample: bool, n: int = 1):
+        from transformers import LogitsProcessorList
+
+        from ..confidence import GreedyProbRecorder
+        recorder = None if sample else GreedyProbRecorder()
+        kw = self._gen_kwargs(sample)
+        if recorder is not None:
+            kw["logits_processor"] = LogitsProcessorList([recorder])
+        if n > 1:
+            kw["num_return_sequences"] = n
+        out = self.model.generate(**inputs, **kw)
+        return out, recorder
+
     def generate_n(self, messages: list[dict], n: int, sample: bool = True) -> list[Generation]:
         torch = self.torch
         inputs = self.encode(messages)
@@ -191,14 +217,10 @@ class HFPolicy:
         was_training = self.model.training
         self.model.eval()
         with torch.no_grad():
-            out = self.model.generate(**inputs, num_return_sequences=n, **self._gen_kwargs(sample))
+            out, recorder = self._generate(inputs, sample, n)
         if was_training:
             self.model.train()
-        gens = []
-        for row in out[:, prompt_len:]:
-            ids = self._trim(row.cpu())
-            gens.append(Generation(self.decode(ids), {"gen_ids": ids}))
-        return gens
+        return self._finish(out, prompt_len, recorder)
 
     def generate_batch(self, conversations: list[list[dict]], sample: bool = False) -> list[Generation]:
         """One turn for several different conversations in a single left-padded batch.
@@ -224,7 +246,7 @@ class HFPolicy:
         self.model.eval()
         try:
             with torch.no_grad():
-                out = self.model.generate(**inputs, **self._gen_kwargs(sample))
+                out, recorder = self._generate(inputs, sample)
         except Exception as e:  # noqa: BLE001 - e.g. a model whose vision tower can't batch mixed sizes
             print(f"batched generation failed for this model ({type(e).__name__}: {str(e)[:120]}); "
                   "running one at a time")
@@ -234,11 +256,7 @@ class HFPolicy:
         finally:
             if was_training:
                 self.model.train()
-        gens = []
-        for row in out[:, prompt_len:]:
-            ids = self._trim(row.cpu())
-            gens.append(Generation(self.decode(ids), {"gen_ids": ids}))
-        return gens
+        return self._finish(out, prompt_len, recorder)
 
     KEEP_TOKENS = ("<think>", "</think>", "<unused94>", "<unused95>")  # thinking markers the parser needs
 

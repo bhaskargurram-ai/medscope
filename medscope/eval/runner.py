@@ -188,7 +188,8 @@ HEADLINE = [
     ("grounded_accuracy", "Grounded accuracy (IoU >= 0.3)"),
     ("clarify_rate_degraded", "Asks to clarify on degraded input"),
     ("net_utility", "Net clinical utility (mean reward)"),
-    ("aurc", "AURC (lower is better)"),
+    ("aurc", "AURC, stated confidence (lower is better)"),
+    ("aurc_prob", "AURC, answer-token probability (lower is better)"),
     ("tool_calls_per_correct", "Tool calls per correct answer"),
     ("malformed_rate", "Malformed output rate"),
     ("natural_hallucination_rate", "Natural negatives: claims the absent finding (lower is better)"),
@@ -248,14 +249,14 @@ def make_report(summary: dict, outcomes: list[Outcome], transcripts: list[dict],
     return "\n".join(lines)
 
 
-def compare_runs(results_dir: str | Path) -> str:
-    """Markdown leaderboard across every run folder that has a summary.json."""
+def compare_runs(results_dir: str | Path, pattern: str = "*") -> str:
+    """Markdown leaderboard across the run folders matching `pattern` that have a summary.json."""
     rows = []
-    for p in sorted(Path(results_dir).glob("*/summary.json")):
+    for p in sorted(Path(results_dir).glob(f"{pattern}/summary.json")):
         s = json.loads(p.read_text())
         rows.append((s["meta"].get("name", p.parent.name), s))
     keys = ["ccr", "esg", "target_hallucination_rate", "grounded_accuracy", "clarify_rate_degraded",
-            "natural_hallucination_rate", "natural_correct_rate", "net_utility", "malformed_rate"]
+            "natural_hallucination_rate", "natural_correct_rate", "net_utility", "aurc_prob", "malformed_rate"]
     lines = ["| Run | Split | Cases | " + " | ".join(keys) + " |", "| --- | --- | --- | " + " | ".join("---" for _ in keys) + " |"]
     def order(r):
         s = r[1]

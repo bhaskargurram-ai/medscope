@@ -33,16 +33,22 @@ def main() -> None:
                     help="per turn; generous because some models (MedGemma 1.5) think before answering")
     ap.add_argument("--quant", choices=["auto", "4bit", "none"], default="auto",
                     help="auto: 4-bit only on GPUs under 20 GB (T4); 16-bit on L4/A100")
+    ap.add_argument("--api", choices=["openai", "gemini"], default=None,
+                    help="evaluate a model behind an API (key from OPENAI_API_KEY / GEMINI_API_KEY); --model is its id")
     ap.add_argument("--batch-size", type=int, default=8,
                     help="episodes advanced together; each sees exactly what it would see alone")
     args = ap.parse_args()
 
-    from medscope.train.hf_policy import HFPolicy
-
     views = select_cases([v for f in args.views for v in load_views(f)], args.limit_cases)
-    policy = HFPolicy(args.model, adapter=args.adapter, load_in_4bit={"auto": None, "4bit": True, "none": False}[args.quant],
-                      max_new_tokens=args.max_new_tokens)
-    precision = "4bit" if policy.load_in_4bit else str(policy.dtype).replace("torch.", "")
+    if args.api:
+        from medscope.api_policy import api_policy
+        policy = api_policy(args.api, args.model)
+        precision = "api"
+    else:
+        from medscope.train.hf_policy import HFPolicy
+        policy = HFPolicy(args.model, adapter=args.adapter, load_in_4bit={"auto": None, "4bit": True, "none": False}[args.quant],
+                          max_new_tokens=args.max_new_tokens)
+        precision = "4bit" if policy.load_in_4bit else str(policy.dtype).replace("torch.", "")
     meta = {"name": args.name, "model": args.model, "adapter": args.adapter, "split": args.split,
             "views_file": " ".join(args.views), "precision": precision}
     summary = evaluate(policy, views, load_config(), args.out, meta, batch_size=args.batch_size)
