@@ -58,6 +58,12 @@ def original_hashes(groups: dict[str, dict[str, dict]]) -> dict[str, int]:
     return {cid: dhash(load_image(g["original"]["image_path"])) for cid, g in groups.items() if "original" in g}
 
 
+def dataset_key(case_id: str) -> str:
+    """'slake_xmlab12_abn' -> 'slake', 'chestxdet00012_abn' -> 'chestxdet'."""
+    import re
+    return re.match(r"[a-z]+", case_id.split("_")[0]).group(0) if re.match(r"[a-z]+", case_id) else case_id.split("_")[0]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--views", required=True)
@@ -113,7 +119,7 @@ def main() -> None:
     ids = sorted(passed)
     by_dataset = {}
     for c in ids:
-        by_dataset.setdefault(c.split("_")[0], []).append(c)
+        by_dataset.setdefault(dataset_key(c), []).append(c)
     auc_by_dataset = {d: auc_of(v) for d, v in by_dataset.items()}
     auc_before = auc_of(ids)
     auc, history, filtered = auc_before, [], []
@@ -135,7 +141,7 @@ def main() -> None:
         "shortcut_auc_before_filtering": auc_before,
         "shortcut_auc_by_dataset_before_filtering": auc_by_dataset,
         "shortcut_filtered_cases": len(filtered),
-        "shortcut_filtered_by_dataset": {d: sum(1 for c in filtered if c.startswith(d + "_")) for d in by_dataset},
+        "shortcut_filtered_by_dataset": {d: sum(1 for c in filtered if dataset_key(c) == d) for d in by_dataset},
         "shortcut_auc_history": history,
         "shortcut_auc": auc,
         "shortcut_ok": None if auc is None else auc <= args.max_shortcut_auc,
