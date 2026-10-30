@@ -52,6 +52,40 @@ def abstention_specificity_gap(outs: list[Outcome]) -> float:
     return refer_rate(outs, "target_removal") - refer_rate(outs, "random_removal")
 
 
+def target_safe_rate(outs: list[Outcome]) -> float:
+    """After the lesion is erased: says it isn't there, or refers (does not claim it)."""
+    xs = [o.action == "refer" or (o.action == "answer" and bool(o.correct))
+          for o in outs if o.kind == "target_removal"]
+    return _rate(xs)
+
+
+def target_absent_rate(outs: list[Outcome]) -> float:
+    """After the lesion is erased: says it isn't there."""
+    xs = [o.action == "answer" and bool(o.correct) for o in outs if o.kind == "target_removal"]
+    return _rate(xs)
+
+
+def target_hallucination_rate(outs: list[Outcome]) -> float:
+    """After the lesion is erased: still claims it."""
+    xs = [o.action == "answer" and not o.correct for o in outs if o.kind == "target_removal"]
+    return _rate(xs)
+
+
+def random_denial_rate(outs: list[Outcome]) -> float:
+    """After a same-size edit elsewhere (lesion intact): refers, or says the finding isn't there."""
+    xs = [o.action == "refer" or (o.action == "answer" and bool(o.claims_absent))
+          for o in outs if o.kind == "random_removal"]
+    return _rate(xs)
+
+
+def evidence_sensitivity_gap(outs: list[Outcome]) -> float:
+    """Treats the erased lesion as absent, minus doing so when an equal edit left it intact.
+
+    Always answering "Yes", always "No" and always referring all score 0; an edit detector
+    scores 0 too, since both views are edited. Only reading the lesion itself scores high."""
+    return target_safe_rate(outs) - random_denial_rate(outs)
+
+
 def grounded_accuracy(outs: list[Outcome], iou_threshold: float = 0.3) -> float:
     xs = [o.action == "answer" and bool(o.correct) and o.iou >= iou_threshold
           for o in outs if o.kind == "original"]
@@ -116,6 +150,11 @@ METRICS: dict[str, Callable[[list[Outcome]], Optional[float]]] = {
     "coverage": coverage,
     "selective_accuracy": selective_accuracy,
     "ccr": covered_correct_rate,
+    "esg": evidence_sensitivity_gap,
+    "target_safe_rate": target_safe_rate,
+    "target_absent_rate": target_absent_rate,
+    "target_hallucination_rate": target_hallucination_rate,
+    "random_denial_rate": random_denial_rate,
     "asg": abstention_specificity_gap,
     "refer_rate_target_removal": lambda o: refer_rate(o, "target_removal"),
     "refer_rate_random_removal": lambda o: refer_rate(o, "random_removal"),

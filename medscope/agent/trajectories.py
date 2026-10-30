@@ -4,7 +4,7 @@ For every view we know the correct final action and, for answerable views, where
 the evidence is. That is enough to write correct multi-turn examples:
 
   original / random_removal  ->  (sometimes) zoom on the evidence, then answer with its box
-  target_removal             ->  (sometimes) zoom on the region, then refer
+  target_removal             ->  (sometimes) zoom on the region, then say the finding is absent
   degraded                   ->  clarify, with a reason that matches the degradation
 
 Each trajectory becomes one SFT sample per assistant turn: the context the model
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..actions import ToolCall, tool_text
+from ..actions import ToolCall, absent_reply, tool_text
 from ..data.schema import Box, View, ViewKind
 from ..data.views import load_image
 from ..env.tools import ToolEnv
@@ -35,10 +35,15 @@ SEE_EVIDENCE = [
     "I can see the evidence for this in the image.",
 ]
 NO_EVIDENCE = [
-    "The image is of usable quality, but I cannot see any evidence of the finding asked about.",
-    "I looked at the relevant area and there is no visible abnormality to support an answer.",
-    "Nothing in this image shows the finding, so I should not guess.",
+    "The image is of good quality and there is no sign of the finding asked about.",
+    "I looked at the relevant area and there is no visible abnormality.",
+    "Nothing in this image shows the finding, so it is not present.",
 ]
+
+
+def absent_text(view: View) -> str:
+    """The answer that says the finding is not there, phrased for this question."""
+    return absent_reply(view.question, view.answer) or "No abnormality"
 CLARIFY = {
     "blur": ("The image is too blurred to assess fine detail.",
              "Could you provide a sharper image of this region?"),
@@ -95,10 +100,6 @@ def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.
 
     pick = lambda opts: opts[int(rng.integers(len(opts)))]  # noqa: E731
 
-    if view.kind is ViewKind.NATURAL_NEGATIVE:  # the dataset says the finding isn't there: say so
-        emit(f"I looked at the image and the finding asked about is not present. "
-             f"{_final(action='answer', answer=view.answer, confidence=round(float(rng.uniform(0.75, 0.95)), 2))}")
-        return samples
 
     if view.kind is ViewKind.DEGRADED:
         reason, question = CLARIFY.get(view.meta.get("degradation", "blur"), CLARIFY["blur"])
@@ -112,9 +113,31 @@ def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.
         messages[-1] = assistant_message(tool_text(ToolCall("zoom", {"box": region})))  # as run_episode keeps it
         messages.append(tool_result_message(env.call("zoom", {"box": region})))
 
-    if view.kind is ViewKind.TARGET_REMOVAL:
-        emit(f"{pick(NO_EVIDENCE)} {_final(action='refer', reason='No visible evidence of the finding asked about; needs clinician review.')}")
+    if view.kind in (ViewKind.TARGET_REMOVAL, ViewKind.NATURAL_NEGATIVE):
+        # lesion-removed and natural negative images get the same reply: the finding isn't there
+        answer = view.answer if view.kind is ViewKind.NATURAL_NEGATIVE else absent_text(view)
+        conf = round(float(rng.uniform(0.75, 0.95)), 2)
+        emit(f"{pick(NO_EVIDENCE)} {_final(action='answer', answer=answer, confidence=conf)}")
     else:
         conf = round(float(rng.uniform(0.75, 0.95)), 2)
         emit(f"{pick(SEE_EVIDENCE)} {_final(action='answer', answer=view.answer, box=view.lesion_box, confidence=conf)}")
     return samples
+
+
+class _Replay:
+    """Policy stand-in that replays recorded assistant turns."""
+
+    def __init__(self, texts: list[str]):
+        self.texts = list(texts)
+
+    def generate(self, messages, sample=False):
+        from .episode import Generation
+        return Generation(self.texts.pop(0) if self.texts else "")
+
+
+def replay_samples(view: View, texts: list[str], cfg: dict, image: np.ndarray | None = None) -> list[SFTSample]:
+    """SFT samples from a recorded episode (rejection sampling): replay the model's own turns
+    through the environment so every turn gets exactly the context the model saw."""
+    from .episode import run_episode
+    ep = run_episode(_Replay(texts), view, cfg, image=image)
+    return [SFTSample(ep.messages[:t.context_len], t.text, view.view_id, view.kind.value) for t in ep.turns]

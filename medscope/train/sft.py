@@ -2,7 +2,8 @@
 
 Two adapters are trained from the same base and LoRA config so they can be merged:
   grounding - answerable views only, single turn, answer + evidence box, no tools
-  agentic   - all four view kinds, multi-turn with zoom, refer and clarify
+  agentic   - every view kind, multi-turn with zoom; says "No" when the lesion is absent,
+              asks to clarify on unusable images
 
 Loss is the mean token NLL of each assistant turn given exactly the context the
 model sees at inference, so training and inference prompts match.
@@ -12,11 +13,12 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Callable, Iterator, Optional
 
 import numpy as np
 
-from ..agent.trajectories import SFTSample, build_trajectory
+from ..agent.trajectories import SFTSample, build_trajectory, replay_samples
+from ..rewards import load_config
 from ..data.schema import View
 from .common import (
     append_log,
@@ -46,7 +48,12 @@ def view_order(views: list[View], epochs: int, seed: int) -> list[View]:
     return order
 
 
-def samples_for(view: View, mode: str, seed: int, index: int) -> list[SFTSample]:
+def samples_for(view: View, mode: str, seed: int, index: int,
+                replays: Optional[dict[str, list[str]]] = None, cfg: Optional[dict] = None) -> list[SFTSample]:
+    """Synthetic trajectory for the view, or the model's own recorded episode for it if one
+    was kept by rejection sampling (`replays`: view_id -> assistant turns)."""
+    if replays and view.view_id in replays:
+        return replay_samples(view, replays[view.view_id], cfg)
     rng = np.random.default_rng([seed, index])
     return build_trajectory(view, rng, direct_only=(mode == "grounding"))
 
@@ -70,6 +77,7 @@ def train_sft(
     save_every: int = 50,
     seed: int = 0,
     log: Callable[[str], None] = print,
+    replays: Optional[dict[str, list[str]]] = None,
 ) -> Path:
     import torch
 
@@ -77,6 +85,7 @@ def train_sft(
     out.mkdir(parents=True, exist_ok=True)
     views = mode_views(views, mode)
     order = view_order(views, epochs, seed)
+    cfg = load_config() if replays else None
     total_steps = max_steps or max(1, int(estimate_samples(views, mode) * epochs / grad_accum))
 
     model = policy.model
@@ -107,7 +116,7 @@ def train_sft(
     micro, running, t0 = 0, [], time.time()
     save_due = False
     for vi in range(start_view, len(order)):
-        for s in samples_for(order[vi], mode, seed, vi):
+        for s in samples_for(order[vi], mode, seed, vi, replays, cfg):
             target = policy.target_ids(s.target)
             lp = policy.token_logprobs(s.messages, target)
             loss = -lp.mean()

@@ -175,7 +175,7 @@ Turn on notebook access for both secrets when Colab asks.
 
 def publish(title: str, sections: str) -> dict:
     return code(f"""
-from medscope.colab import build_report, negatives_by_domain, publish_doc, read_text, train_log_summary
+from medscope.colab import build_report, by_dataset, negatives_by_domain, publish_doc, read_text, train_log_summary
 from medscope.eval.runner import compare_runs
 report = build_report({title!r}, [
 {sections}
@@ -611,6 +611,248 @@ push = f'--push {{PUSH_TO}}' if PUSH_TO else ''
     ]
 
 
+# ---------------------------------------------------------------------------------------------
+# Version 2 pipeline: more imaging types, "No" when the lesion is absent, rejection sampling
+# ---------------------------------------------------------------------------------------------
+
+RESTORE_ALL = r"""
+# --- restore all benchmark data (SLAKE + Kvasir views from notebook 01, the rest from notebook 07) ---
+if not os.path.exists(f'{VIEWS}/test/views_clean.jsonl'):
+    !tar -C {WORK} -xf {DRIVE}/slake/views.tar
+VX = f'{WORK}/views_extra'
+if not os.path.exists(f'{VX}/test/views_clean.jsonl'):
+    if not os.path.exists(f'{DRIVE}/extra/extra.tar'):
+        raise SystemExit('The chest X-ray / ultrasound / brain MRI data is missing: run notebook 07 first.')
+    !tar -C {WORK} -xf {DRIVE}/extra/extra.tar
+NEG_HK, NEG_X = f'{DRIVE}/slake/negatives', f'{WORK}/extra/negatives'
+TRAIN_VIEWS = f'{VIEWS}/train/views_clean.jsonl {VX}/train/views_clean.jsonl'
+VAL_VIEWS = f'{VIEWS}/validation/views_clean.jsonl {VX}/validation/views_clean.jsonl'
+TEST_VIEWS = f'{VIEWS}/test/views_clean.jsonl {VX}/test/views_clean.jsonl'
+TRAIN_NEG = f'{NEG_HK}/views_negatives_train.jsonl {NEG_X}/views_negatives_train.jsonl'
+VAL_NEG = f'{NEG_HK}/views_negatives_val.jsonl {NEG_X}/views_negatives_val.jsonl'
+TEST_NEG = f'{NEG_HK}/views_negatives.jsonl {NEG_X}/views_negatives.jsonl'
+for name in ('TRAIN_VIEWS', 'VAL_VIEWS', 'TEST_VIEWS', 'TRAIN_NEG', 'VAL_NEG', 'TEST_NEG'):
+    files = globals()[name].split()
+    n = sum(sum(1 for _ in open(f)) for f in files)
+    print(f'{name}: {n} views in {len(files)} files')
+"""
+
+LAMA_CELL = r"""
+# Big-LaMa inpainting model (about 200 MB), cached on Drive so it downloads only once
+import torch, numpy as np
+from medscope.data.inpaint import LAMA_URL, lama_inpaint
+LAMA = f'{DRIVE}/models/big-lama.pt'
+if not os.path.exists(LAMA):
+    os.makedirs(os.path.dirname(LAMA), exist_ok=True)
+    torch.hub.download_url_to_file(LAMA_URL, LAMA)
+os.environ['MEDSCOPE_LAMA_PATH'] = LAMA
+test = np.random.default_rng(0).integers(0, 256, (200, 300, 3), dtype=np.uint8)
+hole = np.zeros((200, 300), bool); hole[50:90, 100:160] = True
+assert (lama_inpaint(test, hole)[~hole] == test[~hole]).all()
+print('LaMa works on', 'GPU' if torch.cuda.is_available() else 'CPU (slow: switch the runtime to a GPU)')
+"""
+
+
+def nb07() -> list[dict]:
+    return [
+        md("""
+# MedScope 07: three more imaging types
+
+Adds **chest X-ray** (ChestX-Det: NIH ChestX-ray14 images with 13 finding masks), **breast ultrasound**
+(BUSI) and **brain MRI** (TCGA-LGG FLAIR slices). Each comes from a public, ungated Hugging Face mirror
+with lesion masks and lesion-free images, so each gives counterfactual cases *and* natural negatives.
+Patients (or groups of near-identical images) never cross splits. Same view builder, LaMa inpainting
+and quality checks as notebook 01.
+
+**Runtime:** any GPU (T4 is enough). About 1 hour; downloads about 2 GB.
+""" + SECRETS_NOTE),
+        code(SETUP),
+        code("!pip install -q huggingface_hub pyarrow"),
+        code(LAMA_CELL),
+        md("## Download, select and split"),
+        code(r"""
+import shutil
+EXTRA, VX = f'{WORK}/extra', f'{WORK}/views_extra'
+shutil.rmtree(VX, ignore_errors=True)
+!python scripts/prepare_extra.py --out {EXTRA} --cache {WORK}/raw/extra
+!wc -l {EXTRA}/cases_*.jsonl {EXTRA}/negatives/*.jsonl
+"""),
+        md("## Build views and run the quality checks"),
+        code(r"""
+for split in ['train', 'validation', 'test']:
+    !python scripts/build_views.py --manifest {EXTRA}/cases_{split}.jsonl --out {VX}/{split} --inpainter lama
+!python scripts/check_views.py --views {VX}/train/views.jsonl
+for split in ['validation', 'test']:
+    !python scripts/check_views.py --views {VX}/{split}/views.jsonl --dedup-against {VX}/train/views.jsonl
+"""),
+        md("## Look at a few examples"),
+        code(r"""
+import matplotlib.pyplot as plt
+from PIL import Image
+from collections import defaultdict
+views = [json.loads(l) for l in open(f'{VX}/test/views_clean.jsonl')]
+by_case = defaultdict(dict)
+for v in views:
+    by_case[v['case_id']][v['kind']] = v
+kinds = ['original', 'target_removal', 'random_removal', 'degraded']
+cases = [next(c for c in by_case if c.startswith(p)) for p in ('chestxdet', 'busi', 'lgg') if any(c.startswith(p) for c in by_case)]
+fig, axes = plt.subplots(len(cases), 4, figsize=(12, 3 * len(cases)), squeeze=False)
+for r, cid in enumerate(cases):
+    for c, k in enumerate(kinds):
+        axes[r, c].imshow(Image.open(by_case[cid][k]['image_path']))
+        axes[r, c].set_title(f"{k}\n{by_case[cid][k]['question'][:40]}" if c == 0 else k, fontsize=8)
+        axes[r, c].axis('off')
+plt.tight_layout()
+plt.savefig(f'{RESULTS}/07_examples.png', dpi=80)
+"""),
+        md("## Save to Drive and publish the report"),
+        code(r"""
+os.makedirs(f'{DRIVE}/extra', exist_ok=True)
+!tar -C {WORK} -cf {DRIVE}/extra/extra.tar extra/images extra/negatives extra/extra_report.txt views_extra
+!du -sh {DRIVE}/extra/extra.tar
+def quality(split):
+    r = json.load(open(f'{VX}/{split}/quality_report.json'))
+    r.pop('cases', None)
+    r.pop('filtered', None)
+    return json.dumps(r, indent=2)
+"""),
+        publish("MedScope report - 07 more data", """
+    ('Datasets', read_text(f'{EXTRA}/extra_report.txt')),
+    ('Quality: train', quality('train')),
+    ('Quality: validation', quality('validation')),
+    ('Quality: test', quality('test')),
+"""),
+    ]
+
+
+def nb08() -> list[dict]:
+    return [
+        md(f"""
+# MedScope 08: SFT v2 (every imaging type, says "No" when the lesion is absent)
+
+Trains a fresh agentic LoRA adapter on `{BASE}` from synthetic trajectories over all five imaging types
+(CT/MRI, colonoscopy, chest X-ray, breast ultrasound, brain MRI), plus natural negatives. New target
+behaviour: when the finding is not in the image (lesion erased, or a healthy image) the agent **says so**
+("No") instead of only referring. Both kinds get the same reply and the same reward, so spotting edits
+earns nothing. Then checks it on the full validation set, next to the first agentic adapter.
+
+**Runtime:** A100. Training about 3 hours, validation about 1 hour. Checkpoints every 50 steps;
+rerun all cells to resume.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL),
+        md("## Train"),
+        code(f"!python scripts/train_sft.py --model {BASE} --views {{TRAIN_VIEWS}} --negatives {{TRAIN_NEG}} "
+             "--mode agentic --out {ADAPTERS}/sft_v2"),
+        md("## Validation (new adapter, then the first agentic adapter for comparison)"),
+        code(f"""
+!python scripts/evaluate.py --model {BASE} --adapter {{ADAPTERS}}/sft_v2/final --views {{VAL_VIEWS}} {{VAL_NEG}} --out {{RESULTS}}/v2_sft_v2_val --name medscope-sft-v2 --split validation
+!python scripts/evaluate.py --model {BASE} --adapter {{ADAPTERS}}/sft_agentic/final --views {{VAL_VIEWS}} {{VAL_NEG}} --out {{RESULTS}}/v2_sft_v1_val --name sft-v1-refer --split validation
+"""),
+        publish("MedScope report - 08 SFT v2", """
+    ('Training loss', train_log_summary(f'{ADAPTERS}/sft_v2/train_log.jsonl', window=200)),
+    ('Validation by imaging type', by_dataset(RESULTS, ['v2_sft_v2_val', 'v2_sft_v1_val'])),
+    ('SFT v2 on validation', read_text(f'{RESULTS}/v2_sft_v2_val/report.md')),
+    ('First agentic adapter on the same validation set', read_text(f'{RESULTS}/v2_sft_v1_val/report.md')),
+"""),
+    ]
+
+
+def nb09() -> list[dict]:
+    return [
+        md(f"""
+# MedScope 09: rejection-sampling fine-tuning
+
+RL could not move the SFT agent (it makes the same choice in nearly every sample, so group-relative
+advantages vanish). Rejection sampling still learns from those views: the SFT v2 model tries 150
+training views of each kind 4 times; whenever any try succeeds, its best episode (in the model's own
+words and tool use) is kept. The adapter is then fine-tuned on those episodes plus 3,000 synthetic ones
+at a low learning rate, and checked on validation. The better of SFT v2 and this model on validation
+becomes the final model for notebook 10.
+
+**Runtime:** A100. Sampling about 2 hours, training about 1 hour, validation about 1 hour. Every step resumes.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL),
+        md("## Sample"),
+        code(f"!python scripts/sample_rft.py --model {BASE} --adapter {{ADAPTERS}}/sft_v2/final --views {{TRAIN_VIEWS}} "
+             "--negatives {TRAIN_NEG} --per-kind 150 --k 4 --out {ADAPTERS}/rft/samples.jsonl"),
+        md("## Fine-tune on the kept episodes"),
+        code(f"!python scripts/train_sft.py --model {BASE} --init {{ADAPTERS}}/sft_v2/final --views {{TRAIN_VIEWS}} "
+             "--negatives {TRAIN_NEG} --subsample 3000 --replays {ADAPTERS}/rft/samples.jsonl --lr 5e-5 "
+             "--mode agentic --out {ADAPTERS}/rft_train"),
+        md("## Validation and choice of the final model"),
+        code(f"""
+!python scripts/evaluate.py --model {BASE} --adapter {{ADAPTERS}}/rft_train/final --views {{VAL_VIEWS}} {{VAL_NEG}} --out {{RESULTS}}/v2_rft_val --name medscope-rft --split validation
+scores = {{}}
+for name, run in [('sft_v2', 'v2_sft_v2_val'), ('rft_train', 'v2_rft_val')]:
+    p = f'{{RESULTS}}/{{run}}/summary.json'
+    if os.path.exists(p):
+        scores[name] = json.load(open(p))['metrics']['net_utility']['value']
+best = max(scores, key=scores.get)
+json.dump({{'adapter': f'{{ADAPTERS}}/{{best}}/final', 'chosen': best, 'validation_net_utility': scores}},
+          open(f'{{ADAPTERS}}/final_choice.json', 'w'), indent=2)
+print('validation net utility:', scores, '-> final model:', best)
+"""),
+        publish("MedScope report - 09 RFT", """
+    ('Rejection sampling: success per view kind', read_text(f'{ADAPTERS}/rft/rft_summary.md')),
+    ('Fine-tuning loss', train_log_summary(f'{ADAPTERS}/rft_train/train_log.jsonl', window=50)),
+    ('Final model choice', read_text(f'{ADAPTERS}/final_choice.json')),
+    ('Validation by imaging type', by_dataset(RESULTS, ['v2_rft_val', 'v2_sft_v2_val', 'v2_sft_v1_val'])),
+    ('RFT model on validation', read_text(f'{RESULTS}/v2_rft_val/report.md')),
+"""),
+    ]
+
+
+BASELINES = [
+    ("v2_base_qwen35_test", "qwen3.5-4b", BASE),
+    ("v2_base_medgemma15_test", "medgemma-1.5-4b", MEDGEMMA),
+    ("v2_lingshu7b_test", "lingshu-7b", "lingshu-medical-mllm/Lingshu-7B"),
+    ("v2_huatuo7b_test", "huatuogpt-vision-7b", "FreedomIntelligence/HuatuoGPT-Vision-7B-Qwen2.5VL"),
+    ("v2_qwen25vl7b_test", "qwen2.5-vl-7b", "Qwen/Qwen2.5-VL-7B-Instruct"),
+    ("v2_qwen3vl8b_test", "qwen3-vl-8b", "Qwen/Qwen3-VL-8B-Instruct"),
+]
+
+
+def nb10() -> list[dict]:
+    runs = "\n".join(f"    ({out!r}, {name!r}, {model!r}, None)," for out, name, model in BASELINES)
+    all_runs = ["v2_medscope_test"] + [b[0] for b in BASELINES] + ["v2_sft_v1_test"]
+    return [
+        md(f"""
+# MedScope 10: final test evaluation and export
+
+Every model on the full test set of all five imaging types plus the natural negatives, with the same
+prompt and scoring: the final MedScope model, six open baselines (general and medical, 4-8B) and the
+first refer-only adapter as an ablation. Then merges the final adapter into `{BASE}` and saves it.
+
+**Runtime:** A100, about 8-12 hours in total (about 1 hour per model). Every run resumes where it
+stopped; models run in order of importance, so the main table fills first. A High-RAM runtime is
+safer for the export step.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL),
+        code(f"""
+choice = json.load(open(f'{{ADAPTERS}}/final_choice.json')) if os.path.exists(f'{{ADAPTERS}}/final_choice.json') else {{'adapter': f'{{ADAPTERS}}/sft_v2/final'}}
+FINAL = choice['adapter']
+print('final model adapter:', FINAL)
+runs = [('v2_medscope_test', 'medscope-4b', {BASE!r}, FINAL),
+{runs}
+        ('v2_sft_v1_test', 'ablation-refer-only-sft', {BASE!r}, f'{{ADAPTERS}}/sft_agentic/final')]
+for out, name, model, adapter in runs:
+    adapter_arg = f'--adapter {{adapter}}' if adapter else ''
+    !python scripts/evaluate.py --model {{model}} {{adapter_arg}} --views {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/{{out}} --name {{name}} --split test
+"""),
+        md("## Export the final model"),
+        code("PUSH_TO = ''   # e.g. 'your-hf-username/MedScope-4B' to also upload (private)"),
+        code(f"""
+push = f'--push {{PUSH_TO}}' if PUSH_TO else ''
+!python scripts/export_model.py --model {BASE} --adapter {{FINAL}} --out {{DRIVE}}/export/MedScope-4B --summary {{RESULTS}}/v2_medscope_test/summary.json {{push}}
+"""),
+        publish("MedScope report - 10 final", f"""
+    ('Leaderboard (test)', compare_runs(RESULTS)),
+    ('By imaging type', by_dataset(RESULTS, {all_runs!r})),
+    ('MedScope on test', read_text(f'{{RESULTS}}/v2_medscope_test/report.md')),
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "01_build_slake_views.ipynb": nb01,
     "02_baselines.ipynb": nb02,
@@ -618,7 +860,10 @@ NOTEBOOKS = {
     "03_sft.ipynb": nb03,
     "04_merge.ipynb": nb04,
     "05_rl_grpo.ipynb": nb05,
-    "06_final_eval_export.ipynb": nb06,
+    "07_more_datasets.ipynb": nb07,
+    "08_sft_v2.ipynb": nb08,
+    "09_rejection_sampling.ipynb": nb09,
+    "10_final_eval_export.ipynb": nb10,
 }
 
 

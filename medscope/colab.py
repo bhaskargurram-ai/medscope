@@ -130,6 +130,48 @@ def negatives_by_domain(results_dir: str | Path, views_file: str | Path | None =
     return "\n".join(rows) if len(rows) > 2 else "(no natural-negative results yet)"
 
 
+DATASET_PREFIXES = (("slakeneg", "SLAKE CT/MRI"), ("slake", "SLAKE CT/MRI"),
+                    ("hkneg", "Colonoscopy (Kvasir-SEG, HyperKvasir)"), ("kvasir", "Colonoscopy (Kvasir-SEG, HyperKvasir)"),
+                    ("chestxdet", "Chest X-ray (ChestX-Det)"), ("busi", "Breast ultrasound (BUSI)"),
+                    ("lgg", "Brain MRI (LGG)"))
+
+
+def dataset_of(case_id: str) -> str:
+    for prefix, label in DATASET_PREFIXES:
+        if case_id.startswith(prefix):
+            return label
+    return "other"
+
+
+def by_dataset(results_dir: str | Path, runs: list[str]) -> str:
+    """Key metrics per model and per imaging type, from each run's outcomes."""
+    from .eval.metrics import (covered_correct_rate, evidence_sensitivity_gap, natural_hallucination_rate,
+                               net_utility, target_hallucination_rate)
+    from .rewards import Outcome
+    cols = [("Correct on lesion images", covered_correct_rate), ("Evidence sensitivity gap", evidence_sensitivity_gap),
+            ("Claims erased lesion", target_hallucination_rate), ("Claims finding on healthy image", natural_hallucination_rate),
+            ("Net utility", net_utility)]
+    rows = ["| Model | Imaging | Cases | " + " | ".join(c for c, _ in cols) + " |",
+            "| --- | --- | --- | " + " | ".join("---" for _ in cols) + " |"]
+    for run in runs:
+        p = Path(results_dir) / run / "outcomes.jsonl"
+        if not p.exists():
+            continue
+        recs = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+        outs = [Outcome(**{k: v for k, v in r.items() if k != "vkey"}) for r in recs]
+        groups: dict[str, list] = {}
+        for o in outs:
+            groups.setdefault(dataset_of(o.case_id), []).append(o)
+        for ds in sorted(groups):
+            os_ = groups[ds]
+            vals = []
+            for _, fn in cols:
+                v = fn(os_)
+                vals.append("n/a" if v is None or v != v else f"{v:.2f}")
+            rows.append(f"| {run} | {ds} | {len({o.case_id for o in os_})} | " + " | ".join(vals) + " |")
+    return "\n".join(rows) if len(rows) > 2 else "(no results yet)"
+
+
 def build_report(title: str, sections: list[tuple[str, str]]) -> str:
     out = [f"# {title}", "", "## Environment", environment_info(), ""]
     for heading, body in sections:

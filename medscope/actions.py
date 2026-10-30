@@ -177,18 +177,57 @@ NEGATIONS = {"no", "not", "none", "absent", "without", "negative", "normal", "he
 AFFIRM = {"yes", "present", "positive", "visible", "seen", "there"}
 
 
-def polarity(text: str) -> Optional[str]:
-    """'yes', 'no' or None for a free-text reply to a yes/no question."""
+HEALTHY = {"healthy", "normal", "unremarkable"}
+UNHEALTHY = {"not", "no", "abnormal", "unhealthy", "diseased", "lesion", "abnormality"}
+
+
+def asks_health(question: Optional[str]) -> bool:
+    """'Is the liver healthy?', 'Does this look normal?': a 'Yes' means no finding."""
+    return bool(question) and re.search(r"\b(healthy|normal)\b", question.lower()) is not None
+
+
+def polarity(text: str, question: Optional[str] = None) -> Optional[str]:
+    """'yes', 'no' or None for a free-text reply to a yes/no question.
+
+    For a health question ("Is the liver healthy?") the reply "Healthy" means yes; for a
+    presence question ("Is there a tumor?") the reply "Normal" means no."""
     words = normalise_answer(text).split()
     if not words:
         return None
     if words[0] in ("yes", "no"):
         return words[0]
+    if asks_health(question):
+        if any(w in UNHEALTHY for w in words):
+            return "no"
+        if any(w in HEALTHY for w in words):
+            return "yes"
     if any(w in NEGATIONS for w in words):
         return "no"
     if any(w in AFFIRM for w in words):
         return "yes"
     return None
+
+
+def absent_reply(question: str, gold: str) -> Optional[str]:
+    """The yes/no reply that says the finding is absent, for a question whose gold answer
+    says it is present: "Is there a polyp?" (Yes) -> "No"; "Is the liver healthy?" (No) -> "Yes".
+    None for open questions ("Which organ is abnormal?")."""
+    g = normalise_answer(gold)
+    if g == "yes":
+        return "No"
+    if g == "no" and asks_health(question):
+        return "Yes"
+    return None
+
+
+def claims_absence(pred: Optional[str], question: str, gold: str) -> bool:
+    """Does the reply say the finding is not there? `gold` is the answer when it is there."""
+    if pred is None:
+        return False
+    want = absent_reply(question, gold)
+    if want is not None:
+        return polarity(pred, question) == want.lower()
+    return polarity(pred) == "no"      # open question: "None", "No abnormality", "Normal"
 
 
 def _mentions(text_words: list[str], term: str) -> bool:
@@ -206,7 +245,7 @@ def _mentions(text_words: list[str], term: str) -> bool:
 
 
 def answer_matches(pred: Optional[str], gold: str, aliases: list[str] | None = None,
-                   rivals: Optional[set[str]] = None) -> bool:
+                   rivals: Optional[set[str]] = None, question: Optional[str] = None) -> bool:
     """Lenient but not credulous matching of a free-text answer to the gold answer.
 
     - exact match (after normalising) always counts;
@@ -223,7 +262,7 @@ def answer_matches(pred: Optional[str], gold: str, aliases: list[str] | None = N
         return True
     g = normalise_answer(gold)
     if g in ("yes", "no"):
-        return polarity(pred) == g
+        return polarity(pred, question) == g
     words = p.split()
     if not any(_mentions(words, x) for x in golds):
         return False

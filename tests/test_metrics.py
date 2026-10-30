@@ -69,3 +69,53 @@ class TestMetrics(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEvidenceSensitivity(unittest.TestCase):
+    def test_esg_rewards_reading_the_lesion_not_constant_replies(self):
+        from medscope.eval.metrics import evidence_sensitivity_gap
+
+        def model(target, random_absent):
+            outs = []
+            for i in range(10):
+                c = f"c{i}"
+                o = out(c, "random_removal", "answer", not random_absent)
+                o.claims_absent = random_absent
+                t = out(c, "target_removal", "answer", target)
+                outs += [o, t]
+            return outs
+        self.assertEqual(evidence_sensitivity_gap(model(True, False)), 1.0)    # "No" only when erased
+        self.assertEqual(evidence_sensitivity_gap(model(True, True)), 0.0)     # always "No"
+        self.assertEqual(evidence_sensitivity_gap(model(False, False)), 0.0)   # always "Yes"
+        self.assertEqual(evidence_sensitivity_gap(always_refer_model()), 0.0)
+
+
+class TestRejudgeFromTranscripts(unittest.TestCase):
+    def test_old_rows_are_rejudged_under_current_rules(self):
+        import json
+        import tempfile
+        from pathlib import Path
+
+        from medscope.data.schema import View, ViewKind
+        from medscope.eval.runner import evaluate, view_key
+        from medscope.rewards import load_config
+
+        cfg = load_config()
+        views = [View(f"c1__{k.value}", "c1", "p1", k, "x.png", "Is there a polyp?", "Yes", [], [100, 100, 300, 300], False)
+                 for k in (ViewKind.TARGET_REMOVAL, ViewKind.RANDOM_REMOVAL)]
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            rows, trs = [], []
+            for v, reply, old_correct in ((views[0], "No", False), (views[1], "No polyp", False)):
+                rows.append({**out("c1", v.kind.value, "answer", old_correct).to_dict(), "view_id": v.view_id,
+                             "vkey": view_key(v)})
+                trs.append({"view_id": v.view_id, "vkey": view_key(v), "kind": v.kind.value, "question": v.question,
+                            "gold": v.answer, "error": None,
+                            "turns": [{"role": "assistant", "content": f'<final>{{"action": "answer", "answer": "{reply}"}}</final>'}]})
+            (d / "outcomes.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+            (d / "transcripts.jsonl").write_text("\n".join(json.dumps(t) for t in trs))
+            s = evaluate(None, views, cfg, d, {"name": "x"}, n_bootstrap=5, log=lambda m: None)
+            m = s["metrics"]
+            self.assertEqual(m["target_absent_rate"]["value"], 1.0)     # "No" on the erased lesion: right
+            self.assertEqual(m["random_denial_rate"]["value"], 1.0)     # "No polyp" with it intact: denial
+            self.assertEqual(m["esg"]["value"], 0.0)

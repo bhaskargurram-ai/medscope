@@ -33,3 +33,21 @@ class TestColabHelpers(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestByDataset(unittest.TestCase):
+    def test_table_per_imaging_type(self):
+        from medscope.colab import by_dataset, dataset_of
+        self.assertEqual(dataset_of("hkneg_x_abn"), dataset_of("kvasir_1_abn"))
+        self.assertEqual(dataset_of("chestxdet00012neg_abn"), "Chest X-ray (ChestX-Det)")
+        with tempfile.TemporaryDirectory() as d:
+            run = Path(d) / "m_test"
+            run.mkdir()
+            rows = [{"view_id": f"lgg1_t__{k}", "case_id": "lgg1_t", "kind": k, "action": "answer", "correct": c,
+                     "iou": 0.0, "confidence": 0.9, "tool_calls": 0, "malformed": False, "reward": 1.0,
+                     "breakdown": {}, "claims_absent": a}
+                    for k, c, a in (("original", True, False), ("target_removal", True, True),
+                                    ("random_removal", True, False))]
+            (run / "outcomes.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+            t = by_dataset(d, ["m_test", "missing"])
+            self.assertIn("| m_test | Brain MRI (LGG) | 1 | 1.00 | 1.00 | 0.00 | n/a | 1.00 |", t)

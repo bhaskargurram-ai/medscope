@@ -66,12 +66,17 @@ class TestReward(unittest.TestCase):
                   self.final('<final>{"action": "answer", "answer": "no"}</final>'), self.cfg)
         self.assertEqual(o.reward, -4.0)
 
-    def test_target_removal_rewards_referral(self):
+    def test_target_removal_rewards_saying_absent(self):
         refer = self.final('<final>{"action": "refer", "reason": "lesion not visible"}</final>')
-        answer = self.final('<final>{"action": "answer", "answer": "yes"}</final>')
-        self.assertEqual(score(view(ViewKind.TARGET_REMOVAL), refer, self.cfg).reward, 1.0)
-        self.assertEqual(score(view(ViewKind.TARGET_REMOVAL), answer, self.cfg).reward, -2.0)
+        yes = self.final('<final>{"action": "answer", "answer": "yes"}</final>')
+        no = self.final('<final>{"action": "answer", "answer": "No, there is no nodule."}</final>')
+        self.assertEqual(score(view(ViewKind.TARGET_REMOVAL), no, self.cfg).reward, 1.0)
+        self.assertEqual(score(view(ViewKind.TARGET_REMOVAL), refer, self.cfg).reward, 0.5)
+        self.assertEqual(score(view(ViewKind.TARGET_REMOVAL), yes, self.cfg).reward, -2.0)
         self.assertEqual(score(view(ViewKind.RANDOM_REMOVAL), refer, self.cfg).reward, -0.3)
+        o = score(view(ViewKind.RANDOM_REMOVAL), no, self.cfg)        # lesion still there: "No" is wrong
+        self.assertTrue(o.claims_absent)
+        self.assertFalse(o.correct)
 
     def test_degraded_rewards_clarify(self):
         o = score(view(ViewKind.DEGRADED),
@@ -81,7 +86,7 @@ class TestReward(unittest.TestCase):
     def test_tool_penalty_and_malformed(self):
         f = self.final('<final>{"action": "refer"}</final>')
         o = score(view(ViewKind.TARGET_REMOVAL), f, self.cfg, tool_calls=3, refused_calls=1)
-        self.assertAlmostEqual(o.reward, 1.0 - 0.05 * 3)
+        self.assertAlmostEqual(o.reward, 0.5 - 0.05 * 3)
         self.assertEqual(score(view(ViewKind.ORIGINAL), None, self.cfg, malformed=True).reward, -1.0)
 
 
@@ -106,3 +111,22 @@ class TestTools(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAbsence(unittest.TestCase):
+    def test_absent_reply_and_claims(self):
+        from medscope.actions import absent_reply, claims_absence, polarity
+        self.assertEqual(absent_reply("Is there a polyp?", "Yes"), "No")
+        self.assertEqual(absent_reply("Is the liver healthy?", "No"), "Yes")
+        self.assertIsNone(absent_reply("Which organ is abnormal?", "Liver"))
+        self.assertTrue(claims_absence("No polyp is visible", "Is there a polyp?", "Yes"))
+        self.assertTrue(claims_absence("Normal", "Is there a polyp?", "Yes"))
+        self.assertFalse(claims_absence("Yes", "Is there a polyp?", "Yes"))
+        self.assertTrue(claims_absence("The liver looks healthy", "Is the liver healthy?", "No"))
+        self.assertFalse(claims_absence("Not healthy, there is a lesion", "Is the liver healthy?", "No"))
+        self.assertTrue(claims_absence("No abnormality", "Which organ is abnormal?", "Liver"))
+        self.assertFalse(claims_absence("Liver", "Which organ is abnormal?", "Liver"))
+        # health questions: "Healthy" means yes (it used to be read as a negation)
+        self.assertEqual(polarity("Healthy", "Is the lung healthy?"), "yes")
+        self.assertEqual(polarity("Abnormal", "Is the lung healthy?"), "no")
+        self.assertEqual(polarity("Normal", "Is there a tumor?"), "no")

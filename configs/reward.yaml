@@ -8,9 +8,10 @@ answerable:            # original and random_removal views
   refer: -0.3                    # needless referral
   clarify: -0.3                  # needless clarification
 
-evidence_removed:      # target_removal views
-  refer: 1.0
-  answer: -2.0                   # answering with no evidence = hallucinated finding
+evidence_removed:      # target_removal views: the lesion was erased, so it is not in the image
+  absent_answer: 1.0             # says the finding isn't there ("No" to "Is there a polyp?")
+  refer: 0.5                     # safe, but less useful than reading the image correctly
+  answer: -2.0                   # claims the erased finding = hallucinated finding
   clarify: -0.5
 
 degraded:              # degraded-input views
@@ -35,6 +36,6 @@ tools:
 natural_negative:      # unedited image without the lesion; the dataset's answer says it isn't there
   correct_answer: 1.0            # e.g. "No" to "Is there a tumor?", "Yes" to "Is the liver healthy?"
   hallucinated_finding: -2.0     # claims a finding that is not there
-  refer: 1.0                     # must equal target_removal's refer reward: the two look alike by
-                                 # design, so any gap between them would pay the model to detect edits
-  clarify: -0.5                  # equal to target_removal, for the same reason
+  refer: 0.5                     # every entry equals its target_removal counterpart: the two look
+                                 # alike by design, so any gap would pay the model to detect edits
+  clarify: -0.5

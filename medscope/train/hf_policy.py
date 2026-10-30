@@ -196,6 +196,46 @@ class HFPolicy:
             gens.append(Generation(self.decode(ids), {"gen_ids": ids}))
         return gens
 
+    def generate_batch(self, conversations: list[list[dict]], sample: bool = False) -> list[Generation]:
+        """One turn for several different conversations in a single left-padded batch.
+        Falls back to one at a time if this model's processor cannot batch."""
+        torch = self.torch
+        if len(conversations) == 1 or getattr(self, "_no_batch", False):
+            return [self.generate(m, sample) for m in conversations]
+        tok = self.tokenizer
+        side = tok.padding_side
+        try:
+            tok.padding_side = "left"
+            inputs = self.processor.apply_chat_template(
+                [self.to_hf(m) for m in conversations], add_generation_prompt=True, tokenize=True,
+                return_dict=True, return_tensors="pt", padding=True, **self.template_kwargs).to(self.model.device)
+        except Exception as e:  # noqa: BLE001
+            print(f"batched generation unavailable for this model ({type(e).__name__}); running one at a time")
+            self._no_batch = True
+            return [self.generate(m, sample) for m in conversations]
+        finally:
+            tok.padding_side = side
+        prompt_len = inputs["input_ids"].shape[1]
+        was_training = self.model.training
+        self.model.eval()
+        try:
+            with torch.no_grad():
+                out = self.model.generate(**inputs, **self._gen_kwargs(sample))
+        except Exception as e:  # noqa: BLE001 - e.g. a model whose vision tower can't batch mixed sizes
+            print(f"batched generation failed for this model ({type(e).__name__}: {str(e)[:120]}); "
+                  "running one at a time")
+            self._no_batch = True
+            torch.cuda.empty_cache()
+            return [self.generate(m, sample) for m in conversations]
+        finally:
+            if was_training:
+                self.model.train()
+        gens = []
+        for row in out[:, prompt_len:]:
+            ids = self._trim(row.cpu())
+            gens.append(Generation(self.decode(ids), {"gen_ids": ids}))
+        return gens
+
     KEEP_TOKENS = ("<think>", "</think>", "<unused94>", "<unused95>")  # thinking markers the parser needs
 
     def decode(self, ids) -> str:

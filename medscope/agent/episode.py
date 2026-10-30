@@ -56,6 +56,78 @@ class Episode:
         return out
 
 
+class _State:
+    """One episode in progress."""
+
+    def __init__(self, view: View, img: np.ndarray, budget: int):
+        self.view, self.img = view, img
+        self.env = ToolEnv(img, budget=budget)
+        self.messages = start_messages(img, view.question)
+        self.turns: list[Turn] = []
+        self.final: Optional[FinalAction] = None
+        self.malformed, self.error, self.done = False, "", False
+
+    def step(self, gen: Generation) -> None:
+        """Apply one model turn: a final action ends the episode, a tool call runs."""
+        self.turns.append(Turn(len(self.messages), gen.text, gen.extra))
+        self.messages.append(assistant_message(gen.text))
+        parsed = parse(gen.text)
+        if parsed.malformed:
+            self.malformed, self.error, self.done = True, parsed.error, True
+            return
+        if parsed.final is not None:
+            self.final, self.done = parsed.final, True
+            return
+        # keep only the action that ran: anything the model wrote after it (e.g. an answer
+        # guessed before seeing the zoom) must not sit in the history it reads next turn
+        self.messages[-1] = assistant_message(tool_text(parsed.tool))
+        result = self.env.call(parsed.tool.name, parsed.tool.args)
+        self.messages.append(tool_result_message(result))
+
+    def finish(self, cfg: dict) -> Episode:
+        if not self.done:
+            self.malformed, self.error = True, "no final action within the turn limit"
+        outcome = score(self.view, self.final, cfg, tool_calls=self.env.calls, refused_calls=self.env.refused,
+                        malformed=self.malformed or self.final is None)
+        return Episode(self.view, self.messages, self.turns, self.final, self.malformed, self.error,
+                       self.env.calls, self.env.refused, outcome, self.env.log)
+
+
+def generate_many(policy: Policy, conversations: list[list[dict]], sample: bool) -> list[Generation]:
+    """One turn for several conversations, in a single batch when the policy supports it."""
+    if len(conversations) > 1 and hasattr(policy, "generate_batch"):
+        return policy.generate_batch(conversations, sample=sample)
+    return [policy.generate(m, sample=sample) for m in conversations]
+
+
+def run_episodes(
+    policy: Policy,
+    views: list[View],
+    cfg: dict,
+    sample: bool = False,
+    images: Optional[list[np.ndarray]] = None,
+    first_generations: Optional[list[Generation]] = None,
+    max_turns: Optional[int] = None,
+) -> list[Episode]:
+    """Several episodes advanced in lockstep: every round, all unfinished episodes get their
+    next turn in one batch. Each episode sees exactly what it would see if run alone."""
+    budget = cfg["tools"]["budget"]
+    max_turns = max_turns or budget + 1
+    imgs = images if images is not None else [load_image(v.image_path) for v in views]
+    states = [_State(v, im, budget) for v, im in zip(views, imgs)]
+    for turn_index in range(max_turns):
+        active = [st for st in states if not st.done]
+        if not active:
+            break
+        if turn_index == 0 and first_generations is not None:
+            gens = first_generations
+        else:
+            gens = generate_many(policy, [st.messages for st in active], sample)
+        for st, g in zip(active, gens):
+            st.step(g)
+    return [st.finish(cfg) for st in states]
+
+
 def run_episode(
     policy: Policy,
     view: View,
@@ -65,40 +137,9 @@ def run_episode(
     image: Optional[np.ndarray] = None,
     first_generation: Optional[Generation] = None,
 ) -> Episode:
-    budget = cfg["tools"]["budget"]
-    max_turns = max_turns or budget + 1
-    img = image if image is not None else load_image(view.image_path)
-    env = ToolEnv(img, budget=budget)
-    messages = start_messages(img, view.question)
-    turns: list[Turn] = []
-    final: Optional[FinalAction] = None
-    malformed, error = False, ""
-
-    for turn_index in range(max_turns):
-        if turn_index == 0 and first_generation is not None:
-            gen = first_generation
-        else:
-            gen = policy.generate(messages, sample=sample)
-        turns.append(Turn(len(messages), gen.text, gen.extra))
-        messages.append(assistant_message(gen.text))
-        parsed = parse(gen.text)
-        if parsed.malformed:
-            malformed, error = True, parsed.error
-            break
-        if parsed.final is not None:
-            final = parsed.final
-            break
-        # keep only the action that ran: anything the model wrote after it (e.g. an answer
-        # guessed before seeing the zoom) must not sit in the history it reads next turn
-        messages[-1] = assistant_message(tool_text(parsed.tool))
-        result = env.call(parsed.tool.name, parsed.tool.args)
-        messages.append(tool_result_message(result))
-    else:
-        malformed, error = True, "no final action within the turn limit"
-
-    outcome = score(view, final, cfg, tool_calls=env.calls, refused_calls=env.refused,
-                    malformed=malformed or final is None)
-    return Episode(view, messages, turns, final, malformed, error, env.calls, env.refused, outcome, env.log)
+    return run_episodes(policy, [view], cfg, sample=sample, images=None if image is None else [image],
+                        first_generations=None if first_generation is None else [first_generation],
+                        max_turns=max_turns)[0]
 
 
 def run_group(policy: Policy, view: View, cfg: dict, n: int, sample: bool = True,
@@ -110,4 +151,4 @@ def run_group(policy: Policy, view: View, cfg: dict, n: int, sample: bool = True
         firsts = policy.generate_n(start_messages(img, view.question), n, sample=sample)
     else:
         firsts = [policy.generate(start_messages(img, view.question), sample=sample) for _ in range(n)]
-    return [run_episode(policy, view, cfg, sample=sample, image=img, first_generation=g) for g in firsts]
+    return run_episodes(policy, [view] * n, cfg, sample=sample, images=[img] * n, first_generations=firsts)

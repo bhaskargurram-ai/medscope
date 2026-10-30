@@ -73,7 +73,7 @@ class TestNaturalNegatives(unittest.TestCase):
         refer = parse('<final>{"action": "refer"}</final>').final
         self.assertEqual(score(neg_view(), no, CFG).reward, 1.0)
         self.assertEqual(score(neg_view(), yes, CFG).reward, -2.0)       # hallucinated finding
-        self.assertEqual(score(neg_view(), refer, CFG).reward, 1.0)
+        self.assertEqual(score(neg_view(), refer, CFG).reward, 0.5)
 
     def test_end_to_end_always_yes_model_hallucinates(self):
         with tempfile.TemporaryDirectory() as d:
@@ -105,11 +105,22 @@ class TestNoIncentiveToDetectEdits(unittest.TestCase):
         nn, er = CFG["natural_negative"], CFG["evidence_removed"]
         self.assertEqual(nn["refer"], er["refer"])
         self.assertEqual(nn["clarify"], er["clarify"])
-        self.assertGreaterEqual(er["refer"], nn["correct_answer"])  # refusing is never worse than "No"
+        self.assertEqual(nn["correct_answer"], er["absent_answer"])       # "No" pays the same on both
+        self.assertEqual(nn["hallucinated_finding"], er["answer"])        # so does claiming the finding
+
+    def test_same_reply_same_reward_on_both_kinds(self):
+        from dataclasses import replace
+        nn = neg_view()
+        tr = replace(nn, kind=ViewKind.TARGET_REMOVAL, answer="Yes")   # same question, lesion erased
+        for text in ('<final>{"action": "answer", "answer": "No"}</final>',
+                     '<final>{"action": "answer", "answer": "Yes"}</final>',
+                     '<final>{"action": "refer"}</final>', '<final>{"action": "clarify", "question": "?"}</final>'):
+            f = parse(text).final
+            self.assertEqual(score(tr, f, CFG).reward, score(nn, f, CFG).reward, text)
 
     def test_rescore_follows_the_current_matrix(self):
         from medscope.rewards import rescore
         refer = parse('<final>{"action": "refer"}</final>').final
-        old = score(neg_view(), refer, {**CFG, "natural_negative": {**CFG["natural_negative"], "refer": 0.5}})
-        self.assertEqual(old.reward, 0.5)
-        self.assertEqual(rescore(neg_view(), old, CFG).reward, 1.0)
+        old = score(neg_view(), refer, {**CFG, "natural_negative": {**CFG["natural_negative"], "refer": 1.0}})
+        self.assertEqual(old.reward, 1.0)
+        self.assertEqual(rescore(neg_view(), old, CFG).reward, 0.5)

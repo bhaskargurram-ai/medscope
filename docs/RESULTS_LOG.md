@@ -226,7 +226,32 @@ Observations:
   counterfactual trajectories does most of the work. Run 2 (best on validation) is the model carried to
   the final test; run 1 stays as the plain-GRPO comparison.
 
+## Version 2 plan (2026-10-30)
+
+Changes, driven by the results above:
+- **Say "No" when the lesion is absent.** The refer-only agent refused on every healthy image and never
+  said "No". Lesion-removed and natural-negative views now share one expected reply (the answer that
+  says the finding is absent) and one cost-matrix row (absent answer +1.0, refer +0.5, claim the finding
+  -2.0, clarify -0.5), so detecting edits still earns nothing. New headline metric: evidence sensitivity
+  gap (ESG) = treats the erased lesion as absent (says "No" or refers) minus doing so after a same-size
+  edit that left the lesion intact. Always-yes, always-no, always-refer and edit detectors all score 0.
+  The refer-only abstention gap (ASG) is still reported.
+- **Same instructions for every model.** The system prompt now says to report absence; results are keyed
+  by the prompt, so every model (baselines included) is re-run under it. Answer matching for health
+  questions ("Is the liver healthy?" -> "Healthy" means yes) was fixed at the same time; correctness is
+  re-derived from stored transcripts, so matching fixes never need a rerun.
+- **Three more imaging types** (notebook 07): chest X-ray (ChestX-Det), breast ultrasound (BUSI), brain
+  MRI (TCGA-LGG), each with lesion masks and lesion-free images from the same source; split by patient or
+  near-copy group; one question per image; up to 500/25/50 lesion images and 250/25/50 negatives per
+  train/validation/test split.
+- **Rejection sampling instead of more RL** (notebook 09): keep the model's best successful episode out
+  of 4 samples per training view, fine-tune on those plus synthetic ones; the better of SFT v2 and RFT on
+  validation becomes the final model.
+- **Six open baselines** (notebook 10): Qwen3.5-4B, MedGemma 1.5 4B, Lingshu-7B, HuatuoGPT-Vision-7B
+  (Qwen2.5-VL), Qwen2.5-VL-7B, Qwen3-VL-8B, plus the refer-only adapter as an ablation.
+- **Batched evaluation**: unfinished episodes advance together, one batch per turn, each seeing exactly
+  what it would see alone.
+
 ## Next
 
-- Final evaluation on the full test split and natural negatives for all models (06; its negatives cell
-  also adds both RL models, so 02b does not need rerunning), then export.
+- Notebooks 07 (data), 08 (SFT v2), 09 (rejection sampling), 10 (final test and export).

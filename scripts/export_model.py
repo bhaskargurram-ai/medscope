@@ -1,7 +1,7 @@
 """Merge the final LoRA adapter into the base model and save (optionally push) it.
 
 Usage:
-    python scripts/export_model.py --model Qwen/Qwen3.5-4B --adapter adapters/grpo/final \
+    python scripts/export_model.py --model Qwen/Qwen3.5-4B --adapter adapters/sft_v2/final \
         --out export/MedScope-4B [--push your-hf-username/MedScope-4B] [--summary results/final_test/summary.json]
 """
 
@@ -20,7 +20,8 @@ tags: [medical, vision-language, agent, research-only]
 # {name}
 
 A research multimodal medical agent fine-tuned from `{base}`. It answers a question about a medical
-image only when it can see the evidence; otherwise it zooms in, asks for clarification, or refers.
+image from what the image shows: it localises a finding that is there, says so when it is not, zooms in
+when it needs a closer look, and asks for a better image when the one it has is unusable.
 
 > **Research use only.** Not a medical device. Do not use for diagnosis or treatment.
 
@@ -59,7 +60,7 @@ def main() -> None:
     model.save_pretrained(out)
     processor.save_pretrained(out)
 
-    metrics = "(run notebook 06 to fill this in)"
+    metrics = "(run notebook 10 to fill this in)"
     if args.summary:
         s = json.loads(Path(args.summary).read_text())["metrics"]
         metrics = "\n".join(["| Metric | Value |", "| --- | --- |"] +

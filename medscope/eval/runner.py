@@ -11,9 +11,10 @@ from typing import Callable, Optional
 
 import numpy as np
 
-from ..agent.episode import Policy, run_episode
+from ..agent.episode import Policy, run_episodes
 from ..data.schema import View
-from ..rewards import Outcome, rescore, with_vocab
+from ..actions import parse
+from ..rewards import Outcome, rejudge, rescore, with_vocab
 from .metrics import bootstrap
 
 
@@ -46,6 +47,7 @@ def evaluate(
     meta: dict,
     log: Callable[[str], None] = print,
     n_bootstrap: int = 2000,
+    batch_size: int = 1,
 ) -> dict:
     """Greedy episodes on every view; appends to outcomes.jsonl so reruns resume."""
     out = Path(out_dir)
@@ -76,21 +78,34 @@ def evaluate(
 
     t0 = time.time()
     with open(outcomes_path, "a") as fo, open(transcripts_path, "a") as ft:
-        for i, v in enumerate(todo):
-            ep = run_episode(policy, v, cfg, sample=False)
-            fo.write(json.dumps({**ep.outcome.to_dict(), "vkey": keys[v.view_id]}) + "\n")
-            ft.write(json.dumps({"view_id": v.view_id, "vkey": keys[v.view_id], "kind": v.kind.value,
-                                 "question": v.question, "gold": v.answer, "error": ep.error,
-                                 "turns": ep.transcript()}) + "\n")
+        last_log = -10
+        for b in range(0, len(todo), batch_size):
+            chunk = todo[b:b + batch_size]
+            for v, ep in zip(chunk, run_episodes(policy, chunk, cfg, sample=False)):
+                fo.write(json.dumps({**ep.outcome.to_dict(), "vkey": keys[v.view_id]}) + "\n")
+                ft.write(json.dumps({"view_id": v.view_id, "vkey": keys[v.view_id], "kind": v.kind.value,
+                                     "question": v.question, "gold": v.answer, "error": ep.error,
+                                     "turns": ep.transcript()}) + "\n")
             fo.flush(), ft.flush()
-            if (i + 1) % 10 == 0 or i == 0:
-                rate = (time.time() - t0) / (i + 1)
-                log(f"  {i + 1}/{len(todo)} views, {rate:.1f}s each, ~{rate * (len(todo) - i - 1) / 60:.0f} min left")
+            n = b + len(chunk)
+            if n - last_log >= 10 or b == 0 or n == len(todo):
+                last_log = n
+                rate = (time.time() - t0) / n
+                log(f"  {n}/{len(todo)} views, {rate:.1f}s each, ~{rate * (len(todo) - n) / 60:.0f} min left")
 
     by_id = {v.view_id: v for v in views}
-    # rewards always follow the current cost matrix: the model's decisions are stored, the price is not
-    outcomes = [rescore(by_id[r["view_id"]], Outcome(**{k: v for k, v in r.items() if k != "vkey"}), cfg)
-                for r in _read_jsonl(outcomes_path) if r["view_id"] in keys]
+    # correctness and rewards always follow the current rules: the model's decisions and answer
+    # text are stored, the judging and the prices are recomputed
+    answers = {t["view_id"]: final_answer(t["turns"]) for t in _read_jsonl(transcripts_path) if t["view_id"] in keys}
+    outcomes = []
+    for r in _read_jsonl(outcomes_path):
+        if r["view_id"] not in keys:
+            continue
+        v = by_id[r["view_id"]]
+        o = Outcome(**{k: x for k, x in r.items() if k != "vkey"})
+        if r["view_id"] in answers:
+            o = rejudge(v, o, answers[r["view_id"]], cfg)
+        outcomes.append(rescore(v, o, cfg))
     summary = {"meta": meta, "n_views": len(outcomes), "n_cases": len({o.case_id for o in outcomes}),
                "metrics": bootstrap(outcomes, n_resamples=n_bootstrap)}
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
@@ -99,12 +114,26 @@ def evaluate(
     return summary
 
 
-SCORING_VERSION = 3  # bump when parsing or answer matching changes, so old results are redone
+def final_answer(turns: list[dict]) -> str | None:
+    """The answer text of the first final action in a stored transcript."""
+    for t in turns:
+        if t["role"] == "assistant":
+            f = parse(t["content"]).final
+            if f is not None:
+                return f.answer
+    return None
+
+
+SCORING_VERSION = 3  # bump when parsing changes, so old results are redone (matching is re-derived)
+# results produced under a different system prompt are redone: every model sees the same instructions
+from ..agent.prompts import SYSTEM_PROMPT  # noqa: E402
+PROMPT_KEY = hashlib.sha1(SYSTEM_PROMPT.encode()).hexdigest()[:8]
 
 
 def view_key(view: View, precision=None) -> str:
     """Fingerprint of everything that defines a view's result: the view, model precision, scoring rules."""
-    payload = json.dumps(view.to_dict(), sort_keys=True) + f"|precision={precision}|scoring={SCORING_VERSION}"
+    payload = (json.dumps(view.to_dict(), sort_keys=True) + f"|precision={precision}|scoring={SCORING_VERSION}"
+               + f"|prompt={PROMPT_KEY}")
     return hashlib.sha1(payload.encode()).hexdigest()[:16]
 
 
@@ -126,7 +155,12 @@ HEADLINE = [
     ("ccr", "Covered-and-correct rate (higher is better)"),
     ("selective_accuracy", "Accuracy when answering"),
     ("coverage", "Coverage on answerable views"),
-    ("asg", "Abstention specificity gap (higher is better)"),
+    ("esg", "Evidence sensitivity gap (higher is better)"),
+    ("target_absent_rate", "Lesion erased: says it isn't there"),
+    ("target_safe_rate", "Lesion erased: says it isn't there, or refers"),
+    ("target_hallucination_rate", "Lesion erased: still claims it (lower is better)"),
+    ("random_denial_rate", "Equal edit elsewhere: denies or refers (lower is better)"),
+    ("asg", "Abstention specificity gap (refer-only, higher is better)"),
     ("refer_rate_target_removal", "Refers when lesion removed"),
     ("refer_rate_random_removal", "Refers after random edit (lower is better)"),
     ("grounded_accuracy", "Grounded accuracy (IoU >= 0.3)"),
@@ -198,8 +232,8 @@ def compare_runs(results_dir: str | Path) -> str:
     for p in sorted(Path(results_dir).glob("*/summary.json")):
         s = json.loads(p.read_text())
         rows.append((s["meta"].get("name", p.parent.name), s))
-    keys = ["ccr", "selective_accuracy", "asg", "grounded_accuracy", "clarify_rate_degraded",
-            "natural_hallucination_rate", "natural_safe_rate", "net_utility", "malformed_rate"]
+    keys = ["ccr", "esg", "target_hallucination_rate", "grounded_accuracy", "clarify_rate_degraded",
+            "natural_hallucination_rate", "natural_correct_rate", "net_utility", "malformed_rate"]
     lines = ["| Run | Split | Cases | " + " | ".join(keys) + " |", "| --- | --- | --- | " + " | ".join("---" for _ in keys) + " |"]
     def order(r):
         s = r[1]

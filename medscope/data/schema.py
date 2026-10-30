@@ -33,7 +33,7 @@ class ActionKind(str, Enum):
 EXPECTED_ACTION: dict[ViewKind, ActionKind] = {
     ViewKind.ORIGINAL: ActionKind.ANSWER,
     ViewKind.RANDOM_REMOVAL: ActionKind.ANSWER,
-    ViewKind.TARGET_REMOVAL: ActionKind.REFER,
+    ViewKind.TARGET_REMOVAL: ActionKind.ANSWER,    # saying the finding is absent; refer is acceptable
     ViewKind.DEGRADED: ActionKind.CLARIFY,
     ViewKind.NATURAL_NEGATIVE: ActionKind.ANSWER,  # with the dataset's "not there" answer; refer is acceptable
 }
