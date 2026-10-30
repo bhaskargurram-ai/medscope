@@ -861,7 +861,52 @@ push = f'--push {{PUSH_TO}}' if PUSH_TO else ''
     ]
 
 
+def nb00_sync() -> list[dict]:
+    return [
+        md("""
+# MedScope: copy the Drive files to Hugging Face (to continue on RunPod or another GPU)
+
+Uploads everything the remaining steps need from `My Drive/medscope` to a **private** Hugging Face
+dataset repo: the benchmark views, natural negatives, the trained adapters (including the SFT v2
+checkpoint, so training resumes where it stopped). About 5 GB.
+
+**Runtime: CPU is fine** (Runtime > Change runtime type > CPU); no GPU credits needed.
+
+**Before you start:** add a Colab secret `HF_WRITE_TOKEN`: a Hugging Face token with **write** access
+(huggingface.co > Settings > Access Tokens > Create new token > Write).
+"""),
+        code(r"""
+from google.colab import drive, userdata
+drive.mount('/content/drive')
+!pip install -q -U huggingface_hub
+import os
+from huggingface_hub import HfApi, login
+token = userdata.get('HF_WRITE_TOKEN')
+login(token)
+api = HfApi()
+user = api.whoami()['name']
+REPO = f'{user}/medscope-work'
+api.create_repo(REPO, repo_type='dataset', private=True, exist_ok=True)
+DRIVE = '/content/drive/MyDrive/medscope'
+for f in ['slake/views.tar', 'extra/extra.tar', 'slake/negatives/views_negatives.jsonl',
+          'adapters/sft_agentic/final/adapter_config.json']:
+    print(('ok      ' if os.path.exists(f'{DRIVE}/{f}') else 'MISSING ') + f)
+print('sft_v2 so far:', open(f'{DRIVE}/adapters/sft_v2/state.json').read() if os.path.exists(f'{DRIVE}/adapters/sft_v2/state.json') else 'not started')
+"""),
+        code(r"""
+# resumable: rerun this cell if it stops; files already uploaded are skipped
+api.upload_large_folder(folder_path=DRIVE, repo_id=REPO, repo_type='dataset',
+                        allow_patterns=['slake/views.tar', 'slake/negatives/**', 'extra/extra.tar',
+                                        'adapters/sft_agentic/final/**', 'adapters/sft_v2/**',
+                                        'adapters/merged/best.json', 'adapters/grpo/final/**',
+                                        'adapters/grpo_v2/final/**', 'results/v2_*/**'])
+print('done. On the GPU machine set:  HF_WORK_REPO=' + REPO)
+"""),
+    ]
+
+
 NOTEBOOKS = {
+    "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
     "02_baselines.ipynb": nb02,
     "02b_natural_negatives.ipynb": nb02b,

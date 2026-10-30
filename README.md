@@ -44,6 +44,21 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.
 
+### Continuing on RunPod (or any GPU machine)
+
+1. In Colab on a **CPU** runtime (no credits needed), run `notebooks/00_sync_drive_to_hf.ipynb`: it copies
+   the Drive files the remaining steps need to a private Hugging Face dataset repo.
+2. On the GPU machine (A100 80 GB recommended, 100 GB volume at `/workspace`):
+   ```bash
+   export HF_TOKEN=hf_...  HF_WORK_REPO=your-name/medscope-work  GITHUB_TOKEN=github_pat_...
+   cd /workspace && git clone https://git:$GITHUB_TOKEN@github.com/bhaskargurram-ai/medscope
+   nohup bash medscope/scripts/runpod.sh > /workspace/run.out 2>&1 &
+   tail -f /workspace/pipeline.log
+   ```
+   `scripts/pipeline.py` runs notebooks 08-10's steps, resumes after any interruption (run the same
+   command again), saves adapters and results back to the dataset repo after every step, and pushes
+   each report to the `runs` branch of this repo.
+
 Colab secrets needed: `HF_TOKEN` (and accept the MedGemma terms on Hugging Face); `GITHUB_TOKEN` only if this repo is private.
 
 ## The four views
