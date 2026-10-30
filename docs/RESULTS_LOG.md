@@ -265,6 +265,29 @@ Changes, driven by the results above:
 - A cut-off last line (disconnect) no longer breaks a resume; one failing baseline no longer stops the
   final evaluation; dataset split seeds depend only on the dataset name.
 
+## More imaging types (notebook 07, 2026-10-30)
+
+| Dataset | Lesion images used | Lesion-free images | Skipped | Split (lesion images, train/val/test) | Negatives (train/val/test) |
+| --- | --- | --- | --- | --- | --- |
+| ChestX-Det (chest X-ray) | 2,165 | 611 | 623 diffuse findings (cardiomegaly, emphysema, diffuse nodules), 179 lesions too small/large | 500 / 25 / 50 | 250 / 25 / 50 |
+| BUSI (breast ultrasound) | 559 (407 benign, 152 malignant) | 133 | 88 lesions too large to erase | 393 / 25 / 50 | 91 / 25 / 15 |
+| TCGA-LGG (brain MRI) | 1,371 | 2,192 | 364 slices with little brain | 391 / 25 / 50 | 237 / 25 / 42 |
+
+Chest X-ray findings used: consolidation 786, effusion 525, fibrosis 198, pleural thickening 148,
+atelectasis 142, nodule 131, calcification 83, fracture 82, mass 59, pneumothorax 11.
+
+Views and checks (LaMa inpainting, T4):
+
+| Split | Cases checked | Passed | Lesion not removed | Shortcut AUC before → after filtering | Filtered |
+| --- | --- | --- | --- | --- | --- |
+| Train | 1,136 | 1,055 | 26 | 0.602 → 0.567 | 55 |
+| Validation | 61 | 61 | 0 | 0.598 | 0 |
+| Test | 122 | 119 | 3 | 0.563 | 0 |
+
+Cases with no valid place for the random-edit control are dropped by the view builder (mostly large
+ultrasound lesions). Test set for version 2: about 100 SLAKE/Kvasir cases + 119 new ones, plus 288
+natural negatives (90 SLAKE, 91 HyperKvasir, 107 new).
+
 ## Next
 
 - Notebooks 07 (data), 08 (SFT v2), 09 (rejection sampling), 10 (final test and export).
