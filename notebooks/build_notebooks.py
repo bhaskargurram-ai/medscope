@@ -566,19 +566,26 @@ Evaluates the RL model, its earlier stages and both baselines on the full test s
 then merges the final adapter into `{BASE}` and saves the model to Drive. Pushing to Hugging Face is
 optional and private by default.
 
-**Runtime:** L4, about 3-4 hours. For the export step, a High-RAM runtime is safer.
+**Runtime:** A100, roughly 6-8 hours in total; every run resumes where it stopped, so rerun after a
+disconnect. Models run in order of importance (final model, SFT agent, baselines, then plain GRPO), so
+the main table fills first. For the export step, a High-RAM runtime is safer.
 """ + SECRETS_NOTE),
         code(SETUP), code(GPU_STACK), code(RESTORE_VIEWS),
         code(f"""
 # every model on the FULL test split with the same scoring rules: the paper's main table.
 # Runs that finished earlier on a subset (e.g. the 40-case baseline pilot) carry over.
 runs = [('medscope_grpo_v2_test', 'medscope-grpo', {BASE!r}, f'{{ADAPTERS}}/grpo_v2/final'),
-        ('grpo_plain_test', 'grpo-plain', {BASE!r}, f'{{ADAPTERS}}/grpo/final'),
-        ('medscope_merged_test', 'medscope-sft-merged', {BASE!r}, f'{{ADAPTERS}}/merged/best'),
         ('medscope_sft_agentic_test', 'medscope-sft-agentic', {BASE!r}, f'{{ADAPTERS}}/sft_agentic/final'),
         ('base_qwen35_test', 'base-qwen3.5-4b', {BASE!r}, None),
-        ('base_medgemma15_test', 'base-medgemma-1.5-4b', {MEDGEMMA!r}, None)]
+        ('base_medgemma15_test', 'base-medgemma-1.5-4b', {MEDGEMMA!r}, None),
+        ('grpo_plain_test', 'grpo-plain', {BASE!r}, f'{{ADAPTERS}}/grpo/final'),
+        ('medscope_merged_test', 'medscope-sft-merged', {BASE!r}, f'{{ADAPTERS}}/merged/best')]
+best_file = f'{{ADAPTERS}}/merged/best.json'
+merged_is_copy = os.path.exists(best_file) and json.load(open(best_file))['best'] in ('agentic_only', 'grounding_only')
 for out, name, model, adapter in runs:
+    if out == 'medscope_merged_test' and merged_is_copy:
+        print('skipping medscope-sft-merged: no merge beat the unmerged adapter, so it is an identical copy')
+        continue
     adapter_arg = f'--adapter {{adapter}}' if adapter else ''
     !python scripts/evaluate.py --model {{model}} {{adapter_arg}} --views {{VIEWS}}/test/views_clean.jsonl --out {{RESULTS}}/{{out}} --name {{name}} --split test
 """),

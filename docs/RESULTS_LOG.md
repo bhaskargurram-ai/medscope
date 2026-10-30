@@ -196,7 +196,37 @@ Run 2 (dynamic sampling, as in DAPO): 8 episodes per image, images drawn one at 
 with signal (at most 6 groups per step), lr 2e-5, 50 steps, saved to adapters/grpo_v2. Run 1 stays as
 the "plain GRPO" comparison in notebooks 02b and 06.
 
+## RL, run 2: GRPO with dynamic sampling (notebook 05, 2026-10-29)
+
+50 steps, 8 episodes per image, images drawn until 2 groups had signal (at most 6 per step), lr 2e-5,
+A100 40 GB, about 4 minutes per step. Same 45-case validation set as run 1 (15 cases + 30 HyperKvasir
+natural negatives).
+
+| Validation metric | Run 1 (plain GRPO) | Run 2 (dynamic sampling) |
+| --- | --- | --- |
+| Net clinical utility | 0.844 [0.503, 1.060] | 0.878 [0.542, 1.071] |
+| Refers when lesion removed | 0.867 (13/15) | 0.933 (14/15) |
+| Refers after random edit | 0.000 | 0.000 |
+| Abstention specificity gap | 0.867 | 0.933 [0.789, 1.000] |
+| Accuracy when answering | 0.933 | 0.933 |
+| Grounded accuracy | 0.867 | 0.867 |
+| Asks to clarify on degraded input | 0.667 | 0.667 |
+| Natural negatives: claims finding / refers | 0.000 / 1.000 | 0.000 / 1.000 |
+| AURC | 0.016 | 0.032 |
+
+Observations:
+- Run 2 is better by one case (one more lesion-removed view referred); the confidence intervals overlap
+  almost entirely, so this is a small, not significant gain.
+- Dynamic sampling found signal early (about 1.7 groups per step in steps 1-10) but the policy became
+  more deterministic as it trained (0.4-1.0 groups per step from step 11, even with 6 draws). In total
+  about 46 groups with signal, the same number as run 1 found in 150 steps, but with 8 episodes each.
+- The refer share during training rose from 11% to 57%; validation shows no extra false refusals
+  (0 refers on original or random-edit views), so this is not over-refusal on validation.
+- Finding: with a confident SFT agent, on-policy RL has little to learn from; the SFT stage on
+  counterfactual trajectories does most of the work. Run 2 (best on validation) is the model carried to
+  the final test; run 1 stays as the plain-GRPO comparison.
+
 ## Next
 
-- RL run 2 (05), then 02b (adds both RL models on natural negatives), then the final evaluation on the
-  full test split (06).
+- Final evaluation on the full test split and natural negatives for all models (06; its negatives cell
+  also adds both RL models, so 02b does not need rerunning), then export.
