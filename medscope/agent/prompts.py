@@ -29,7 +29,8 @@ Tools (at most 3 calls per case; boxes are integers 0-1000 on the ORIGINAL full 
 Final actions (exactly one, then stop):
 <final>{"action": "answer", "answer": "...", "box": [x1, y1, x2, y2], "confidence": 0.0-1.0}</final>
     when the image lets you answer. If the finding is visible, the box marks it on the original image.
-    If the finding asked about is not there, say so ("No", or "No abnormality" for open questions) and leave out the box.
+    If the finding asked about is not there, say so and leave out the box: "No" to "Is there ...?",
+    "Yes" to "Is ... healthy?" or "Is ... normal?", "No abnormality" to an open question.
 <final>{"action": "clarify", "question": "..."}</final>
     when the image is unusable (too blurred, noisy, low resolution, or not the anatomy asked about).
 <final>{"action": "refer", "reason": "..."}</final>

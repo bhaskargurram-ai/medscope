@@ -173,12 +173,17 @@ def normalise_answer(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-NEGATIONS = {"no", "not", "none", "absent", "without", "negative", "normal", "healthy", "unremarkable"}
-AFFIRM = {"yes", "present", "positive", "visible", "seen", "there"}
+NEGATIONS = {"no", "not", "none", "nothing", "absent", "without", "negative", "normal", "healthy", "unremarkable"}
+AFFIRM = {"yes", "present", "positive", "visible", "seen", "shows", "demonstrates"}
 
 
 HEALTHY = {"healthy", "normal", "unremarkable"}
-UNHEALTHY = {"not", "no", "abnormal", "unhealthy", "diseased", "lesion", "abnormality"}
+UNHEALTHY = {"not", "abnormal", "unhealthy", "diseased", "lesion", "lesions", "abnormality", "abnormalities",
+             "tumor", "tumour", "mass", "nodule"}
+_ABSENT_FINDING = re.compile(r"\b(?:no|without)\s+(?:\w+\s+){0,2}?(?:abnormalit\w*|lesions?|findings?|tumou?rs?|disease|pathology)\b")
+_THERE_IS_NO = re.compile(r"\bthere (?:is|are) (?:no|not)\b")
+_THERE_IS = re.compile(r"\bthere (?:is|are)\b")
+_ASKED = re.compile(r"\b(?:is|are) there (?:an? |any )?(.+?)(?: in | on | at | within |$)")
 
 
 def asks_health(question: Optional[str]) -> bool:
@@ -186,26 +191,62 @@ def asks_health(question: Optional[str]) -> bool:
     return bool(question) and re.search(r"\b(healthy|normal)\b", question.lower()) is not None
 
 
+def asked_finding(question: Optional[str]) -> Optional[str]:
+    """The finding a presence question asks about: "Is there a pneumothorax in ...?" -> "pneumothorax"."""
+    if not question:
+        return None
+    m = _ASKED.search(normalise_answer(question))
+    return m.group(1).strip() if m else None
+
+
+def _first_cue(text: str) -> Optional[str]:
+    """Polarity of the earliest yes/no cue in the text."""
+    cues = [(m.start(), "no") for m in _THERE_IS_NO.finditer(text)]
+    cues += [(m.start(), "yes") for m in _THERE_IS.finditer(text) if not _THERE_IS_NO.match(text, m.start())]
+    pos = 0
+    for w in text.split():
+        if w in NEGATIONS:
+            cues.append((pos, "no"))
+        elif w in AFFIRM:
+            cues.append((pos, "yes"))
+        pos += len(w) + 1
+    return min(cues)[1] if cues else None
+
+
 def polarity(text: str, question: Optional[str] = None) -> Optional[str]:
     """'yes', 'no' or None for a free-text reply to a yes/no question.
 
-    For a health question ("Is the liver healthy?") the reply "Healthy" means yes; for a
-    presence question ("Is there a tumor?") the reply "Normal" means no."""
-    words = normalise_answer(text).split()
+    - health question ("Is the liver healthy?"): "Healthy" or "No abnormality" mean yes;
+    - presence question ("Is there a pneumothorax?"): the asked finding preceded by a negation
+      ("no pneumothorax") means no, the finding stated plainly ("Pneumothorax present without
+      mediastinal shift") means yes;
+    - otherwise the first word if it is yes/no, else the earliest cue ("normal", "seen", ...)."""
+    t = normalise_answer(text)
+    words = t.split()
     if not words:
         return None
-    if words[0] in ("yes", "no"):
-        return words[0]
     if asks_health(question):
+        if _ABSENT_FINDING.search(t):
+            return "yes"
+        if words[0] in ("yes", "no"):
+            return words[0]
         if any(w in UNHEALTHY for w in words):
             return "no"
         if any(w in HEALTHY for w in words):
             return "yes"
-    if any(w in NEGATIONS for w in words):
-        return "no"
-    if any(w in AFFIRM for w in words):
-        return "yes"
-    return None
+        return _first_cue(t)
+    if words[0] in ("yes", "no"):
+        return words[0]
+    finding = asked_finding(question)
+    if finding:
+        head = finding.split()[-1]
+        stem = head[:max(4, len(head) - 4)]
+        neg = re.search(rf"\b(?:no|not|without|absent|negative for|free of)\b(?:\s+\w+){{0,3}}?\s+{re.escape(stem)}\w*", t)
+        if neg:
+            return "no"
+        if re.search(rf"\b{re.escape(stem)}\w*", t):
+            return "yes"
+    return _first_cue(t)
 
 
 def absent_reply(question: str, gold: str) -> Optional[str]:

@@ -41,6 +41,7 @@ class Outcome:
     reward: float
     breakdown: dict
     claims_absent: Optional[bool] = None   # answer says the finding isn't there (answers only)
+    box_ok: Optional[bool] = None          # answer's box overlaps the lesion enough for the grounding bonus
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -104,7 +105,12 @@ def rescore(view: View, outcome: Outcome, cfg: dict) -> Outcome:
     else:
         parts = dict(outcome.breakdown)
         parts["action"] = action_reward(view, outcome.action, outcome.correct, cfg)
-        if "grounding" in parts:
+        box_ok = outcome.box_ok
+        if box_ok is None:   # rows written before box_ok was stored
+            box_ok = "grounding" in parts or outcome.iou >= cfg["grounding"]["iou_threshold"]
+        parts.pop("grounding", None)
+        if (view.kind in (ViewKind.ORIGINAL, ViewKind.RANDOM_REMOVAL) and outcome.action == "answer"
+                and outcome.correct and box_ok):
             parts["grounding"] = cfg["grounding"]["bonus"]
     return Outcome(**{**outcome.to_dict(), "reward": sum(parts.values()), "breakdown": parts})
 
@@ -132,9 +138,11 @@ def score(
         overlap = iou(final.box, view.lesion_box)
 
     parts["action"] = action_reward(view, final.kind.value, correct, cfg)
-    if view.kind in (ViewKind.ORIGINAL, ViewKind.RANDOM_REMOVAL) and final.kind is ActionKind.ANSWER and correct:
+    box_ok = None
+    if final.kind is ActionKind.ANSWER:
         g = cfg["grounding"]
-        if overlap >= g["iou_threshold"] and box_area_fraction(final.box) <= g["max_box_area"]:
+        box_ok = bool(overlap >= g["iou_threshold"] and box_area_fraction(final.box) <= g["max_box_area"])
+        if view.kind in (ViewKind.ORIGINAL, ViewKind.RANDOM_REMOVAL) and correct and box_ok:
             parts["grounding"] = g["bonus"]
 
     t = cfg["tools"]
@@ -143,4 +151,4 @@ def score(
         parts["tools"] = -t["per_extra_call"] * extra
 
     return Outcome(view.view_id, view.case_id, view.kind.value, final.kind.value, correct, overlap,
-                   final.confidence, tool_calls, False, sum(parts.values()), parts, absent)
+                   final.confidence, tool_calls, False, sum(parts.values()), parts, absent, box_ok)

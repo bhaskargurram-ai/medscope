@@ -5,7 +5,7 @@ import numpy as np
 from medscope.actions import answer_matches, parse
 from medscope.data.schema import ActionKind, View, ViewKind, iou
 from medscope.env.tools import ToolEnv
-from medscope.rewards import load_config, score
+from medscope.rewards import Outcome, load_config, score
 
 BOX = [300, 300, 400, 400]
 
@@ -130,3 +130,26 @@ class TestAbsence(unittest.TestCase):
         self.assertEqual(polarity("Healthy", "Is the lung healthy?"), "yes")
         self.assertEqual(polarity("Abnormal", "Is the lung healthy?"), "no")
         self.assertEqual(polarity("Normal", "Is there a tumor?"), "no")
+
+
+class TestFreeTextReplies(unittest.TestCase):
+    def test_wordy_replies_read_correctly(self):
+        from medscope.actions import polarity
+        q = "Is there a pneumothorax in this chest X-ray?"
+        self.assertEqual(polarity("Pneumothorax present without mediastinal shift", q), "yes")
+        self.assertEqual(polarity("A mass is seen; no pneumothorax", q), "no")
+        self.assertEqual(polarity("There is no pneumothorax", q), "no")
+        self.assertEqual(polarity("A small left apical pneumothorax", q), "yes")
+        self.assertEqual(polarity("Normal chest X-ray", q), "no")
+        h = "Is the liver healthy?"
+        self.assertEqual(polarity("No abnormality", h), "yes")
+        self.assertEqual(polarity("There is a lesion", h), "no")
+
+    def test_grounding_bonus_follows_rejudged_correctness(self):
+        from medscope.rewards import rescore
+        v = view(ViewKind.ORIGINAL)
+        right = score(v, parse(f'<final>{{"action": "answer", "answer": "yes", "box": {v.lesion_box}}}</final>').final, load_config())
+        self.assertIn("grounding", right.breakdown)
+        flipped = Outcome(**{**right.to_dict(), "correct": False})
+        self.assertNotIn("grounding", rescore(v, flipped, load_config()).breakdown)
+        self.assertEqual(rescore(v, flipped, load_config()).reward, -2.0)

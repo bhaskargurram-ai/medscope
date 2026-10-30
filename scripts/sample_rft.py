@@ -31,7 +31,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from medscope.data.schema import View, ViewKind  # noqa: E402
-from medscope.eval.runner import load_views  # noqa: E402
+from medscope.eval.runner import load_views, read_jsonl  # noqa: E402
 from medscope.rewards import load_config, with_vocab  # noqa: E402
 
 
@@ -100,7 +100,9 @@ def main() -> None:
     todo = pick_views(views, args.per_kind)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    done = {json.loads(l)["view_id"] for l in out.read_text().splitlines() if l.strip()} if out.exists() else set()
+    old = read_jsonl(out)
+    out.write_text("".join(json.dumps(r) + "\n" for r in old)) if out.exists() else None   # drop a cut-off line
+    done = {r["view_id"] for r in old}
     todo = [v for v in todo if v.view_id not in done]
     print(f"{len(done)} views already sampled, {len(todo)} to go ({args.k} samples each)", flush=True)
 
@@ -118,7 +120,7 @@ def main() -> None:
                 print(f"  {i + 1}/{len(todo)} views, kept {kept[True]}, {rate:.1f}s each, "
                       f"~{rate * (len(todo) - i - 1) / 60:.0f} min left", flush=True)
 
-    recs = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
+    recs = read_jsonl(out)
     table = summary(recs)
     (out.parent / "rft_summary.md").write_text(table + "\n")
     print(table)

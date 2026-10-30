@@ -23,6 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from medscope.data.loaders import extra  # noqa: E402
+from medscope.data.loaders.common import stable_index  # noqa: E402
 
 
 def main() -> None:
@@ -44,7 +45,12 @@ def main() -> None:
         print(f"{name}: downloading {spec['repo']}", flush=True)
         files = extra.download(spec["repo"], Path(args.cache))
         recs, stats = extra.scan(name, extra.iter_parquet_rows(files), out / "images")
-        splits = extra.split_and_cap(recs, seed=args.seed + 10 + i)
+        kinds = __import__("collections").Counter(r.negative for r in recs)
+        if not kinds[True] or not kinds[False]:
+            raise SystemExit(f"{name}: {kinds[False]} lesion images and {kinds[True]} lesion-free images were found; "
+                             f"the dataset layout may have changed ({dict(stats)})")
+        # the split seed depends on the dataset name only, so preparing a subset gives the same splits
+        splits = extra.split_and_cap(recs, seed=args.seed + stable_index(name, 1000))
         counts = extra.write_outputs(splits, out)
         lines += [f"{name} ({spec['repo']}): {dict(stats)}",
                   f"{name} labels: {dict(__import__('collections').Counter(r.label for r in recs))}",

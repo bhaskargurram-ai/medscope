@@ -52,6 +52,7 @@ def build_views(
     other_image: Optional[np.ndarray] = None,
     degradation: Optional[str] = None,
     inpaint_fn: InpaintFn = telea_inpaint,
+    other_modality: Optional[str] = None,
 ) -> list[View]:
     """Build original, target-removal, random-removal and degraded views.
 
@@ -106,5 +107,7 @@ def build_views(
              **common),
         View(view_id=f"{case.case_id}__degraded", kind=ViewKind.DEGRADED,
              image_path=_save(degraded_img, base / "degraded.png"),
-             meta=meta(degradation=degradation), **common),
+             meta=meta(degradation=degradation,
+                       **({"mismatch_from": other_modality, "modality": case.modality}
+                          if degradation == "mismatch" else {})), **common),
     ]

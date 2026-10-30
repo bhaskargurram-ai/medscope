@@ -252,6 +252,19 @@ Changes, driven by the results above:
 - **Batched evaluation**: unfinished episodes advance together, one batch per turn, each seeing exactly
   what it would see alone.
 
+### Code review fixes before the version 2 runs (2026-10-30)
+
+- "Mismatch" degraded views now swap in an image of a different imaging type. Before, the swapped image
+  was simply the next case from another patient, often the same anatomy (another colonoscopy, another
+  chest X-ray), which a model should answer rather than query. Old mismatch views (built without this
+  guarantee) are left out of training and evaluation; blur, noise and low-resolution views are kept.
+- Free-text replies are read by the asked finding first ("no pneumothorax" = no; "pneumothorax present
+  without mediastinal shift" = yes), then by the earliest cue, so wordy baselines are not misread.
+- Every model decodes the same way (no repetition penalty or n-gram blocking from its own config).
+- The grounding bonus is recomputed with correctness when results are re-judged.
+- A cut-off last line (disconnect) no longer breaks a resume; one failing baseline no longer stops the
+  final evaluation; dataset split seeds depend only on the dataset name.
+
 ## Next
 
 - Notebooks 07 (data), 08 (SFT v2), 09 (rejection sampling), 10 (final test and export).

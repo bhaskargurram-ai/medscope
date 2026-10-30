@@ -160,11 +160,15 @@ class HFPolicy:
     # ---- generation -----------------------------------------------------------
 
     def _gen_kwargs(self, sample: bool) -> dict:
+        # every model decodes the same way: no repetition penalty or n-gram blocking from its own
+        # generation_config (some ship one), plain greedy for evaluation, plain sampling for training
         kw = dict(max_new_tokens=self.max_new_tokens, do_sample=sample, stop_strings=STOP_STRINGS,
-                  tokenizer=self.tokenizer, pad_token_id=self.tokenizer.pad_token_id)
+                  tokenizer=self.tokenizer, pad_token_id=self.tokenizer.pad_token_id,
+                  repetition_penalty=1.0, no_repeat_ngram_size=0)
         if sample:
-            # override any generation_config defaults so samples come from the plain policy (on-policy RL)
-            kw.update(temperature=self.temperature, top_p=self.top_p, top_k=0, repetition_penalty=1.0)
+            kw.update(temperature=self.temperature, top_p=self.top_p, top_k=0)
+        else:
+            kw.update(temperature=None, top_p=None, top_k=None)
         return kw
 
     def _trim(self, ids):

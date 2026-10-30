@@ -20,6 +20,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from medscope.data.inpaint import get_inpainter  # noqa: E402
+from medscope.data.loaders.common import stable_index  # noqa: E402
 from medscope.data.schema import Case  # noqa: E402
 from medscope.data.views import build_views, load_image  # noqa: E402
 
@@ -39,14 +40,23 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     cases = [Case.from_dict(json.loads(line)) for line in open(args.manifest) if line.strip()]
 
+    modalities = sorted({c.modality for c in cases})
+    others = {m: [c for c in cases if c.modality != m] for m in modalities}
+
+    def by_modality_except(m: str) -> list[Case]:
+        return others[m]
+
     kept = dropped = 0
     with open(out / "views.jsonl", "w") as vf, open(out / "dropped.jsonl", "w") as df:
         for i, case in enumerate(cases):
-            # A mismatch distractor: an image from a different patient, if any.
-            other = next((c for c in cases[i + 1:] + cases[:i] if c.patient_id != case.patient_id), None)
+            # A mismatch distractor: an image of a different imaging type (and patient), so the image
+            # really cannot answer the question; without one, this case gets another degradation
+            pool = by_modality_except(case.modality)
+            other = pool[stable_index(case.case_id, len(pool))] if pool else None
             other_img = load_image(other.image_path) if other else None
             try:
-                views = build_views(case, out, rng, other_image=other_img, inpaint_fn=inpaint_fn)
+                views = build_views(case, out, rng, other_image=other_img, inpaint_fn=inpaint_fn,
+                                    other_modality=other.modality if other else None)
             except ValueError as exc:
                 views, reason = [], str(exc)
             else:

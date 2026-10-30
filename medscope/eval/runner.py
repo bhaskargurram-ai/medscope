@@ -18,9 +18,32 @@ from ..rewards import Outcome, rejudge, rescore, with_vocab
 from .metrics import bootstrap
 
 
+def usable(view: View) -> bool:
+    """False for "mismatch" degraded views built before the swapped-in image was required to be
+    a different imaging type (it could be another patient's normal image of the same anatomy,
+    which a model should answer, not query)."""
+    return not (view.kind.value == "degraded" and view.meta.get("degradation") == "mismatch"
+                and not view.meta.get("mismatch_from"))
+
+
 def load_views(path: str | Path) -> list[View]:
-    lines = Path(path).read_text().splitlines()
-    return [View.from_dict(json.loads(line)) for line in lines if line.strip()]
+    views = [View.from_dict(r) for r in read_jsonl(Path(path))]
+    return [v for v in views if usable(v)]
+
+
+def read_jsonl(path: Path) -> list[dict]:
+    """Rows of a JSONL file; a last line cut off by a disconnect is ignored (it is redone)."""
+    if not path.exists():
+        return []
+    lines = [l for l in path.read_text().splitlines() if l.strip()]
+    rows = []
+    for i, line in enumerate(lines):
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            if i != len(lines) - 1:
+                raise
+    return rows
 
 
 def select_cases(views: list[View], limit_cases: Optional[int], seed: int = 0) -> list[View]:
@@ -33,10 +56,7 @@ def select_cases(views: list[View], limit_cases: Optional[int], seed: int = 0) -
     return [v for v in views if v.case_id in keep]
 
 
-def _read_jsonl(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+_read_jsonl = read_jsonl
 
 
 def evaluate(
@@ -72,6 +92,8 @@ def evaluate(
         _write_jsonl(outcomes_path, rows)
         _write_jsonl(transcripts_path, trows)
         log(f"{len(stale)} earlier results used a different view or precision; set aside and redone")
+    _write_jsonl(outcomes_path, rows)       # rewrite first: a cut-off last line must not end up mid-file
+    _write_jsonl(transcripts_path, trows)
     done = {r["view_id"] for r in rows if r["view_id"] in keys}
     todo = [v for v in views if v.view_id not in done]
     log(f"{len(done)} views already done, {len(todo)} to run")

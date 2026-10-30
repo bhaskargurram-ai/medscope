@@ -50,8 +50,8 @@ def main() -> None:
         negs = [negs[i] for i in sorted(rng.permutation(len(negs))[:round(share * len(negs))])]
     replays = None
     if args.replays:
-        import json
-        recs = [json.loads(l) for l in Path(args.replays).read_text().splitlines() if l.strip()]
+        from medscope.eval.runner import read_jsonl
+        recs = read_jsonl(Path(args.replays))
         from dataclasses import replace
         kept = [replace(by_id[r["view_id"]], view_id=r["view_id"] + "#rft")
                 for r in recs if r.get("kept") and r["view_id"] in by_id]

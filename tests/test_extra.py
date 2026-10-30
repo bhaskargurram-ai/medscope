@@ -105,3 +105,35 @@ class TestExtraDatasets(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMismatchAndResume(unittest.TestCase):
+    def test_mismatch_image_comes_from_another_imaging_type(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            recs, _ = extra.scan("lgg", lgg_rows(12), d / "images")
+            cx, _ = extra.scan("chestxdet", cxr_rows(8), d / "images")
+            cases = [c for r in recs + cx if not r.negative for c in extra.cases_for(r, "test")]
+            with open(d / "cases.jsonl", "w") as f:
+                for c in cases:
+                    f.write(json.dumps(c.to_dict()) + "\n")
+            res = subprocess.run([sys.executable, str(ROOT / "scripts/build_views.py"), "--manifest", str(d / "cases.jsonl"),
+                                  "--out", str(d / "views")], capture_output=True, text=True)
+            self.assertEqual(res.returncode, 0, res.stderr)
+            views = [json.loads(l) for l in (d / "views" / "views.jsonl").read_text().splitlines()]
+            mism = [v for v in views if v["meta"].get("degradation") == "mismatch"]
+            self.assertTrue(mism)
+            self.assertTrue(all(v["meta"]["mismatch_from"] != v["meta"]["modality"] for v in mism))
+
+    def test_old_mismatch_views_and_cut_off_lines(self):
+        from medscope.eval.runner import load_views
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "v.jsonl"
+            base = {"case_id": "c", "patient_id": "p", "image_path": "x", "question": "Is there a polyp?",
+                    "answer": "Yes", "answer_aliases": [], "lesion_box": None, "critical": False}
+            rows = [{**base, "view_id": "a", "kind": "degraded", "meta": {"degradation": "mismatch"}},
+                    {**base, "view_id": "b", "kind": "degraded", "meta": {"degradation": "blur"}},
+                    {**base, "view_id": "c", "kind": "degraded",
+                     "meta": {"degradation": "mismatch", "mismatch_from": "mri", "modality": "xray"}}]
+            p.write_text("\n".join(json.dumps(r) for r in rows) + '\n{"view_id": "d", "ki')
+            self.assertEqual([v.view_id for v in load_views(p)], ["b", "c"])

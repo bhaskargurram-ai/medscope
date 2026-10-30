@@ -835,9 +835,17 @@ print('final model adapter:', FINAL)
 runs = [('v2_medscope_test', 'medscope-4b', {BASE!r}, FINAL),
 {runs}
         ('v2_sft_v1_test', 'ablation-refer-only-sft', {BASE!r}, f'{{ADAPTERS}}/sft_agentic/final')]
+failed = []
 for out, name, model, adapter in runs:
     adapter_arg = f'--adapter {{adapter}}' if adapter else ''
-    !python scripts/evaluate.py --model {{model}} {{adapter_arg}} --views {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/{{out}} --name {{name}} --split test
+    try:
+        !python scripts/evaluate.py --model {{model}} {{adapter_arg}} --views {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/{{out}} --name {{name}} --split test
+    except SystemExit:
+        failed.append(name)   # keep going: one model that fails to load must not cost the others
+        import torch; torch.cuda.empty_cache()
+print('failed:', failed or 'none')
+if failed and 'medscope-4b' in failed:
+    raise SystemExit('The MedScope run failed: copy the error above into the chat.')
 """),
         md("## Export the final model"),
         code("PUSH_TO = ''   # e.g. 'your-hf-username/MedScope-4B' to also upload (private)"),
