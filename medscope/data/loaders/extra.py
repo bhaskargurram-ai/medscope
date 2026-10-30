@@ -42,6 +42,7 @@ CXR_FOCAL = {
 }
 CXR_DIFFUSE = ("cardiomegaly", "emphysema", "diffuse_nodule")
 CXR_CRITICAL = {"pneumothorax", "mass"}
+BUSI_CLASSES = ("benign", "malignant", "normal")
 
 
 @dataclass
@@ -121,7 +122,8 @@ def lesion_fraction_ok(mask: np.ndarray) -> bool:
 def chestxdet_row(row: dict, stats: Counter):
     img = decode(row["image"])
     image_id = str(row.get("image_id", ""))
-    group = "cxr_" + image_id.split("_")[0].split(".")[0]           # NIH file names start with the patient id
+    # NIH file names ("00000013_005.png") start with the patient id; otherwise near-copy groups are used
+    group = "cxr_" + image_id.split("_")[0] if "_" in image_id else ""
     if bool(row.get("is_negative")):
         return img, None, group, "normal", False, True
     present = {c: binary(decode(row.get(f"{c}_mask"))) for c in list(CXR_FOCAL) + list(CXR_DIFFUSE)}
@@ -141,8 +143,13 @@ def chestxdet_row(row: dict, stats: Counter):
 
 def busi_row(row: dict, stats: Counter):
     img = decode(row["image"])
-    label = str(row.get("class_label", "")).lower()
-    group = "busi_" + str(row.get("image_id", ""))                   # replaced by near-copy groups later
+    label = row.get("class_label", "")
+    image_id = str(row.get("image_id", ""))
+    if not isinstance(label, str) or label.lower() not in BUSI_CLASSES:
+        # a class index, or missing: the file name ("benign (12)") says it
+        label = next((c for c in BUSI_CLASSES if image_id.lower().startswith(c)), str(label))
+    label = label.lower()
+    group = "busi_" + image_id                                        # replaced by near-copy groups later
     if label == "normal":
         return img, None, group, "normal", False, True
     mask = binary(decode(row.get("mask")))
@@ -240,7 +247,7 @@ def scan(name: str, rows: Iterable[dict], out_dir: Path, log: Callable[[str], No
         stats["negative images" if negative else "lesion images"] += 1
         if (i + 1) % 500 == 0:
             log(f"  {name}: {i + 1} rows read, {len(recs)} kept")
-    if spec["group_by_copies"] and recs:
+    if recs and (spec["group_by_copies"] or any(not r.group for r in recs)):
         groups = near_duplicate_groups([r.image_path for r in recs])
         for r, g in zip(recs, groups):
             r.group = f"{name}_g{g}"

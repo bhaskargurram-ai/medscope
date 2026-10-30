@@ -47,15 +47,22 @@ def near_duplicate_groups(
     min_correlation: float = 0.95,
 ) -> list[int]:
     """Group id for each image; images in one group are near-copies of each other (transitively)."""
-    images = [load_image(p) for p in image_paths]
-    hashes = [dhash(img) for img in images]
-    uf = _UnionFind(len(images))
-    for i in range(len(images)):
-        for j in range(i + 1, len(images)):
+    import cv2
+
+    from ..quality import to_gray
+    # one image in memory at a time: keep its hash and the 64x64 thumbnail `correlation` works on
+    hashes, thumbs = [], []
+    for p in image_paths:
+        img = load_image(p)
+        hashes.append(dhash(img))
+        thumbs.append(cv2.resize(to_gray(img), (64, 64), interpolation=cv2.INTER_AREA))
+    uf = _UnionFind(len(hashes))
+    for i in range(len(hashes)):
+        for j in range(i + 1, len(hashes)):
             if hamming(hashes[i], hashes[j]) <= max_hash_distance and uf.find(i) != uf.find(j):
-                if correlation(images[i], images[j]) >= min_correlation:
+                if correlation(thumbs[i], thumbs[j]) >= min_correlation:
                     uf.union(i, j)
-    roots = [uf.find(i) for i in range(len(images))]
+    roots = [uf.find(i) for i in range(len(hashes))]
     relabel = {r: k for k, r in enumerate(sorted(set(roots)))}
     return [relabel[r] for r in roots]
 
