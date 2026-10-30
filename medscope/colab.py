@@ -130,7 +130,11 @@ def negatives_by_domain(results_dir: str | Path, views_file: str | Path | None =
     return "\n".join(rows) if len(rows) > 2 else "(no natural-negative results yet)"
 
 
-DATASET_PREFIXES = (("slaketest", "SLAKE test (VQA)"), ("slakeneg", "SLAKE CT/MRI"), ("slake", "SLAKE CT/MRI"),
+DATASET_PREFIXES = (("cvcext", "External colonoscopy (CVC-ClinicDB)"),
+                    ("qataext", "External chest X-ray (QaTa-COV19)"),
+                    ("busbraext", "External breast ultrasound (BUS-BRA)"),
+                    ("bratsext", "External brain MRI (BraTS-Africa)"),
+                    ("slaketest", "SLAKE test (VQA)"), ("slakeneg", "SLAKE CT/MRI"), ("slake", "SLAKE CT/MRI"),
                     ("hkneg", "Colonoscopy (Kvasir-SEG, HyperKvasir)"), ("kvasir", "Colonoscopy (Kvasir-SEG, HyperKvasir)"),
                     ("chestxdet", "Chest X-ray (ChestX-Det)"), ("busi", "Breast ultrasound (BUSI)"),
                     ("lgg", "Brain MRI (LGG)"), ("vqarad", "VQA-RAD"), ("pathvqa", "PathVQA"))

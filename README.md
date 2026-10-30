@@ -39,7 +39,9 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `07_more_datasets` | Chest X-ray, breast ultrasound and brain MRI: cases, natural negatives, views, checks | T4 or better | ~1 h |
 | `08_sft_v2` | Agentic adapter on all five imaging types; says "No" when the lesion is absent | A100 | ~4 h |
 | `09_rejection_sampling` | Keep the model's own successful episodes, fine-tune on them, pick the final model | A100 | ~4 h |
-| `10_final_eval_export` | Final model, six open baselines and an ablation on the full test set; export | A100, High-RAM | 8–12 h |
+| `10_final_eval_export` | Final model, six open baselines and an ablation on the full test set; learned edit detector; significance tests; export | A100, High-RAM | 8–12 h |
+| `11_generalization` | External centres (CVC-ClinicDB, QaTa-COV19, BUS-BRA, BraTS-Africa) and standard medical VQA (VQA-RAD, SLAKE, PathVQA) for every model | A100 | 8–10 h |
+| `12_frontier_models` | GPT and Gemini through the same agent loop on a fixed test subset (API keys as Colab secrets) | CPU | 1–2 h |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.

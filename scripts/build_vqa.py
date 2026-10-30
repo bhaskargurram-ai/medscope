@@ -60,8 +60,9 @@ def from_slake(root: Path, out: Path, limit: int | None, seed: int = 0) -> list[
     if limit and limit < len(qs):
         keep = sorted(np.random.default_rng(seed).permutation(len(qs))[:limit].tolist())
         qs = [qs[i] for i in keep]
-    return [view("slaketest", k, str(root / "imgs" / q["img_name"]), q["question"], q["answer"])
-            for k, q in enumerate(qs)]
+    # images are copied next to the other sets, so the folder is self-contained
+    return [view("slaketest", k, save(root / "imgs" / q["img_name"], out / "images" / "slaketest" / f"{k:05d}.png"),
+                 q["question"], q["answer"]) for k, q in enumerate(qs)]
 
 
 def main() -> None:

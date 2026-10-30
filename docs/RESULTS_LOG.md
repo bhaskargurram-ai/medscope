@@ -318,6 +318,25 @@ Observations:
 - The verbalised confidence is nearly constant (0.81), so AURC is weak (0.098 vs 0.055); a
   probability-based confidence would be needed for selective-prediction claims.
 
+## Evaluation additions for the paper (2026-10-30)
+
+- **Confidence from token probabilities** for every local model (geometric mean of the greedy
+  probabilities of the answer tokens), with its own AURC, because fine-tuning collapsed the stated
+  confidence to a constant.
+- **Paired bootstrap tests** (same cases for both models) for net utility, ESG, CCR and both
+  hallucination rates.
+- **Learned edit detector** (ResNet-18): can a classifier tell lesion-removed from same-size random
+  edits? AUC near 0.5 means the edits themselves give nothing away.
+- **External validation** (notebook 11), sources never used in training: CVC-ClinicDB (Barcelona),
+  QaTa-COV19 (Qatar), BUS-BRA (Brazil), BraTS-Africa 2023 (axial FLAIR slices with the largest tumour,
+  plus a tumour-free slice of the same patient). Mirrors: TahaKoleilat/MedCLIPSeg test folders,
+  MedOtter/brats2023-ssa. SIIM pneumothorax and BraTS 2020/2021 were not used: they share images with
+  the training sources (NIH ChestX-ray14, TCGA).
+- **Standard medical VQA** (notebook 11): VQA-RAD test (451), SLAKE English test and PathVQA test (300
+  each), scored with the benchmark's answer matching, closed and open questions separately.
+- **Frontier models** (notebook 12, CPU): OpenAI and Gemini through the same agent loop, on a fixed
+  150-case test subset; compared with MedScope on exactly those cases.
+
 ## Next
 
 - Notebooks 07 (data), 08 (SFT v2), 09 (rejection sampling), 10 (final test and export).

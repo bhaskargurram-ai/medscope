@@ -962,6 +962,90 @@ for p in PROVIDERS:
     ]
 
 
+def nb11_generalization() -> list[dict]:
+    model_rows = "\n".join(f"    ({out.replace('_test', '')!r}, {name!r}, {model!r}, None)," for out, name, model in BASELINES)
+    ext_runs = ["v2_medscope_ext"] + [b[0].replace("_test", "_ext") for b in BASELINES]
+    vqa_runs = ["v2_medscope_vqa"] + [b[0].replace("_test", "_vqa") for b in BASELINES]
+    return [
+        md(f"""
+# MedScope 11: generalisation (external centres, standard medical VQA)
+
+1. **External validation:** the same test on data from other centres that no model was trained on:
+   colonoscopy from Barcelona (CVC-ClinicDB), chest X-ray from Qatar (QaTa-COV19), breast ultrasound
+   from Brazil (BUS-BRA) and brain MRI from Sub-Saharan Africa (BraTS-Africa 2023). Up to 50 lesion
+   images and 50 lesion-free images per source; same view builder and checks.
+2. **Standard medical VQA:** VQA-RAD (all 451 test questions), SLAKE official English test and
+   PathVQA test (300 sampled each), to show the training did not cost general ability.
+
+Every model: the final MedScope model and the six open baselines. Run notebook 09 first (it picks the
+final model). **Runtime:** A100, about 8-10 hours; every step resumes.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code("!pip install -q nibabel datasets pyarrow huggingface_hub"),
+        code(LAMA_CELL), code(RESTORE_ALL),
+        md("## External data (built once, then restored from Drive)"),
+        code(r"""
+EXT, VEXT = f'{WORK}/external', f'{WORK}/views_external'
+if not os.path.exists(f'{VEXT}/test/views_clean.jsonl') and os.path.exists(f'{DRIVE}/external/external.tar'):
+    !tar -C {WORK} -xf {DRIVE}/external/external.tar
+if not os.path.exists(f'{VEXT}/test/views_clean.jsonl'):
+    !python scripts/prepare_external.py --out {EXT} --cache {WORK}/raw/external --cap 50
+    !python scripts/build_views.py --manifest {EXT}/cases_test.jsonl --out {VEXT}/test --inpainter lama
+    !python scripts/check_views.py --views {VEXT}/test/views.jsonl
+    os.makedirs(f'{DRIVE}/external', exist_ok=True)
+    !tar -C {WORK} -cf {DRIVE}/external/external.tar external/images external/negatives external/external_report.txt views_external
+print(open(f'{EXT}/external_report.txt').read())
+EXT_VIEWS = f'{VEXT}/test/views_clean.jsonl {EXT}/negatives/views_negatives_external.jsonl'
+"""),
+        md("## Standard VQA sets (built once)"),
+        code(r"""
+VQA = f'{WORK}/vqa'
+if not os.path.exists(f'{VQA}/views_vqa.jsonl') and os.path.exists(f'{DRIVE}/external/vqa.tar'):
+    !tar -C {WORK} -xf {DRIVE}/external/vqa.tar
+if not os.path.exists(f'{VQA}/views_vqa.jsonl'):
+    from huggingface_hub import hf_hub_download
+    import zipfile, shutil, pathlib
+    RAW = f'{WORK}/raw/slake'
+    if not os.path.exists(f'{RAW}/imgs'):
+        os.makedirs(RAW, exist_ok=True)
+        for f in ['test.json', 'imgs.zip']:
+            shutil.copy(hf_hub_download('BoKelvin/SLAKE', f, repo_type='dataset'), f'{RAW}/{f}')
+        with zipfile.ZipFile(f'{RAW}/imgs.zip') as z:
+            z.extractall(RAW)
+        raw = pathlib.Path(RAW)
+        if not (raw / 'imgs').exists():
+            next(raw.rglob('xmlab*')).parent.rename(raw / 'imgs')
+    !python scripts/build_vqa.py --out {VQA} --slake {WORK}/raw/slake --per-set 300
+    !tar -C {WORK} -cf {DRIVE}/external/vqa.tar vqa
+!wc -l {VQA}/views_vqa.jsonl
+"""),
+        md("## Evaluate every model (external first, then VQA)"),
+        code(f"""
+choice = json.load(open(f'{{ADAPTERS}}/final_choice.json')) if os.path.exists(f'{{ADAPTERS}}/final_choice.json') else {{'adapter': f'{{ADAPTERS}}/sft_v2/final'}}
+FINAL = choice['adapter']
+models = [('v2_medscope', 'medscope-4b', {BASE!r}, FINAL),
+{model_rows}
+]
+failed = []
+for suffix, views in (('ext', EXT_VIEWS), ('vqa', f'{{VQA}}/views_vqa.jsonl')):
+    for out, name, model, adapter in models:
+        adapter_arg = f'--adapter {{adapter}}' if adapter else ''
+        try:
+            !python scripts/evaluate.py --model {{model}} {{adapter_arg}} --views {{views}} --out {{RESULTS}}/{{out}}_{{suffix}} --name {{name}} --split {{suffix}}
+        except SystemExit:
+            failed.append(f'{{name}} ({{suffix}})')
+            import torch; torch.cuda.empty_cache()
+print('failed:', failed or 'none')
+"""),
+        publish("MedScope report - 11 generalisation", f"""
+    ('External data', read_text(f'{{EXT}}/external_report.txt')),
+    ('External validation leaderboard', compare_runs(RESULTS, 'v2_*_ext')),
+    ('MedScope vs each model on external data (paired bootstrap)', significance_table(RESULTS, 'v2_medscope_ext', {ext_runs[1:]!r})),
+    ('External validation by source', by_dataset(RESULTS, {ext_runs!r})),
+    ('Standard medical VQA', vqa_table(RESULTS, {vqa_runs!r})),
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -974,6 +1058,7 @@ NOTEBOOKS = {
     "08_sft_v2.ipynb": nb08,
     "09_rejection_sampling.ipynb": nb09,
     "10_final_eval_export.ipynb": nb10,
+    "11_generalization.ipynb": nb11_generalization,
     "12_frontier_models.ipynb": nb12_frontier,
 }
 
