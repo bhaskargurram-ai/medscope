@@ -749,7 +749,7 @@ rerun all cells to resume.
 !python scripts/evaluate.py --model {BASE} --adapter {{ADAPTERS}}/sft_agentic/final --views {{VAL_VIEWS}} {{VAL_NEG}} --out {{RESULTS}}/v2_sft_v1_val --name sft-v1-refer --split validation
 """),
         publish("MedScope report - 08 SFT v2", """
-    ('Training loss', train_log_summary(f'{ADAPTERS}/sft_v2/train_log.jsonl', window=200)),
+    ('Training loss', train_log_summary(f'{ADAPTERS}/sft_v2/train_log.jsonl', window=20)),
     ('Validation by imaging type', by_dataset(RESULTS, ['v2_sft_v2_val', 'v2_sft_v1_val'])),
     ('SFT v2 on validation', read_text(f'{RESULTS}/v2_sft_v2_val/report.md')),
     ('First agentic adapter on the same validation set', read_text(f'{RESULTS}/v2_sft_v1_val/report.md')),
@@ -794,7 +794,7 @@ print('validation net utility:', scores, '-> final model:', best)
 """),
         publish("MedScope report - 09 RFT", """
     ('Rejection sampling: success per view kind', read_text(f'{ADAPTERS}/rft/rft_summary.md')),
-    ('Fine-tuning loss', train_log_summary(f'{ADAPTERS}/rft_train/train_log.jsonl', window=50)),
+    ('Fine-tuning loss', train_log_summary(f'{ADAPTERS}/rft_train/train_log.jsonl', window=10)),
     ('Final model choice', read_text(f'{ADAPTERS}/final_choice.json')),
     ('Validation by imaging type', by_dataset(RESULTS, ['v2_rft_val', 'v2_sft_v2_val', 'v2_sft_v1_val'])),
     ('RFT model on validation', read_text(f'{RESULTS}/v2_rft_val/report.md')),

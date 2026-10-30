@@ -169,7 +169,7 @@ def stage_08() -> None:
     evaluate(BASE, f"{ADAPTERS}/sft_v2/final", f"{VAL_VIEWS} {VAL_NEG}", "v2_sft_v2_val", "medscope-sft-v2", "validation")
     evaluate(BASE, f"{ADAPTERS}/sft_agentic/final", f"{VAL_VIEWS} {VAL_NEG}", "v2_sft_v1_val", "sft-v1-refer", "validation")
     report("MedScope report - 08 SFT v2", [
-        ("Training loss", train_log_summary(ADAPTERS / "sft_v2" / "train_log.jsonl", window=200)),
+        ("Training loss", train_log_summary(ADAPTERS / "sft_v2" / "train_log.jsonl", window=20)),
         ("Validation by imaging type", by_dataset(RESULTS, ["v2_sft_v2_val", "v2_sft_v1_val"])),
         ("SFT v2 on validation", read_text(RESULTS / "v2_sft_v2_val" / "report.md")),
         ("First agentic adapter on the same validation set", read_text(RESULTS / "v2_sft_v1_val" / "report.md")),
@@ -198,7 +198,7 @@ def stage_09() -> None:
     log(f"validation net utility {scores} -> final model: {best}")
     report("MedScope report - 09 RFT", [
         ("Rejection sampling: success per view kind", read_text(ADAPTERS / "rft" / "rft_summary.md")),
-        ("Fine-tuning loss", train_log_summary(ADAPTERS / "rft_train" / "train_log.jsonl", window=50)),
+        ("Fine-tuning loss", train_log_summary(ADAPTERS / "rft_train" / "train_log.jsonl", window=10)),
         ("Final model choice", read_text(ADAPTERS / "final_choice.json")),
         ("Validation by imaging type", by_dataset(RESULTS, ["v2_rft_val", "v2_sft_v2_val", "v2_sft_v1_val"])),
         ("RFT model on validation", read_text(RESULTS / "v2_rft_val" / "report.md")),

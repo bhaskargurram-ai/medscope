@@ -288,6 +288,36 @@ Cases with no valid place for the random-edit control are dropped by the view bu
 ultrasound lesions). Test set for version 2: about 100 SLAKE/Kvasir cases + 119 new ones, plus 288
 natural negatives (90 SLAKE, 91 HyperKvasir, 107 new).
 
+## SFT v2 (notebook 08, 2026-10-30)
+
+Fresh agentic LoRA on all five imaging types plus natural negatives (11,000+ views, 1,980 optimizer
+steps, mean loss 0.27), A100 40 GB. Validation: 329 cases, 781 views (163 counterfactual cases, 166
+natural negatives), same prompt and scoring for both adapters.
+
+| Metric (validation) | SFT v1 (refer-only, notebook 03) | SFT v2 |
+| --- | --- | --- |
+| Covered-and-correct rate | 0.733 [0.669, 0.799] | **0.880** [0.827, 0.926] |
+| Evidence sensitivity gap | 0.601 [0.521, 0.679] | **0.761** [0.687, 0.826] |
+| Lesion erased: still claims it | 0.135 | **0.117** |
+| Equal edit elsewhere: denies or refers | 0.264 | **0.123** |
+| Natural negatives: claims the finding | 0.060 | 0.072 |
+| Natural negatives: correctly says "No" | 0.271 | **0.928** |
+| Grounded accuracy (IoU >= 0.3) | 0.663 | **0.804** |
+| Asks to clarify on degraded input | 1.000 | 1.000 |
+| Net clinical utility | 0.628 [0.555, 0.699] | **0.785** [0.688, 0.871] |
+
+By imaging type (SFT v2): colonoscopy ESG 0.83, breast ultrasound 0.75, brain MRI 0.71, SLAKE CT/MRI
+0.67, chest X-ray 0.65. The refer-only adapter, never trained on the new imaging types, reaches only
+0.23-0.25 correct on chest X-ray and ultrasound (it refers instead), against 0.80-0.92 for SFT v2.
+
+Observations:
+- Saying "No" replaces referring entirely (0 refers); referring on natural negatives drops from 67% to 0
+  with almost no rise in hallucinated findings (6.0% -> 7.2%).
+- Remaining errors: missed lesions ("No" on an original or random-edit view, about 12%), and claiming an
+  erased lesion (11.7%, highest on brain MRI, 24%).
+- The verbalised confidence is nearly constant (0.81), so AURC is weak (0.098 vs 0.055); a
+  probability-based confidence would be needed for selective-prediction claims.
+
 ## Next
 
 - Notebooks 07 (data), 08 (SFT v2), 09 (rejection sampling), 10 (final test and export).
