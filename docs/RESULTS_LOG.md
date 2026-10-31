@@ -455,3 +455,23 @@ gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash. Each provider's defaul
 on where it is the default), the same prompt, images and scoring as every other model. Token usage is
 recorded per call from the providers' own counts (usage.json) and priced at the 2026-10-31 list
 prices; a 20-case pilot per model measures the cost per view before the full run.
+
+## 2026-10-31: notebook 14 (ablation) and notebook 15 (SFT v3 with VQA replay)
+
+**Ablation: the same fine-tuning without counterfactual views** (sft_nocf vs sft_v2, paired, 507 test cases):
+net utility 0.760 vs 0.494 (+0.267 [+0.202, +0.333], p<0.001); ESG 0.758 vs 0.402 (+0.356, p<0.001);
+claims an erased lesion 11.9% vs 53.0% (-41 points, p<0.001); claims a finding on a healthy image 8.7% vs
+22.2% (p<0.001); CCR 0.877 vs 0.929 (-0.053, p<0.001: the ablation answers "Yes" more often, which helps on
+real lesions and fails when the lesion is gone). External centres (169 cases): ESG +0.176 (p=0.001),
+erased-lesion claims 10.9% vs 41.2%, healthy-image claims 8.0% vs 36.0% (both p<0.001), net +0.083 (p=0.19).
+The counterfactual views are what teach evidence sensitivity; everything else in the recipe is held fixed.
+
+**SFT v3 (continued from RFT with general VQA replay), chosen by validation net utility (0.804 vs 0.801):**
+- Test vs RFT: net 0.714 vs 0.752 (p=0.15, not significant), ESG 0.744 vs 0.758 (p=0.52), CCR 0.881 vs 0.865,
+  erased-lesion claims 13.7% vs 11.4% (p=0.18), healthy-image claims 14.6% vs 8.3% (p<0.001).
+- External: no significant difference on any metric (ESG 0.672 vs 0.664).
+- Standard VQA (all closed / open): SLAKE 0.767 (base Qwen3.5-4B 0.570, RFT 0.387); VQA-RAD 0.554 (base 0.481,
+  RFT 0.415); PathVQA 0.520 (base 0.293, RFT 0.260). The VQA regression is gone. Note for the paper: v3 saw the
+  three benchmarks' train splits (images of the test splits excluded), the base model is zero-shot.
+- Final model: sft_v3 (prefix v2_medscope3). It keeps the evidence-sensitivity results and is a general
+  medical VQA model as well; the cost is more false findings on healthy images (14.6% vs 8.3%).
