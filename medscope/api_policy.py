@@ -47,6 +47,10 @@ def with_retries(fn, tries: int = 6):
             time.sleep(wait)
 
 
+# A request that hangs is cut off after this many seconds and retried (with_retries), so one stuck
+# connection cannot stall a run. Generous: thinking models can take a minute on a hard image.
+TIMEOUT_S = 180
+
 # USD per 1M tokens (input, output), standard tier, from the providers' pricing pages on 2026-10-31.
 # Output includes reasoning/thinking tokens. Image inputs are billed as input tokens.
 PRICES = {
@@ -121,7 +125,7 @@ class OpenAIPolicy(_ApiPolicy):
     def __init__(self, model: str, **kw):
         super().__init__(model, **kw)
         from openai import OpenAI
-        self.client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        self.client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=TIMEOUT_S, max_retries=0)
 
     @staticmethod
     def to_openai(messages: list[dict]) -> list[dict]:
@@ -155,7 +159,7 @@ class AnthropicPolicy(_ApiPolicy):
     def __init__(self, model: str, **kw):
         super().__init__(model, **kw)
         import anthropic
-        self.client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        self.client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], timeout=TIMEOUT_S, max_retries=0)
 
     @staticmethod
     def to_anthropic(messages: list[dict]) -> tuple[str, list[dict]]:
@@ -186,7 +190,9 @@ class GeminiPolicy(_ApiPolicy):
     def __init__(self, model: str, **kw):
         super().__init__(model, **kw)
         from google import genai
-        self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        from google.genai import types
+        self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"],
+                                   http_options=types.HttpOptions(timeout=TIMEOUT_S * 1000))   # milliseconds
 
     def _call(self, messages: list[dict]) -> str:
         from google.genai import types
