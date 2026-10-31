@@ -446,3 +446,12 @@ labels as a healthy brain); this affects every model equally and is worth a manu
 ## Next
 
 - Notebooks 07 (data), 08 (SFT v2), 09 (rejection sampling), 10 (final test and export).
+
+## 2026-10-31: expanded frontier comparison set up (notebook 12 v2)
+
+Nine frontier models on the full test set (all cases, paired with MedScope): OpenAI gpt-6-sol,
+gpt-6-astra, gpt-6.1-sol; Anthropic claude-fable-5-1, claude-opus-5-5, claude-sonnet-5-5; Google
+gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash. Each provider's default settings (reasoning
+on where it is the default), the same prompt, images and scoring as every other model. Token usage is
+recorded per call from the providers' own counts (usage.json) and priced at the 2026-10-31 list
+prices; a 20-case pilot per model measures the cost per view before the full run.

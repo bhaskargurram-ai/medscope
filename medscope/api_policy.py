@@ -1,8 +1,11 @@
-"""Frontier models behind an API (OpenAI, Google Gemini) as agent policies.
+"""Frontier models behind an API (OpenAI, Anthropic, Google Gemini) as agent policies.
 
 They see exactly the same system prompt, images, tool results and turn structure as the local
 models; only the transport differs. Several conversations are sent in parallel. Keys come from
-the environment (OPENAI_API_KEY, GEMINI_API_KEY), never from code.
+the environment (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY), never from code.
+
+Every call's token usage is recorded (input, output including reasoning), so a run's real cost is
+measured from the provider's own counts, not estimated.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ import base64
 import io
 import os
 import random
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
@@ -43,17 +47,65 @@ def with_retries(fn, tries: int = 6):
             time.sleep(wait)
 
 
+# USD per 1M tokens (input, output), standard tier, from the providers' pricing pages on 2026-10-31.
+# Output includes reasoning/thinking tokens. Image inputs are billed as input tokens.
+PRICES = {
+    "gpt-6-astra": (10.00, 50.00), "gpt-6.1-sol": (2.00, 10.00), "gpt-6.1-terra": (1.00, 5.00),
+    "gpt-6-luna": (0.10, 0.50),
+    "gpt-6-sol": (2.00, 10.00),               # superseded; no longer on OpenAI's page, price from third-party listings
+    "claude-fable-5-1": (10.00, 50.00), "claude-opus-5-5": (4.00, 20.00), "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-haiku-5-5": (0.10, 0.50),
+    "gemini-4-argon": (2.00, 10.00),          # until 2026-11-30, then 4.00 / 20.00
+    "gemini-3.1-pro-preview": (2.00, 12.00), "gemini-3.8-flash": (0.75, 3.75),
+}
+
+
+def cost_usd(model: str, input_tokens: int, output_tokens: int) -> Optional[float]:
+    if model not in PRICES:
+        return None
+    pin, pout = PRICES[model]
+    return input_tokens / 1e6 * pin + output_tokens / 1e6 * pout
+
+
+def measured_cost_per_view(run_dir) -> Optional[dict]:
+    """Average tokens and dollars per view from a run's usage.json (only calls that ran views count)."""
+    import json
+    from pathlib import Path
+    p = Path(run_dir) / "usage.json"
+    if not p.exists():
+        return None
+    u = json.loads(p.read_text())
+    calls = [c for c in u.get("calls", []) if c.get("views_run")]
+    n = sum(c["views_run"] for c in calls)
+    if not n:
+        return None
+    tin, tout = sum(c["input_tokens"] for c in calls), sum(c["output_tokens"] for c in calls)
+    return {"model": u["model"], "views": n, "requests_per_view": sum(c["requests"] for c in calls) / n,
+            "input_per_view": tin / n, "output_per_view": tout / n,
+            "usd_per_view": None if cost_usd(u["model"], tin, tout) is None else cost_usd(u["model"], tin, tout) / n}
+
+
 class _ApiPolicy:
     load_in_4bit = False
     dtype = "api"
 
     def __init__(self, model: str, max_tokens: int = 16000, workers: int = 8):
         self.model, self.max_tokens, self.workers = model, max_tokens, workers
+        self.usage = {"requests": 0, "input_tokens": 0, "output_tokens": 0, "errors": 0}
+        self._lock = threading.Lock()
+
+    def _record(self, input_tokens: int, output_tokens: int) -> None:
+        with self._lock:
+            self.usage["requests"] += 1
+            self.usage["input_tokens"] += int(input_tokens or 0)
+            self.usage["output_tokens"] += int(output_tokens or 0)
 
     def generate(self, messages: list[dict], sample: bool = False) -> Generation:
         try:
             text = with_retries(lambda: self._call(messages))
         except Exception as e:  # noqa: BLE001 - a refused or failed request is scored as malformed
+            with self._lock:
+                self.usage["errors"] += 1
             text = f"[API error: {type(e).__name__}: {str(e)[:200]}]"
         return Generation(text or "")
 
@@ -94,7 +146,40 @@ class OpenAIPolicy(_ApiPolicy):
     def _call(self, messages: list[dict]) -> str:
         r = self.client.chat.completions.create(model=self.model, messages=self.to_openai(messages),
                                                 max_completion_tokens=self.max_tokens)
+        if getattr(r, "usage", None):
+            self._record(r.usage.prompt_tokens, r.usage.completion_tokens)
         return r.choices[0].message.content or ""
+
+
+class AnthropicPolicy(_ApiPolicy):
+    def __init__(self, model: str, **kw):
+        super().__init__(model, **kw)
+        import anthropic
+        self.client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+    @staticmethod
+    def to_anthropic(messages: list[dict]) -> tuple[str, list[dict]]:
+        system = " ".join(c["text"] for m in messages if m["role"] == "system" for c in m["content"])
+        out = []
+        for m in messages:
+            if m["role"] == "system":
+                continue
+            parts = []
+            for c in m["content"]:
+                if c["type"] == "image":
+                    parts.append({"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                                              "data": base64.b64encode(png_bytes(c["image"])).decode()}})
+                else:
+                    parts.append({"type": "text", "text": c["text"]})
+            out.append({"role": m["role"], "content": parts})
+        return system, out
+
+    def _call(self, messages: list[dict]) -> str:
+        system, msgs = self.to_anthropic(messages)
+        r = self.client.messages.create(model=self.model, system=system, messages=msgs, max_tokens=self.max_tokens)
+        if getattr(r, "usage", None):
+            self._record(r.usage.input_tokens, r.usage.output_tokens)
+        return "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
 
 
 class GeminiPolicy(_ApiPolicy):
@@ -116,11 +201,14 @@ class GeminiPolicy(_ApiPolicy):
         r = self.client.models.generate_content(
             model=self.model, contents=contents,
             config=types.GenerateContentConfig(system_instruction=system, max_output_tokens=self.max_tokens))
+        u = getattr(r, "usage_metadata", None)
+        if u:
+            self._record(u.prompt_token_count or 0, (u.candidates_token_count or 0) + (getattr(u, "thoughts_token_count", 0) or 0))
         return r.text or ""
 
 
 def api_policy(provider: str, model: str, workers: int = 8) -> _ApiPolicy:
-    return {"openai": OpenAIPolicy, "gemini": GeminiPolicy}[provider](model, workers=workers)
+    return {"openai": OpenAIPolicy, "anthropic": AnthropicPolicy, "gemini": GeminiPolicy}[provider](model, workers=workers)
 
 
 def available_models(provider: str) -> Optional[list[str]]:
@@ -129,9 +217,58 @@ def available_models(provider: str) -> Optional[list[str]]:
         if provider == "openai":
             from openai import OpenAI
             return sorted(m.id for m in OpenAI(api_key=os.environ["OPENAI_API_KEY"]).models.list())
+        if provider == "anthropic":
+            import anthropic
+            client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+            return sorted(m.id for m in client.models.list())
         from google import genai
         client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])   # keep a reference: the list is fetched lazily
         return sorted(m.name for m in client.models.list())
     except Exception as e:  # noqa: BLE001
         print(f"could not list {provider} models: {e}")
         return None
+
+
+def cost_table(rows: list[tuple[str, str, str]], pilot_root, results_root, all_views) -> str:
+    """Markdown: per model, measured tokens and $ per view (pilot or full run), the cost so far and
+    the projected cost of finishing the full run. rows: (run name, provider, model id)."""
+    from pathlib import Path
+    from .eval.runner import remaining
+    lines = ["| Model | Price in/out per 1M | Measured on (views) | Requests per view | Input tokens per view | "
+             "Output tokens per view | $ per view | Spent so far | Views left | Projected to finish | Full run total |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    total_left = total_all = 0.0
+    for run, provider, model in rows:
+        main, pilot = Path(results_root) / run, Path(pilot_root) / run
+        m = measured_cost_per_view(main) or measured_cost_per_view(pilot)
+        price = PRICES.get(model)
+        price_s = f"${price[0]:g} / ${price[1]:g}" if price else "not listed"
+        spent = sum(_spent(d) for d in (main, pilot))
+        left = len(remaining(all_views, main, "api"))
+        if not m:
+            lines.append(f"| {model} | {price_s} | not measured yet | | | | | ${spent:.2f} | {left} | run the pilot | |")
+            continue
+        upv = m["usd_per_view"]
+        fin = None if upv is None else upv * left
+        full = None if upv is None else upv * len(all_views)
+        if fin is not None:
+            total_left += fin
+            total_all += full
+        money = lambda x: "price not listed" if x is None else f"${x:.2f}"  # noqa: E731
+        lines.append(f"| {model} | {price_s} | {m['views']} | {m['requests_per_view']:.2f} | {m['input_per_view']:,.0f} | "
+                     f"{m['output_per_view']:,.0f} | {money(upv) if upv is None else f'${upv:.4f}'} | ${spent:.2f} | {left} | "
+                     f"{money(fin)} | {money(full)} |")
+    lines.append(f"\n**Projected cost to finish all listed models: ${total_left:.2f}** "
+                 f"(a full run of every model from scratch: ${total_all:.2f}). Tokens are the providers' own counts; "
+                 f"prices are the standard-tier list prices of 2026-10-31 (gemini-4-argon doubles from 2026-12-01).")
+    return "\n".join(lines)
+
+
+def _spent(run_dir) -> float:
+    import json
+    from pathlib import Path
+    p = Path(run_dir) / "usage.json"
+    if not p.exists():
+        return 0.0
+    return json.loads(p.read_text()).get("cost_usd") or 0.0
+

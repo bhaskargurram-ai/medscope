@@ -102,6 +102,7 @@ def evaluate(
         if todo:
             log(f"no model given: {len(todo)} views without results are left out")
         todo = []
+    n_run = len(todo)
     t0 = time.time()
     with open(outcomes_path, "a") as fo, open(transcripts_path, "a") as ft:
         last_log = -10
@@ -139,6 +140,7 @@ def evaluate(
     summary = {"meta": meta, "n_views": len(outcomes), "n_cases": len({o.case_id for o in outcomes}),
                "metrics": bootstrap(outcomes, n_resamples=n_bootstrap)}
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
+    summary["n_run"] = n_run          # views run in this call (not saved: it describes the call, not the results)
     report = make_report(summary, outcomes, [t for t in _read_jsonl(transcripts_path) if t["view_id"] in keys])
     (out / "report.md").write_text(report)
     return summary

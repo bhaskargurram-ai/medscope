@@ -910,54 +910,97 @@ print('done. On the GPU machine set:  HF_WORK_REPO=' + REPO)
     ]
 
 
+# Frontier models behind an API: (run name, provider, model id). The first OpenAI and Gemini rows keep
+# their earlier run names, so the 150 cases already done are reused.
+FRONTIER = [
+    ("v2_openai_test", "openai", "gpt-6-sol"),
+    ("v2_gpt6astra_test", "openai", "gpt-6-astra"),
+    ("v2_gpt61sol_test", "openai", "gpt-6.1-sol"),
+    ("v2_claudefable_test", "anthropic", "claude-fable-5-1"),
+    ("v2_claudeopus_test", "anthropic", "claude-opus-5-5"),
+    ("v2_claudesonnet_test", "anthropic", "claude-sonnet-5-5"),
+    ("v2_gemini_test", "gemini", "gemini-4-argon"),
+    ("v2_gemini31pro_test", "gemini", "gemini-3.1-pro-preview"),
+    ("v2_gemini38flash_test", "gemini", "gemini-3.8-flash"),
+]
+FRONTIER_RUNS = [r for r, _, _ in FRONTIER]
+
+
 def nb12_frontier() -> list[dict]:
     return [
         md("""
-# MedScope 12: frontier models (GPT, Gemini) on MedScope-Bench
+# MedScope 12: frontier models (OpenAI, Anthropic, Google) on MedScope-Bench
 
-The same agent prompt, images, tools and scoring as every other model, sent through the OpenAI and
-Gemini APIs, on a fixed random subset of the test set (the same subset for both). The comparison
-with MedScope is paired on exactly these cases.
+Nine frontier models, three per provider, get the same agent prompt, images, tools and scoring as
+every other model, on the **full test set**, so the comparison with MedScope is paired on every case.
 
 **Runtime: CPU is fine** (no GPU credits): the models run on the providers' servers.
-**Cost:** roughly 500 API requests per model with images; with the default 150 cases expect about
-$10-25 per model (check your provider's current prices). Set `N_CASES` lower for a cheaper first run.
 
-**Before you start:** add Colab secrets `OPENAI_API_KEY` and/or `GEMINI_API_KEY` (key icon). Only the
-providers with a key are run. Images from the five datasets are sent to the provider for this
-research evaluation; the datasets' licences allow research use.
+**Cost is measured, not guessed.** Step 1 runs a 20-case pilot per model and prints, from the
+providers' own token counts and the official list prices, the exact cost per view and the projected
+cost of the full run. Step 2 (set `RUN_FULL = True`) runs everything and prints what was spent.
+Run before 1 December 2026: gemini-4-argon's price doubles then.
+
+**Before you start:** add Colab secrets `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` and `GEMINI_API_KEY`
+(key icon). Only providers with a key are run. Images from the datasets are sent to the providers
+for this research evaluation; the datasets' licences allow research use. Every step resumes.
 """),
         code(SETUP),
-        code("!pip install -q -U openai google-genai"),
+        code("!pip install -q -U openai anthropic google-genai"),
         code(RESTORE_ALL),
         code(r"""
-from medscope.api_policy import available_models
-for name in ('OPENAI_API_KEY', 'GEMINI_API_KEY'):
+from medscope.api_policy import available_models, cost_table, PRICES
+KEYS = {'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}
+for name in KEYS.values():
     if secret(name):
         os.environ[name] = secret(name)
-PROVIDERS = [p for p, k in (('openai', 'OPENAI_API_KEY'), ('gemini', 'GEMINI_API_KEY')) if os.environ.get(k)]
+PROVIDERS = [p for p, k in KEYS.items() if os.environ.get(k)]
 print('providers with a key:', PROVIDERS)
 for p in PROVIDERS:
     names = available_models(p) or []
-    print(p, [n for n in names if ('gpt' in n or 'gemini' in n) and 'audio' not in n and 'tts' not in n][-25:])
+    print(p, [n for n in names if any(t in n for t in ('gpt', 'claude', 'gemini')) and 'audio' not in n and 'tts' not in n][-25:])
 """),
-        md("Model ids below were the newest flagships with image input in October 2026; change them if the list above shows newer ones."),
+        md("Model ids below were the newest models with image input in October 2026; if one is missing from the lists above, replace it with the closest id shown."),
+        code(f"""
+FRONTIER = {FRONTIER!r}
+PILOT_CASES = 20
+RUN_FULL = False       # set True after reading the pilot's cost table
+from medscope.eval.runner import load_views, select_cases
+ALL_VIEWS = select_cases([v for f in (TEST_VIEWS, TEST_NEG) for v in load_views(f)], None)
+RUNS = [(r, p, m) for r, p, m in FRONTIER if p in PROVIDERS]
+print(len(ALL_VIEWS), 'test views,', len({{v.case_id for v in ALL_VIEWS}}), 'cases;', len(RUNS), 'models to run')
+"""),
+        md("## Step 1: 20-case pilot per model and the exact cost of the full run"),
         code(r"""
-MODELS = {'openai': 'gpt-6-sol', 'gemini': 'gemini-4-argon'}
-N_CASES = 150
-for p in PROVIDERS:
-    m = MODELS[p]
+for run, p, m in RUNS:
     try:
-        !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases {N_CASES} --out {RESULTS}/v2_{p}_test --name {p}-{m} --split test --batch-size 8
+        !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases {PILOT_CASES} --out {RESULTS}/pilot/{run} --name {p}-{m} --split test --batch-size 8
     except SystemExit:
-        print(f'{p} failed: see the error above')
+        print(f'{m} failed: see the error above')
+COSTS = cost_table(RUNS, f'{RESULTS}/pilot', RESULTS, ALL_VIEWS)
+open(f'{RESULTS}/frontier_costs.md', 'w').write(COSTS)
+from IPython.display import Markdown, display
+display(Markdown(COSTS))
+"""),
+        md("## Step 2: full test set (only when `RUN_FULL = True`)"),
+        code(r"""
+if RUN_FULL:
+    for run, p, m in RUNS:
+        try:
+            !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --out {RESULTS}/{run} --name {p}-{m} --split test --batch-size 8
+        except SystemExit:
+            print(f'{m} failed: see the error above')
+    COSTS = cost_table(RUNS, f'{RESULTS}/pilot', RESULTS, ALL_VIEWS)
+    open(f'{RESULTS}/frontier_costs.md', 'w').write(COSTS)
+    display(Markdown(COSTS))
+else:
+    print('RUN_FULL is False: read the cost table above, then set RUN_FULL = True and rerun from the FRONTIER cell')
 """),
         publish("MedScope report - 12 frontier", """
-    ('Leaderboard (test; frontier rows are on a subset)', compare_runs(RESULTS, 'v2_*_test')),
-    ('MedScope vs frontier models on the same cases (paired bootstrap)', significance_table(RESULTS, 'v2_medscope_test', ['v2_openai_test', 'v2_gemini_test'])),
-    ('By imaging type', by_dataset(RESULTS, ['v2_medscope_test', 'v2_openai_test', 'v2_gemini_test'])),
-    ('OpenAI model on test', read_text(f'{RESULTS}/v2_openai_test/report.md')),
-    ('Gemini model on test', read_text(f'{RESULTS}/v2_gemini_test/report.md')),
+    ('API cost (measured)', read_text(f'{RESULTS}/frontier_costs.md')),
+    ('Leaderboard (test)', compare_runs(RESULTS, 'v2_*_test')),
+    ('MedScope vs frontier models on the same cases (paired bootstrap)', significance_table(RESULTS, 'v2_medscope_test', [r for r, _, _ in RUNS])),
+    ('By imaging type', by_dataset(RESULTS, ['v2_medscope_test'] + [r for r, _, _ in RUNS])),
 """),
     ]
 
@@ -1074,7 +1117,7 @@ choice = json.load(open(f'{{ADAPTERS}}/final_choice.json'))
 M = choice.get('prefix', 'v2_medscope')
 print('final MedScope model:', choice['adapter'], '->', M)
 BASE_TEST = {baseline_test!r}
-TEST_RUNS = [f'{{M}}_test'] + BASE_TEST + ['v2_openai_test', 'v2_gemini_test', 'v2_sft_v1_test', 'v2_sft_v2_test', 'v2_nocf_test']
+TEST_RUNS = [f'{{M}}_test'] + BASE_TEST + {FRONTIER_RUNS!r} + ['v2_sft_v1_test', 'v2_sft_v2_test', 'v2_nocf_test']
 EXT_RUNS = [f'{{M}}_ext'] + [r.replace('_test', '_ext') for r in BASE_TEST] + ['v2_sft_v2_ext', 'v2_nocf_ext']
 VQA_RUNS = [f'{{M}}_vqa'] + [r.replace('_test', '_vqa') for r in BASE_TEST]
 if M != 'v2_medscope':
@@ -1093,6 +1136,7 @@ if M != 'v2_medscope':
     ('Ablation: counterfactual training vs the same fine-tuning without it (test)', significance_table(RESULTS, 'v2_sft_v2_test', ['v2_nocf_test'])),
     ('Ablation on external centres', significance_table(RESULTS, 'v2_sft_v2_ext', ['v2_nocf_ext'])),
     ('Standard medical VQA', vqa_table(RESULTS, VQA_RUNS)),
+    ('Frontier models: measured API cost', read_text(f'{RESULTS}/frontier_costs.md')),
     ('Edit-trace test', read_text(f'{RESULTS}/v2_edit_detector/edit_detector.md')),
     ('MedScope on test (full report)', read_text(f'{RESULTS}/{M}_test/report.md')),
 """),
