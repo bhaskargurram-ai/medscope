@@ -518,3 +518,11 @@ answer, rarely abstain. Paired tests against MedScope come from notebook 13.
   ESG 0.59 -> 0.47, net 0.24 -> -0.06 (example: answers "No" to "Is the lung healthy?" on healthy images),
   plausibly from SLAKE's own VQA questions in the replay. Other imaging types same or better.
 - Token-probability AURC: v3 0.021 (test), 0.078 (external); RFT 0.022 / 0.053.
+
+Rerun of notebook 13 with the rescored tables (2026-10-31): MedScope v3 vs the open baselines, paired:
+Lingshu-7B ESG 0.416 (+0.329), erased-lesion claims 32.0% (-18 points), healthy-image claims 12.5% (not
+different, p=0.48); HuatuoGPT-Vision-7B ESG 0.265, erased 30.1%, healthy 22.9% (p=0.003); MedGemma 1.5 ESG
+0.283, erased 54.3%; Qwen3-VL-8B ESG 0.297, erased 12.8% (not different, p=0.82: it rarely answers, CCR 0.553).
+Standard VQA after rescoring (all questions): Lingshu SLAKE 0.637, VQA-RAD 0.479, PathVQA 0.390; HuatuoGPT
+0.450 / 0.470 / 0.380; MedGemma 0.440 / 0.448 / 0.277; MedScope v3 0.767 / 0.554 / 0.520 stays best on all three.
+gpt-6-sol after rescoring: CCR 0.829 (MedScope +0.053, p=0.013).

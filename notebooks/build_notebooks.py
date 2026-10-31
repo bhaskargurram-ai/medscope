@@ -1267,6 +1267,7 @@ def nb17_frontier_checks() -> list[dict]:
    name a finding that is not in the image. Does better prompting close the gap?
 3. **Can a frontier model see the edits?** gemini-4-argon and gpt-6.1-sol rate how likely each image was
    edited (original, lesion erased, same-size edit elsewhere), as a second edit-trace test.
+4. **Example figure** of real views per imaging type, saved to results/figures for the paper.
 
 **Runtime: CPU.** About 1-2 hours. **Cost:** about $35-45 in total (measured costs are printed).
 Colab secrets `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` as in notebook 12. Every step resumes.
@@ -1301,6 +1302,12 @@ for tag, p, m in FLAGSHIPS:
 for tag, p, m in [('gemini', 'gemini', 'gemini-4-argon'), ('gpt61sol', 'openai', 'gpt-6.1-sol')]:
     if [f for f in FLAGSHIPS if f[1] == p]:
         !python scripts/edit_guess.py --api {p} --model {m} --views {TEST_VIEWS} --out {RESULTS}/edit_guess_{tag} | tail -12
+"""),
+        md("## 4. Figure with real example views (for the paper)"),
+        code(r"""
+!python scripts/example_figure.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {RESULTS}/figures
+from IPython.display import Image as _Img, display
+display(_Img(f'{RESULTS}/figures/examples.png', width=900))
 """),
         publish("MedScope report - 17 frontier checks", """
     ('External centres: leaderboard', compare_runs(RESULTS, 'v2_*_ext')),
