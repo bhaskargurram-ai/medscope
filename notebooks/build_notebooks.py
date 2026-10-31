@@ -1047,9 +1047,7 @@ print('failed:', failed or 'none')
 
 
 def nb13_paper_tables() -> list[dict]:
-    test_runs = ["v2_medscope_test"] + [b[0] for b in BASELINES] + ["v2_sft_v1_test", "v2_sft_v2_test", "v2_nocf_test"]
-    ext_runs = ["v2_medscope_ext"] + [b[0].replace("_test", "_ext") for b in BASELINES] + ["v2_sft_v2_ext", "v2_nocf_ext"]
-    vqa_runs = ["v2_medscope_vqa"] + [b[0].replace("_test", "_vqa") for b in BASELINES]
+    baseline_test = [b[0] for b in BASELINES]
     return [
         md("""
 # MedScope 13: paper tables
@@ -1058,7 +1056,8 @@ Recomputes every result from the stored decisions and transcripts under the fina
 (no model is run): replies written in plain prose instead of the action format are read as the
 model's decision, identically for every model. Reruns the learned edit-trace test, then publishes
 all paper tables in one report: main test, significance, per imaging type, external centres,
-standard VQA, frontier models (if notebook 12 ran) and the edit-trace test.
+standard VQA, frontier models, the ablation and the edit-trace test. The final MedScope model is the
+one recorded in adapters/final_choice.json (SFT v3 if notebook 15 chose it).
 
 **Runtime:** any GPU (T4 is enough; the edit-trace test trains a small CNN), about 30-40 minutes.
 """),
@@ -1070,20 +1069,32 @@ for tar, check in ((f'{DRIVE}/external/external.tar', f'{WORK}/views_external/te
         !tar -C {WORK} -xf {tar}
 !python scripts/rescore_all.py --results {RESULTS}
 """),
+        code(f"""
+choice = json.load(open(f'{{ADAPTERS}}/final_choice.json'))
+M = choice.get('prefix', 'v2_medscope')
+print('final MedScope model:', choice['adapter'], '->', M)
+BASE_TEST = {baseline_test!r}
+TEST_RUNS = [f'{{M}}_test'] + BASE_TEST + ['v2_openai_test', 'v2_gemini_test', 'v2_sft_v1_test', 'v2_sft_v2_test', 'v2_nocf_test']
+EXT_RUNS = [f'{{M}}_ext'] + [r.replace('_test', '_ext') for r in BASE_TEST] + ['v2_sft_v2_ext', 'v2_nocf_ext']
+VQA_RUNS = [f'{{M}}_vqa'] + [r.replace('_test', '_vqa') for r in BASE_TEST]
+if M != 'v2_medscope':
+    TEST_RUNS.append('v2_medscope_test'); EXT_RUNS.append('v2_medscope_ext'); VQA_RUNS.append('v2_medscope_vqa')
+"""),
         md("## Do the edits leave a visible trace? (learned classifier, about 20 minutes)"),
         code("!python scripts/edit_detector.py --train {TRAIN_VIEWS} --test {TEST_VIEWS} --out {RESULTS}/v2_edit_detector"),
-        publish("MedScope report - 13 paper tables", f"""
+        publish("MedScope report - 13 paper tables", """
+    ('Final model', read_text(f'{ADAPTERS}/final_choice.json')),
     ('Main test: leaderboard', compare_runs(RESULTS, 'v2_*_test')),
-    ('Main test: MedScope vs each model (paired bootstrap over cases)', significance_table(RESULTS, 'v2_medscope_test', {(test_runs[1:] + ['v2_openai_test', 'v2_gemini_test'])!r})),
-    ('Main test: by imaging type', by_dataset(RESULTS, {test_runs!r})),
+    ('Main test: MedScope vs each model (paired bootstrap over cases)', significance_table(RESULTS, f'{M}_test', TEST_RUNS[1:])),
+    ('Main test: by imaging type', by_dataset(RESULTS, TEST_RUNS)),
     ('External centres: leaderboard', compare_runs(RESULTS, 'v2_*_ext')),
-    ('External centres: MedScope vs each model', significance_table(RESULTS, 'v2_medscope_ext', {ext_runs[1:]!r})),
-    ('External centres: by source', by_dataset(RESULTS, {ext_runs!r})),
+    ('External centres: MedScope vs each model', significance_table(RESULTS, f'{M}_ext', EXT_RUNS[1:])),
+    ('External centres: by source', by_dataset(RESULTS, EXT_RUNS)),
     ('Ablation: counterfactual training vs the same fine-tuning without it (test)', significance_table(RESULTS, 'v2_sft_v2_test', ['v2_nocf_test'])),
     ('Ablation on external centres', significance_table(RESULTS, 'v2_sft_v2_ext', ['v2_nocf_ext'])),
-    ('Standard medical VQA', vqa_table(RESULTS, {vqa_runs!r})),
-    ('Edit-trace test', read_text(f'{{RESULTS}}/v2_edit_detector/edit_detector.md')),
-    ('MedScope on test (full report)', read_text(f'{{RESULTS}}/v2_medscope_test/report.md')),
+    ('Standard medical VQA', vqa_table(RESULTS, VQA_RUNS)),
+    ('Edit-trace test', read_text(f'{RESULTS}/v2_edit_detector/edit_detector.md')),
+    ('MedScope on test (full report)', read_text(f'{RESULTS}/{M}_test/report.md')),
 """),
     ]
 
@@ -1129,6 +1140,86 @@ for out, name, adapter in [('v2_nocf', 'ablation-no-counterfactual-sft', f'{{ADA
     ]
 
 
+def nb15_sft_v3() -> list[dict]:
+    return [
+        md(f"""
+# MedScope 15: SFT v3 (keep general ability: replay of ordinary medical questions)
+
+SFT v2 lost some general medical VQA ability (open questions dropped, e.g. "Where are the kidneys?" ->
+"No abnormality"): every training question was about a lesion. SFT v3 trains the same way from scratch
+and mixes in ordinary questions from the **training** splits of VQA-RAD, SLAKE and PathVQA (no image
+near-identical to any evaluation image, and no SLAKE image used in our validation or test sets).
+
+**Decision rule, fixed before testing:** SFT v3 becomes the final model if its validation net utility is
+no more than 0.02 below the current final model's. If so it is tested on the main test set, the
+external centres and standard VQA, and exported. Notebook 13 then uses it automatically.
+
+**Runtime:** A100, about 7 hours (training about 4.5 h, validation 40 min, tests about 2 h). Resumes.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code("!pip install -q datasets pyarrow"), code(RESTORE_ALL),
+        code(r"""
+for tar, check in ((f'{DRIVE}/external/external.tar', f'{WORK}/views_external/test/views_clean.jsonl'),
+                   (f'{DRIVE}/external/vqa.tar', f'{WORK}/vqa/views_vqa.jsonl')):
+    if not os.path.exists(check):
+        !tar -C {WORK} -xf {tar}
+EXT_VIEWS = f'{WORK}/views_external/test/views_clean.jsonl {WORK}/external/negatives/views_negatives_external.jsonl'
+VQA_VIEWS = f'{WORK}/vqa/views_vqa.jsonl'
+"""),
+        md("## Replay set: ordinary questions from the training splits (built once)"),
+        code(r"""
+REPLAY = f'{DRIVE}/external/vqa_train/views_vqa_train.jsonl'
+if not os.path.exists(REPLAY):
+    from huggingface_hub import hf_hub_download
+    import zipfile, shutil, pathlib
+    RAW = f'{WORK}/raw/slake'
+    os.makedirs(RAW, exist_ok=True)
+    for f in ['train.json', 'test.json', 'imgs.zip']:
+        if not os.path.exists(f'{RAW}/{f}'):
+            shutil.copy(hf_hub_download('BoKelvin/SLAKE', f, repo_type='dataset'), f'{RAW}/{f}')
+    if not os.path.exists(f'{RAW}/imgs'):
+        with zipfile.ZipFile(f'{RAW}/imgs.zip') as z:
+            z.extractall(RAW)
+        raw = pathlib.Path(RAW)
+        if not (raw / 'imgs').exists():
+            next(raw.rglob('xmlab*')).parent.rename(raw / 'imgs')
+    !python scripts/build_vqa.py --out {DRIVE}/external/vqa_train --split train --slake {RAW} --per-set 2000 --exclude-images {VAL_VIEWS} {TEST_VIEWS} {VAL_NEG} {TEST_NEG} {EXT_VIEWS} {VQA_VIEWS}
+!wc -l {REPLAY}
+"""),
+        md("## Train SFT v3"),
+        code(f"!python scripts/train_sft.py --model {BASE} --views {{TRAIN_VIEWS}} {{REPLAY}} --negatives {{TRAIN_NEG}} "
+             "--mode agentic --out {ADAPTERS}/sft_v3"),
+        md("## Validation and decision"),
+        code(f"""
+!python scripts/evaluate.py --model {BASE} --adapter {{ADAPTERS}}/sft_v3/final --views {{VAL_VIEWS}} {{VAL_NEG}} --out {{RESULTS}}/v2_sft_v3_val --name medscope-sft-v3 --split validation
+choice = json.load(open(f'{{ADAPTERS}}/final_choice.json'))
+current = max(choice['validation_net_utility'].values())
+v3 = json.load(open(f'{{RESULTS}}/v2_sft_v3_val/summary.json'))['metrics']['net_utility']['value']
+USE_V3 = v3 >= current - 0.02
+print(f'validation net utility: current final {{current:.3f}}, SFT v3 {{v3:.3f}} ->', 'SFT v3 becomes the final model' if USE_V3 else 'keep the current final model')
+if USE_V3:
+    choice.update({{'adapter': f'{{ADAPTERS}}/sft_v3/final', 'chosen': 'sft_v3', 'prefix': 'v2_medscope3',
+                   'previous': choice.get('chosen')}})
+    choice['validation_net_utility']['sft_v3'] = v3
+    json.dump(choice, open(f'{{ADAPTERS}}/final_choice.json', 'w'), indent=2)
+"""),
+        md("## Test the new final model (only if chosen) and export it"),
+        code(f"""
+if USE_V3:
+    A = f'{{ADAPTERS}}/sft_v3/final'
+    for split, views in (('test', f'{{TEST_VIEWS}} {{TEST_NEG}}'), ('ext', EXT_VIEWS), ('vqa', VQA_VIEWS)):
+        !python scripts/evaluate.py --model {BASE} --adapter {{A}} --views {{views}} --out {{RESULTS}}/v2_medscope3_{{split}} --name medscope-4b-v3 --split {{split}}
+    !python scripts/export_model.py --model {BASE} --adapter {{A}} --out {{DRIVE}}/export/MedScope-4B --summary {{RESULTS}}/v2_medscope3_test/summary.json
+"""),
+        publish("MedScope report - 15 SFT v3", """
+    ('Decision', read_text(f'{ADAPTERS}/final_choice.json')),
+    ('Validation by imaging type', by_dataset(RESULTS, ['v2_sft_v3_val', 'v2_rft_val'])),
+    ('Main test: v3 vs the previous final model', significance_table(RESULTS, 'v2_medscope3_test', ['v2_medscope_test'])),
+    ('External centres: v3 vs the previous final model', significance_table(RESULTS, 'v2_medscope3_ext', ['v2_medscope_ext'])),
+    ('Standard medical VQA', vqa_table(RESULTS, ['v2_medscope3_vqa', 'v2_medscope_vqa', 'v2_base_qwen35_vqa'])),
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -1145,6 +1236,7 @@ NOTEBOOKS = {
     "12_frontier_models.ipynb": nb12_frontier,
     "13_paper_tables.ipynb": nb13_paper_tables,
     "14_ablation.ipynb": nb14_ablation,
+    "15_sft_v3_replay.ipynb": nb15_sft_v3,
 }
 
 

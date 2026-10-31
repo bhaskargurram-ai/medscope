@@ -44,6 +44,11 @@ NO_EVIDENCE = [
 def absent_text(view: View) -> str:
     """The answer that says the finding is not there, phrased for this question."""
     return absent_reply(view.question, view.answer) or "No abnormality"
+GENERAL = [
+    "Looking at the image, I can answer this directly.",
+    "The image shows what is needed to answer.",
+    "From the image:",
+]
 CLARIFY = {
     "blur": ("The image is too blurred to assess fine detail.",
              "Could you provide a sharper image of this region?"),
@@ -118,6 +123,10 @@ def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.
         answer = view.answer if view.kind is ViewKind.NATURAL_NEGATIVE else absent_text(view)
         conf = round(float(rng.uniform(0.75, 0.95)), 2)
         emit(f"{pick(NO_EVIDENCE)} {_final(action='answer', answer=answer, confidence=conf)}")
+    elif view.meta.get("benchmark"):
+        # general medical VQA (replay, keeps general ability): a plain answer, no box
+        conf = round(float(rng.uniform(0.75, 0.95)), 2)
+        emit(f"{pick(GENERAL)} {_final(action='answer', answer=view.answer, confidence=conf)}")
     else:
         conf = round(float(rng.uniform(0.75, 0.95)), 2)
         emit(f"{pick(SEE_EVIDENCE)} {_final(action='answer', answer=view.answer, box=view.lesion_box, confidence=conf)}")

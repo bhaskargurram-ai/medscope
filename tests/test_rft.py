@@ -64,3 +64,17 @@ class TestRFT(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReplayTrajectory(unittest.TestCase):
+    def test_general_vqa_view_gets_plain_answer(self):
+        from medscope.agent.episode import run_episode
+        from medscope.data.schema import View
+        img = np.zeros((64, 64, 3), np.uint8)
+        v = View("vqaradtr00001__original", "vqaradtr00001", "vqaradtr00001", ViewKind.ORIGINAL, "x.png",
+                 "Which organ is shown?", "Liver", [], None, False, meta={"benchmark": "vqaradtr"})
+        samples = build_trajectory(v, np.random.default_rng(0), image=img)
+        self.assertEqual(len(samples), 1)
+        self.assertNotIn('"box"', samples[0].target)
+        ep = run_episode(Scripted([s.target for s in samples]), v, CFG, image=img)
+        self.assertTrue(ep.outcome.correct)

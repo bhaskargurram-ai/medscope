@@ -374,6 +374,40 @@ and lesion-removed from original with 0.932. Both pairs differ in whether the le
 measured lesion detection, not edit traces. Redesigned: the main test is now random edit vs original
 (both show the lesion, only one is edited); lesion-removed vs random edit is kept as a reference.
 
+## Generalisation (notebook 11, 2026-10-31)
+
+External centres, paired with MedScope on 169 cases (p from paired bootstrap):
+
+| vs MedScope | ESG | Claims erased lesion | Net utility |
+| --- | --- | --- | --- |
+| MedScope-4B | 0.664 | 0.109 | 0.534 |
+| Qwen3.5-4B | 0.328 (p<0.001) | 0.445 | 0.160 |
+| MedGemma 1.5 | 0.185 (p<0.001) | 0.496 | -0.262 |
+| Qwen3-VL-8B | 0.227 (p<0.001) | 0.059 | 0.037 |
+
+By source (MedScope): BraTS-Africa ESG 0.93, CVC-ClinicDB 0.80, BUS-BRA 0.69, QaTa-COV19 0.15 (claims the
+erased opacity 45%). COVID opacities are diffuse; erasing them is far less complete than erasing a
+polyp or tumour, so this is reported as a limitation of the counterfactual for diffuse findings. Only
+BraTS-Africa provides lesion-free images among the external sources.
+
+Standard medical VQA (same agent prompt and matching for all; low absolute numbers for every model):
+
+| Accuracy | MedScope | Qwen3.5-4B base | MedGemma 1.5 | Qwen3-VL-8B |
+| --- | --- | --- | --- | --- |
+| VQA-RAD | 0.415 | 0.481 | 0.379 | 0.452 |
+| SLAKE test | 0.387 | 0.570 | 0.407 | 0.477 |
+| PathVQA | 0.260 | 0.293 | 0.230 | 0.250 |
+
+Closed (yes/no) questions hold (VQA-RAD 0.673 vs 0.657); open questions drop (SLAKE 0.215 vs 0.424): the
+model over-uses "No abnormality" ("Where are the kidneys?" -> "No abnormality") because every training
+question was about a lesion. Fix in notebook 15 (SFT v3): replay ordinary questions from the VQA-RAD,
+SLAKE and PathVQA training splits, excluding any image near-identical to an evaluation image and any
+SLAKE image in our validation or test sets; replaces the final model only if validation net utility is
+within 0.02 of it (rule fixed before testing).
+
+Frontier model (notebook 12, 150-case subset, before rescoring): GPT-6-sol CCR 0.875, ESG 0.397, claims
+the erased lesion 47.1%, claims a finding on healthy images 29.3%, net utility 0.306; 0% malformed.
+
 ## Evaluation additions for the paper (2026-10-30)
 
 - **Confidence from token probabilities** for every local model (geometric mean of the greedy
