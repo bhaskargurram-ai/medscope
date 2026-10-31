@@ -16,8 +16,8 @@ from .metrics import METRICS
 
 
 def load_outcomes(run_dir: str | Path) -> list[Outcome]:
-    from .runner import read_jsonl
-    return [Outcome(**{k: v for k, v in r.items() if k != "vkey"}) for r in read_jsonl(Path(run_dir) / "outcomes.jsonl")]
+    from .runner import scored_rows
+    return [Outcome(**{k: v for k, v in r.items() if k != "vkey"}) for r in scored_rows(run_dir)]
 
 
 def paired_bootstrap(a: list[Outcome], b: list[Outcome], metric: str, n: int = 2000, seed: int = 0) -> dict:

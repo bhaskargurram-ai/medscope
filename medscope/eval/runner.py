@@ -137,6 +137,8 @@ def evaluate(
             else:
                 o = rejudge(v, o, final_answer(t["turns"]), cfg)
         outcomes.append(rescore(v, o, cfg))
+    # the judged outcomes under the current rules: every table and paired test reads these
+    _write_jsonl(out / "scored.jsonl", [o.to_dict() for o in outcomes])
     summary = {"meta": meta, "n_views": len(outcomes), "n_cases": len({o.case_id for o in outcomes}),
                "metrics": bootstrap(outcomes, n_resamples=n_bootstrap)}
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
@@ -187,6 +189,13 @@ def remaining(views: list[View], out_dir: str | Path, precision=None) -> list[Vi
     rows = _read_jsonl(Path(out_dir) / "outcomes.jsonl")
     done = {r["view_id"] for r in rows if r.get("vkey") == keys.get(r["view_id"])}
     return [v for v in views if v.view_id not in done]
+
+
+def scored_rows(run_dir: str | Path) -> list[dict]:
+    """A run's outcomes judged under the current rules (scored.jsonl, written by evaluate);
+    the raw outcomes.jsonl only for runs not yet rescored."""
+    d = Path(run_dir)
+    return read_jsonl(d / "scored.jsonl") if (d / "scored.jsonl").exists() else read_jsonl(d / "outcomes.jsonl")
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:

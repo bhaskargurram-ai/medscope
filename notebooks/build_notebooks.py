@@ -849,7 +849,12 @@ if failed and 'medscope-4b' in failed:
     raise SystemExit('The MedScope run failed: copy the error above into the chat.')
 """),
         md("## Are the edits detectable? A learned detector (about 20 minutes)"),
-        code("!python scripts/edit_detector.py --train {TRAIN_VIEWS} --test {TEST_VIEWS} --out {RESULTS}/v2_edit_detector"),
+        code(r"""
+if os.path.exists(f'{RESULTS}/v2_edit_detector/edit_detector.md'):
+    print('edit-trace test already done; delete results/v2_edit_detector to redo it')
+else:
+    !python scripts/edit_detector.py --train {TRAIN_VIEWS} --test {TEST_VIEWS} --out {RESULTS}/v2_edit_detector
+"""),
         md("## Export the final model"),
         code("PUSH_TO = ''   # e.g. 'your-hf-username/MedScope-4B' to also upload (private)"),
         code(f"""
@@ -1125,7 +1130,12 @@ if M != 'v2_medscope':
     TEST_RUNS.append('v2_medscope_test'); EXT_RUNS.append('v2_medscope_ext'); VQA_RUNS.append('v2_medscope_vqa')
 """),
         md("## Do the edits leave a visible trace? (learned classifier, about 20 minutes)"),
-        code("!python scripts/edit_detector.py --train {TRAIN_VIEWS} --test {TEST_VIEWS} --out {RESULTS}/v2_edit_detector"),
+        code(r"""
+if os.path.exists(f'{RESULTS}/v2_edit_detector/edit_detector.md'):
+    print('edit-trace test already done; delete results/v2_edit_detector to redo it')
+else:
+    !python scripts/edit_detector.py --train {TRAIN_VIEWS} --test {TEST_VIEWS} --out {RESULTS}/v2_edit_detector
+"""),
         publish("MedScope report - 13 paper tables", """
     ('Final model', read_text(f'{ADAPTERS}/final_choice.json')),
     ('Main test: leaderboard', compare_runs(RESULTS, 'v2_*_test')),

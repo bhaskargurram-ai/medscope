@@ -158,10 +158,10 @@ def by_dataset(results_dir: str | Path, runs: list[str]) -> str:
     rows = ["| Model | Imaging | Cases | " + " | ".join(c for c, _ in cols) + " |",
             "| --- | --- | --- | " + " | ".join("---" for _ in cols) + " |"]
     for run in runs:
-        p = Path(results_dir) / run / "outcomes.jsonl"
-        if not p.exists():
+        from .eval.runner import scored_rows
+        recs = scored_rows(Path(results_dir) / run)
+        if not recs:
             continue
-        recs = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
         outs = [Outcome(**{k: v for k, v in r.items() if k != "vkey"}) for r in recs]
         groups: dict[str, list] = {}
         for o in outs:
@@ -178,11 +178,11 @@ def by_dataset(results_dir: str | Path, runs: list[str]) -> str:
 
 def vqa_table(results_dir: str | Path, runs: list[str]) -> str:
     """Standard medical VQA accuracy per model and benchmark, closed (yes/no) and open questions."""
-    from .eval.runner import read_jsonl
+    from .eval.runner import read_jsonl, scored_rows
     rows = ["| Model | Benchmark | Closed (yes/no) | Open | All | Questions |", "| --- | --- | --- | --- | --- | --- |"]
     for run in runs:
         d = Path(results_dir) / run
-        outs = read_jsonl(d / "outcomes.jsonl")
+        outs = scored_rows(d)
         if not outs:
             continue
         gold = {t["view_id"]: str(t["gold"]).strip().lower() for t in read_jsonl(d / "transcripts.jsonl")}
