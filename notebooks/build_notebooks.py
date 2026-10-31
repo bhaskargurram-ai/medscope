@@ -1195,6 +1195,124 @@ for out, name, adapter in [('v2_nocf', 'ablation-no-counterfactual-sft', f'{{ADA
     ]
 
 
+def nb16_robustness() -> list[dict]:
+    plain_rows = "\n".join(f"    ({out.replace('v2_', 'v2_plain_')!r}, {name!r}, {model!r}),"
+                           for out, name, model in BASELINES)
+    return [
+        md(f"""
+# MedScope 16: robustness checks reviewers ask for (GPU)
+
+1. **Tools switched off at test time.** MedScope (RFT and v3) on the main test with every tool call
+   refused, so the gain from zooming and windowing can be separated from the training itself.
+2. **Open baselines with their own plain prompt.** Each open model gets a short native VQA prompt with no
+   action format, one reply, read as plain prose, so no model is judged on following our format.
+3. **Extra analyses from stored results** (no model run): decisions per view kind, strict ESG (only
+   explicit "not there" answers count), always-yes / always-no / always-refer / always-clarify policies,
+   net utility under other cost matrices, tool use, and results by lesion size.
+
+Run notebook 13 first. **Runtime:** A100, about 4-6 hours; every step resumes.
+Run notebook 17 (CPU, API models) at the same time if you like.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL),
+        md("## 1. Tools switched off (MedScope RFT and v3)"),
+        code(f"""
+choice = json.load(open(f'{{ADAPTERS}}/final_choice.json'))
+RFT = choice.get('previous_adapter', f'{{ADAPTERS}}/rft_train/final')
+V3 = choice['adapter']
+for out, name, adapter in [('v2_medscope_notools_test', 'medscope-4b-rft-no-tools', RFT),
+                           ('v2_medscope3_notools_test', 'medscope-4b-v3-no-tools', V3)]:
+    !python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{TEST_VIEWS}} {{TEST_NEG}} --tool-budget 0 --out {{RESULTS}}/{{out}} --name {{name}} --split test
+"""),
+        md("## 2. Open baselines with a plain native prompt (one reply, no action format)"),
+        code(f"""
+PLAIN = [
+{plain_rows}
+]
+for out, name, model in PLAIN:
+    try:
+        !python scripts/evaluate.py --model {{model}} --views {{TEST_VIEWS}} {{TEST_NEG}} --prompt plain --out {{RESULTS}}/{{out}} --name {{name}}-plain --split test
+    except SystemExit:
+        print(f'{{name}} failed: see above')
+"""),
+        md("## 3. Extra analyses (CPU, from stored results)"),
+        code(f"""
+RUNS = ['v2_medscope3_test=MedScope-4B v3', 'v2_medscope_test=MedScope-4B RFT', 'v2_sft_v2_test=SFT (stage 1)',
+        'v2_nocf_test=No counterfactual views', 'v2_medscope_notools_test=RFT, tools off', 'v2_medscope3_notools_test=v3, tools off',
+        'v2_base_qwen35_test=Qwen3.5-4B', 'v2_gemini_test=gemini-4-argon', 'v2_gpt6astra_test=gpt-6-astra',
+        'v2_claudeopus_test=claude-opus-5-5', 'v2_claudesonnet_test=claude-sonnet-5-5']
+RUNS += [f"{{out}}={{name}} (plain prompt)" for out, name, _ in PLAIN]
+TOOL_RUNS = ['v2_medscope3_test=MedScope-4B v3', 'v2_medscope_test=MedScope-4B RFT', 'v2_gemini_test=gemini-4-argon',
+             'v2_claudeopus_test=claude-opus-5-5', 'v2_gpt6astra_test=gpt-6-astra', 'v2_claudesonnet_test=claude-sonnet-5-5']
+!python scripts/rescore_all.py --results {{RESULTS}}
+q = lambda xs: ' '.join(f'"{{x}}"' for x in xs)
+!python scripts/extra_analysis.py --results {{RESULTS}} --views {{TEST_VIEWS}} {{TEST_NEG}} --runs {{q(RUNS)}} --tool-runs {{q(TOOL_RUNS)}} --out {{RESULTS}}/extra_analysis.md > /dev/null
+"""),
+        publish("MedScope report - 16 robustness", """
+    ('Tools switched off vs on (paired)', significance_table(RESULTS, 'v2_medscope_test', ['v2_medscope_notools_test']) + '\\n\\n' + significance_table(RESULTS, 'v2_medscope3_test', ['v2_medscope3_notools_test'])),
+    ('Open baselines: agent prompt vs their own plain prompt', compare_runs(RESULTS, 'v2_*_test')),
+    ('MedScope vs open baselines under their plain prompt (paired)', significance_table(RESULTS, 'v2_medscope3_test', [r for r, _, _ in PLAIN])),
+    ('Extra analyses', read_text(f'{RESULTS}/extra_analysis.md')),
+"""),
+    ]
+
+
+def nb17_frontier_checks() -> list[dict]:
+    return [
+        md("""
+# MedScope 17: frontier-model checks (CPU, API)
+
+1. **External centres:** one flagship per provider (gpt-6-astra, claude-opus-5-5, gemini-4-argon) on the 169
+   external cases, to show their erased-lesion claims hold outside the main test set.
+2. **Cautious prompt:** the same three models on 150 test cases with an added warning that the question may
+   name a finding that is not in the image. Does better prompting close the gap?
+3. **Can a frontier model see the edits?** gemini-4-argon and gpt-6.1-sol rate how likely each image was
+   edited (original, lesion erased, same-size edit elsewhere), as a second edit-trace test.
+
+**Runtime: CPU.** About 1-2 hours. **Cost:** about $35-45 in total (measured costs are printed).
+Colab secrets `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` as in notebook 12. Every step resumes.
+"""),
+        code(SETUP),
+        code("!pip install -q -U openai anthropic google-genai"),
+        code(RESTORE_ALL),
+        code(r"""
+for name in ('OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY'):
+    if secret(name):
+        os.environ[name] = secret(name)
+EXT_VIEWS = f'{WORK}/views_external/test/views_clean.jsonl {WORK}/external/negatives/views_negatives_external.jsonl'
+if not os.path.exists(f'{WORK}/views_external/test/views_clean.jsonl'):
+    !tar -C {WORK} -xf {DRIVE}/external/external.tar
+FLAGSHIPS = [('gpt6astra', 'openai', 'gpt-6-astra'), ('claudeopus', 'anthropic', 'claude-opus-5-5'),
+             ('gemini', 'gemini', 'gemini-4-argon')]
+FLAGSHIPS = [f for f in FLAGSHIPS if os.environ.get({'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}[f[1]])]
+print('models:', [m for _, _, m in FLAGSHIPS])
+"""),
+        md("## 1. External centres"),
+        code(r"""
+for tag, p, m in FLAGSHIPS:
+    !python scripts/evaluate.py --api {p} --model {m} --views {EXT_VIEWS} --out {RESULTS}/v2_{tag}_ext --name {p}-{m} --split ext --batch-size 8 | tail -4
+"""),
+        md("## 2. Cautious prompt (150 test cases; compared with the same model's standard run on the same cases)"),
+        code(r"""
+for tag, p, m in FLAGSHIPS:
+    !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --prompt cautious --out {RESULTS}/v2_cautious_{tag}_test --name {p}-{m}-cautious --split test --batch-size 8 | tail -4
+"""),
+        md("## 3. Can a frontier model see the edits?"),
+        code(r"""
+for tag, p, m in [('gemini', 'gemini', 'gemini-4-argon'), ('gpt61sol', 'openai', 'gpt-6.1-sol')]:
+    if [f for f in FLAGSHIPS if f[1] == p]:
+        !python scripts/edit_guess.py --api {p} --model {m} --views {TEST_VIEWS} --out {RESULTS}/edit_guess_{tag} | tail -12
+"""),
+        publish("MedScope report - 17 frontier checks", """
+    ('External centres: leaderboard', compare_runs(RESULTS, 'v2_*_ext')),
+    ('External centres: MedScope v3 vs flagships (paired)', significance_table(RESULTS, 'v2_medscope3_ext', [f'v2_{t}_ext' for t, _, _ in FLAGSHIPS])),
+    ('Cautious prompt vs standard prompt, same model, same 150 cases', '\\n\\n'.join(significance_table(RESULTS, f'v2_cautious_{t}_test', [{'gpt6astra': 'v2_gpt6astra_test', 'claudeopus': 'v2_claudeopus_test', 'gemini': 'v2_gemini_test'}[t]]) for t, _, _ in FLAGSHIPS)),
+    ('MedScope v3 vs cautious-prompt flagships (paired, 150 cases)', significance_table(RESULTS, 'v2_medscope3_test', [f'v2_cautious_{t}_test' for t, _, _ in FLAGSHIPS])),
+    ('Edit visibility: gemini-4-argon', read_text(f'{RESULTS}/edit_guess_gemini/edit_guess.md')),
+    ('Edit visibility: gpt-6.1-sol', read_text(f'{RESULTS}/edit_guess_gpt61sol/edit_guess.md')),
+"""),
+    ]
+
+
 def nb15_sft_v3() -> list[dict]:
     return [
         md(f"""
@@ -1298,6 +1416,8 @@ NOTEBOOKS = {
     "13_paper_tables.ipynb": nb13_paper_tables,
     "14_ablation.ipynb": nb14_ablation,
     "15_sft_v3_replay.ipynb": nb15_sft_v3,
+    "16_robustness.ipynb": nb16_robustness,
+    "17_frontier_checks.ipynb": nb17_frontier_checks,
 }
 
 

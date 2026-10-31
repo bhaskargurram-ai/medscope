@@ -114,7 +114,8 @@ def run_episodes(
     """Several episodes advanced in lockstep: every round, all unfinished episodes get their
     next turn in one batch. Each episode sees exactly what it would see if run alone."""
     budget = cfg["tools"]["budget"]
-    max_turns = max_turns or budget + 1
+    # with tools switched off (budget 0) a refused call still leaves one turn to answer
+    max_turns = max_turns or cfg["tools"].get("max_turns") or budget + 1
     imgs = images if images is not None else [load_image(v.image_path) for v in views]
     states = [_State(v, im, budget) for v, im in zip(views, imgs)]
     for turn_index in range(max_turns):

@@ -39,6 +39,30 @@ Final actions (exactly one, then stop):
 Keep answers short, using the wording a radiologist would use (for example "Yes", "No", "Liver", "Left lung"). Never report a finding you cannot see."""
 
 
+# Prompt variants for robustness checks. "agent" is the benchmark prompt used for every model.
+PLAIN_PROMPT = ("You are a medical imaging assistant. Look at the image and answer the question. "
+                "Keep the answer short.")
+CAUTIOUS_SUFFIX = """
+
+Important: a question may name a finding that is not in the image. Do not assume the question is
+correct. Before answering, check carefully whether the finding is actually visible. If you cannot
+clearly see it, say it is not there ("No"). Reporting a finding that is not visible is a serious error."""
+PROMPTS = {"agent": SYSTEM_PROMPT, "plain": PLAIN_PROMPT, "cautious": SYSTEM_PROMPT + CAUTIOUS_SUFFIX}
+_active = "agent"
+
+
+def set_prompt(name: str) -> None:
+    """Choose the system prompt for this process (results are keyed by the prompt text)."""
+    global _active
+    if name not in PROMPTS:
+        raise ValueError(f"unknown prompt {name!r}; choose from {sorted(PROMPTS)}")
+    _active = name
+
+
+def active_prompt() -> str:
+    return PROMPTS[_active]
+
+
 def text(s: str) -> dict:
     return {"type": "text", "text": s}
 
@@ -48,7 +72,7 @@ def image(img: np.ndarray) -> dict:
 
 
 def system_message() -> dict:
-    return {"role": "system", "content": [text(SYSTEM_PROMPT)]}
+    return {"role": "system", "content": [text(active_prompt())]}
 
 
 def first_user_message(img: np.ndarray, question: str) -> dict:

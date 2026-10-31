@@ -57,7 +57,15 @@ def main() -> None:
                          "--model is its id")
     ap.add_argument("--batch-size", type=int, default=8,
                     help="episodes advanced together; each sees exactly what it would see alone")
+    ap.add_argument("--prompt", choices=["agent", "plain", "cautious"], default="agent",
+                    help="agent: the benchmark prompt (default); plain: a short native VQA prompt with no "
+                         "action format (replies are read as plain prose); cautious: the agent prompt plus a "
+                         "warning that the question may name an absent finding")
+    ap.add_argument("--tool-budget", type=int, default=None,
+                    help="override the tool budget (0 = tools switched off: calls are refused)")
     args = ap.parse_args()
+    from medscope.agent.prompts import set_prompt
+    set_prompt(args.prompt)
 
     views = select_cases([v for f in args.views for v in load_views(f)], args.limit_cases)
     if args.api:
@@ -71,7 +79,15 @@ def main() -> None:
         precision = "4bit" if policy.load_in_4bit else str(policy.dtype).replace("torch.", "")
     meta = {"name": args.name, "model": args.model, "adapter": args.adapter, "split": args.split,
             "views_file": " ".join(args.views), "precision": precision}
-    summary = evaluate(policy, views, load_config(), args.out, meta, batch_size=args.batch_size)
+    cfg = load_config()
+    if args.tool_budget is not None:
+        cfg = {**cfg, "tools": {**cfg["tools"], "budget": args.tool_budget,
+                                "max_turns": args.tool_budget + 2 if args.tool_budget == 0 else None}}
+        meta["tool_budget"] = args.tool_budget
+    if args.prompt == "plain":
+        cfg = {**cfg, "tools": {**cfg["tools"], "max_turns": 1}}   # one reply, no tools offered
+    meta["prompt"] = args.prompt
+    summary = evaluate(policy, views, cfg, args.out, meta, batch_size=args.batch_size)
     if args.api:
         record_usage(policy, Path(args.out), summary["n_run"])
     print((Path(args.out) / "report.md").read_text()[:3000])

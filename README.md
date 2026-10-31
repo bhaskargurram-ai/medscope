@@ -45,6 +45,8 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `13_paper_tables` | Rescore every run under the final rules, edit-trace test, all paper tables in one report | any GPU | ~40 min |
 | `14_ablation` | Same fine-tuning without the counterfactual views, tested against SFT v2 | A100 | ~5 h |
 | `15_sft_v3_replay` | Continue the final model with replay of ordinary medical questions (keeps general VQA ability); becomes final if not worse on validation | A100 | ~4 h |
+| `16_robustness` | Tools switched off, open baselines with their own plain prompt, strict ESG, trivial policies, cost-matrix sensitivity, tool use, lesion size | A100 | 4–6 h |
+| `17_frontier_checks` | Frontier flagships on the external centres, a cautious-prompt check, and whether a frontier model can see the edits | CPU | 1–2 h |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.

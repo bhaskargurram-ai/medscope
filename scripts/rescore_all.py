@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from medscope.eval.runner import evaluate, load_views  # noqa: E402
+from medscope.agent.prompts import set_prompt  # noqa: E402
 from medscope.rewards import load_config  # noqa: E402
 
 
@@ -34,6 +35,7 @@ def main() -> None:
             print(f"skip {s.parent.name}: views not available ({missing or 'none recorded'})")
             continue
         views = [v for f in files for v in load_views(f)]
+        set_prompt(meta.get("prompt", "agent"))   # results are keyed by the prompt they were run with
         old = json.loads(s.read_text())["metrics"]["net_utility"]["value"]
         new = evaluate(None, views, cfg, s.parent, meta, log=lambda m: None)
         nu = new["metrics"]["net_utility"]["value"]

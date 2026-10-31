@@ -176,10 +176,16 @@ from ..agent.prompts import SYSTEM_PROMPT  # noqa: E402
 PROMPT_KEY = hashlib.sha1(SYSTEM_PROMPT.encode()).hexdigest()[:8]
 
 
+def prompt_key() -> str:
+    """Fingerprint of the system prompt in use (the benchmark prompt gives PROMPT_KEY)."""
+    from ..agent.prompts import active_prompt
+    return hashlib.sha1(active_prompt().encode()).hexdigest()[:8]
+
+
 def view_key(view: View, precision=None) -> str:
     """Fingerprint of everything that defines a view's result: the view, model precision, scoring rules."""
     payload = (json.dumps(view.to_dict(), sort_keys=True) + f"|precision={precision}|scoring={SCORING_VERSION}"
-               + f"|prompt={PROMPT_KEY}")
+               + f"|prompt={prompt_key()}")
     return hashlib.sha1(payload.encode()).hexdigest()[:16]
 
 

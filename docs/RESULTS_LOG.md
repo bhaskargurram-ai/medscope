@@ -498,3 +498,23 @@ on real lesions (CCR 0.83-0.89) and claims an erased lesion in 41-62% of cases. 
 (gemini-4-argon); gemini-4-argon also has the fewest healthy-image false findings of any model (9.0%,
 below MedScope v3's 14.6% and close to MedScope RFT's 8.3%). Frontier refer rates are near zero: they
 answer, rarely abstain. Paired tests against MedScope come from notebook 13.
+
+## 2026-10-31: paper tables (notebook 13)
+
+- Plain-prose rescoring of the open baselines (leaderboard): Lingshu-7B CCR 0.527, ESG 0.416, erased-lesion
+  claims 32.0%, net -0.249; HuatuoGPT-Vision-7B CCR 0.498, ESG 0.265, net -0.426; Qwen2.5-VL-7B CCR 0.144,
+  ESG 0.146, net -0.742; MedGemma 1.5 ESG 0.283, net -0.255. Bug: the paired tests, per-imaging-type and VQA
+  tables still read the unrescored outcomes (Lingshu/HuatuoGPT at 0); fixed (evaluate writes scored.jsonl,
+  every table reads it). Rerun notebook 13 for the corrected tables.
+- MedScope v3 vs all nine frontier models (paired, 507 cases): ESG and erased-lesion claims better against
+  every one (all p<0.001); CCR not different from 8 of 9 (better than gpt-6-sol, p=0.004); net utility better
+  against all (gemini-4-argon +0.150, p=0.003; others p<0.001). Healthy-image false findings: v3 better than
+  7 of 9; not different from claude-sonnet-5-5 (p=0.45); worse than gemini-4-argon (14.6% vs 9.0%, p=0.033).
+- Learned edit-trace test (ResNet-18): random edit vs original AUC 0.832 [0.799, 0.868]; lesion removed vs
+  random edit 0.928 [0.904, 0.948]. The inpainting leaves a trace a trained CNN can find. MedScope's denial
+  rate on random-edit views is 11.4%, so its "not there" answers do not follow edit traces; this is what the
+  matched control is for, and the paper must state the edit visibility rather than claim invisible edits.
+- v3 regressed on SLAKE CT/MRI against RFT: erased-lesion claims 0% -> 24%, healthy-image claims 17% -> 33%,
+  ESG 0.59 -> 0.47, net 0.24 -> -0.06 (example: answers "No" to "Is the lung healthy?" on healthy images),
+  plausibly from SLAKE's own VQA questions in the replay. Other imaging types same or better.
+- Token-probability AURC: v3 0.021 (test), 0.078 (external); RFT 0.022 / 0.053.
