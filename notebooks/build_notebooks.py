@@ -964,7 +964,7 @@ for p in PROVIDERS:
         code(f"""
 FRONTIER = {FRONTIER!r}
 PILOT_CASES = 20
-RUN_FULL = False       # set True after reading the pilot's cost table
+RUN_FULL = False       # set True to run all cases (the pilot in step 1 is optional: skip it if cost is not a concern)
 from medscope.eval.runner import load_views, select_cases
 ALL_VIEWS = select_cases([v for f in (TEST_VIEWS, TEST_NEG) for v in load_views(f)], None)
 RUNS = [(r, p, m) for r, p, m in FRONTIER if p in PROVIDERS]
@@ -984,6 +984,7 @@ display(Markdown(COSTS))
 """),
         md("## Step 2: full test set (only when `RUN_FULL = True`)"),
         code(r"""
+from IPython.display import Markdown, display
 if RUN_FULL:
     for run, p, m in RUNS:
         try:
