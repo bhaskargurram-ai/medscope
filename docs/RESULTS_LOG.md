@@ -405,8 +405,24 @@ SLAKE and PathVQA training splits, excluding any image near-identical to an eval
 SLAKE image in our validation or test sets; replaces the final model only if validation net utility is
 within 0.02 of it (rule fixed before testing).
 
-Frontier model (notebook 12, 150-case subset, before rescoring): GPT-6-sol CCR 0.875, ESG 0.397, claims
-the erased lesion 47.1%, claims a finding on healthy images 29.3%, net utility 0.306; 0% malformed.
+## Frontier models (notebook 12, 2026-10-31)
+
+Same 150 test cases (345 views) for both, paired with MedScope on those cases:
+
+| On the same 150 cases | MedScope-4B | GPT-6-sol | Gemini-4-argon |
+| --- | --- | --- | --- |
+| Correct on lesion images (CCR) | 0.860 | 0.853 (p=0.91) | 0.860 (p=1.0) |
+| Evidence sensitivity gap | **0.765** | 0.382 (p<0.001) | 0.441 (p<0.001) |
+| Claims the erased lesion | **0.103** | 0.471 (p<0.001) | 0.412 (p<0.001) |
+| Claims a finding on a healthy image | 0.073 | 0.293 (p=0.001) | 0.061 (p=0.84) |
+| Net utility | **0.743** | 0.271 (p<0.001) | 0.545 (p=0.013) |
+
+Both frontier models follow the action format (0% malformed; GPT 2.6% plain prose). They are as accurate
+as MedScope when the lesion is there, but claim an erased lesion 4x as often, typically with a box where
+it used to be ("a large sessile polyp occupying the central portion"). GPT also reports findings on 29%
+of healthy images; Gemini does not. Gemini's stated confidence ranks its answers well (AURC 0.018).
+Note for the paper: some SLAKE "healthy" labels may be noisy (Gemini describes a mass on images SLAKE
+labels as a healthy brain); this affects every model equally and is worth a manual look at a sample.
 
 ## Evaluation additions for the paper (2026-10-30)
 
