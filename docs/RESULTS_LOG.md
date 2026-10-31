@@ -318,6 +318,28 @@ Observations:
 - The verbalised confidence is nearly constant (0.81), so AURC is weak (0.098 vs 0.055); a
   probability-based confidence would be needed for selective-prediction claims.
 
+## Rejection-sampling fine-tuning (notebook 09, 2026-10-30)
+
+SFT v2 sampled 4 episodes on 150 training views of each kind; at least one success on 95-100% of views
+(per-sample success: degraded 100%, natural negative 95%, random edit 87%, original 84%, erased 84%).
+Fine-tuned from SFT v2 on the kept episodes plus 3,000 synthetic views (lr 5e-5, about 670 steps, loss
+about 0.21 throughout). Same validation set as notebook 08.
+
+| Metric (validation) | SFT v2 | SFT v2 + RFT (final) |
+| --- | --- | --- |
+| Net clinical utility | 0.785 [0.688, 0.871] | **0.801** [0.702, 0.887] |
+| Evidence sensitivity gap | 0.761 | **0.767** |
+| Lesion erased: still claims it | 0.117 | **0.104** |
+| Natural negatives: claims the finding | 0.072 | **0.060** |
+| Covered-and-correct rate | 0.880 | 0.880 |
+| Grounded accuracy | 0.804 | 0.804 |
+
+A small, consistent gain (fewer hallucinated findings on both erased and healthy images, same accuracy),
+within the confidence intervals. Breast ultrasound improved most (net utility 0.69 -> 0.80), chest X-ray
+ESG dropped (0.65 -> 0.55) while its healthy-image hallucination halved (0.16 -> 0.08). Chosen as the final
+model by validation net utility. Stated confidence stays near 0.8 (AURC on stated confidence 0.205);
+the final test reports the token-probability AURC as well.
+
 ## Evaluation additions for the paper (2026-10-30)
 
 - **Confidence from token probabilities** for every local model (geometric mean of the greedy
