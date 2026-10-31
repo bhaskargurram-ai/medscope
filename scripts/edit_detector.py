@@ -1,10 +1,13 @@
-"""Can a trained image classifier tell lesion-removed views from same-size random edits?
+"""Are the inpainting edits themselves visible? A trained image classifier as the test.
 
-A ResNet-18 (ImageNet weights) is fine-tuned on the training split to separate target-removal
-views from random-removal views, and tested on the test split. Both are edited with the same
-inpainting operator and an edit of the same shape, so an AUC near 0.5 means the edits themselves
-give nothing away: a model can only tell the two apart by checking whether the lesion is still
-there. For reference it also reports original vs target-removal (is inpainting detectable at all?).
+A ResNet-18 (ImageNet weights) is fine-tuned on the training split and tested on the test split:
+
+  random_removal vs original   the main test. Both show the lesion; one has an inpainted patch of
+                               the lesion's size elsewhere. AUC near 0.5 means the edit leaves no
+                               trace a CNN can find, so no model can answer by spotting edits.
+  target_removal vs random_removal   for reference: both edited the same way, but only one still
+                               shows the lesion, so a high AUC here is lesion detection, not edit
+                               detection (it shows what a plain CNN can read from these images).
 
 Usage:
     python scripts/edit_detector.py --train views/train/views_clean.jsonl ... --test views/test/views_clean.jsonl ... --out results/edit_detector
@@ -33,18 +36,18 @@ def auc(scores: np.ndarray, labels: np.ndarray) -> float:
     return float(((diff > 0).sum() + 0.5 * (diff == 0).sum()) / diff.size)
 
 
-def pairs(files: list[str], neg_kind: str) -> tuple[list[str], list[int], list[str]]:
+def pairs(files: list[str], pos_kind: str, neg_kind: str) -> tuple[list[str], list[int], list[str]]:
     views = [v for f in files for v in load_views(f)]
     paths, labels, cases = [], [], []
     for v in views:
-        if v.kind.value == "target_removal":
+        if v.kind.value == pos_kind:
             paths.append(v.image_path), labels.append(1), cases.append(v.case_id)
         elif v.kind.value == neg_kind:
             paths.append(v.image_path), labels.append(0), cases.append(v.case_id)
     return paths, labels, cases
 
 
-def run(train_files, test_files, neg_kind: str, epochs: int, seed: int = 0) -> dict:
+def run(train_files, test_files, pos_kind: str, neg_kind: str, epochs: int, seed: int = 0) -> dict:
     import torch
     import torchvision
     from PIL import Image
@@ -57,8 +60,8 @@ def run(train_files, test_files, neg_kind: str, epochs: int, seed: int = 0) -> d
     def load(paths):
         return torch.stack([tf(Image.open(p).convert("RGB")) for p in paths])
 
-    tr_p, tr_y, _ = pairs(train_files, neg_kind)
-    te_p, te_y, te_c = pairs(test_files, neg_kind)
+    tr_p, tr_y, _ = pairs(train_files, pos_kind, neg_kind)
+    te_p, te_y, te_c = pairs(test_files, pos_kind, neg_kind)
     model = torchvision.models.resnet18(weights="IMAGENET1K_V1")
     model.fc = torch.nn.Linear(model.fc.in_features, 1)
     model.to(dev)
@@ -76,7 +79,7 @@ def run(train_files, test_files, neg_kind: str, epochs: int, seed: int = 0) -> d
             loss.backward()
             opt.step()
             losses.append(loss.item())
-        print(f"  {neg_kind}: epoch {ep + 1}/{epochs} loss {np.mean(losses):.3f}", flush=True)
+        print(f"  {pos_kind} vs {neg_kind}: epoch {ep + 1}/{epochs} loss {np.mean(losses):.3f}", flush=True)
     model.eval()
     scores = []
     with torch.no_grad():
@@ -92,7 +95,7 @@ def run(train_files, test_files, neg_kind: str, epochs: int, seed: int = 0) -> d
     for _ in range(1000):
         pick = [i for c in rng.choice(cases, len(cases)) for i in idx_by[c]]
         boots.append(auc(s[pick], lab[pick]))
-    return {"comparison": f"target_removal vs {neg_kind}", "train_images": len(tr_p), "test_images": len(te_p),
+    return {"comparison": f"{pos_kind} vs {neg_kind}", "train_images": len(tr_p), "test_images": len(te_p),
             "auc": point, "ci_low": float(np.nanquantile(boots, 0.025)), "ci_high": float(np.nanquantile(boots, 0.975))}
 
 
@@ -105,10 +108,14 @@ def main() -> None:
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    results = [run(args.train, args.test, k, args.epochs) for k in ("random_removal", "original")]
+    results = [run(args.train, args.test, "random_removal", "original", args.epochs),
+               run(args.train, args.test, "target_removal", "random_removal", args.epochs)]
     (out / "edit_detector.json").write_text(json.dumps(results, indent=2))
-    lines = ["| Learned detector (ResNet-18) | Train images | Test images | Test AUC [95% CI] |", "| --- | --- | --- | --- |"]
-    lines += [f"| {r['comparison']} | {r['train_images']} | {r['test_images']} | {r['auc']:.3f} [{r['ci_low']:.3f}, {r['ci_high']:.3f}] |"
+    lines = ["| Learned classifier (ResNet-18) | What a high AUC would mean | Train images | Test images | Test AUC [95% CI] |",
+             "| --- | --- | --- | --- | --- |"]
+    meaning = {"random_removal vs original": "the edit leaves a visible trace",
+               "target_removal vs random_removal": "the lesion's presence is readable (expected)"}
+    lines += [f"| {r['comparison']} | {meaning[r['comparison']]} | {r['train_images']} | {r['test_images']} | {r['auc']:.3f} [{r['ci_low']:.3f}, {r['ci_high']:.3f}] |"
               for r in results]
     (out / "edit_detector.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))

@@ -176,6 +176,7 @@ METRICS: dict[str, Callable[[list[Outcome]], Optional[float]]] = {
     "aurc_prob": aurc_prob,
     "tool_calls_per_correct": tool_calls_per_correct,
     "malformed_rate": malformed_rate,
+    "free_text_rate": lambda o: _rate([bool(x.free_text) for x in o]),
     "natural_hallucination_rate": natural_hallucination_rate,
     "natural_safe_rate": natural_safe_rate,
     "natural_correct_rate": natural_correct_rate,

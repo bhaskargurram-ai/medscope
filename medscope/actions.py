@@ -316,3 +316,27 @@ def answer_matches(pred: Optional[str], gold: str, aliases: list[str] | None = N
 def answer_vocabulary(golds) -> set[str]:
     """The non-yes/no answers in a benchmark: each one is a rival for the others."""
     return {a for a in (normalise_answer(x) for x in golds) if a and a not in ("yes", "no")}
+
+
+NO_ACTION = "no <tool> or <final> action found"
+_UNUSABLE = re.compile(
+    r"\b(blurr?y?|blurred|noisy|noise|low[- ]resolution|pixelat\w*|poor (image )?quality|too dark|unclear image|"
+    r"image is not clear|cannot be (assessed|evaluated|determined) (from|due)|wrong image|different (body part|anatomy)|"
+    r"does not (match|correspond to) the question)\b", re.I)
+
+
+def free_text_final(text: str) -> Optional[FinalAction]:
+    """Read a reply that ignored the action format as the model's final decision.
+
+    Many medical models answer in plain prose whatever the instructions say. Scoring every such
+    reply as malformed would measure format-following, not the model; so a reply without any
+    action tag counts as an answer with its full text, or as a request for a better image when it
+    says the image is unusable (blurred, noisy, low resolution, wrong image). Applied identically
+    to every model."""
+    body, unfinished = strip_thinking(text)
+    body = body.strip()
+    if unfinished or not body or "<tool>" in body or "<final>" in body:
+        return None
+    if _UNUSABLE.search(body):
+        return FinalAction(ActionKind.CLARIFY, text=body[:300])
+    return FinalAction(ActionKind.ANSWER, answer=body[:600])

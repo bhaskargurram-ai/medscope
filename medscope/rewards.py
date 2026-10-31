@@ -43,6 +43,7 @@ class Outcome:
     claims_absent: Optional[bool] = None   # answer says the finding isn't there (answers only)
     box_ok: Optional[bool] = None          # answer's box overlaps the lesion enough for the grounding bonus
     answer_prob: Optional[float] = None    # the model's own probability of its answer tokens (greedy runs)
+    free_text: Optional[bool] = None       # decision read from a plain-prose reply (no action tag)
 
     def to_dict(self) -> dict:
         return asdict(self)

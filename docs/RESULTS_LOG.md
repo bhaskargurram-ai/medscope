@@ -340,6 +340,40 @@ ESG dropped (0.65 -> 0.55) while its healthy-image hallucination halved (0.16 ->
 model by validation net utility. Stated confidence stays near 0.8 (AURC on stated confidence 0.205);
 the final test reports the token-probability AURC as well.
 
+## Final test and external centres, first look (notebooks 10 and 11, 2026-10-31)
+
+Main test: 507 cases (219 counterfactual cases x 4 views + 288 natural negatives), 1,115 views.
+
+| Model (test) | CCR | ESG | Claims erased lesion | Claims finding on healthy | Grounded | Net utility | Malformed |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **MedScope-4B (final)** | **0.865** | **0.758** | 0.114 | **0.083** | **0.813** | **0.752** [0.673, 0.829] | 0.000 |
+| Refer-only SFT (ablation) | 0.660 | 0.594 | 0.059 | 0.132 | 0.575 | 0.537 | 0.000 |
+| Qwen3-VL-8B | 0.553 | 0.297 | 0.128 | 0.125 | 0.388 | 0.186 | 0.000 |
+| Qwen3.5-4B (base) | 0.758 | 0.338 | 0.420 | 0.194 | 0.192 | 0.134 | 0.014 |
+| MedGemma 1.5 4B | 0.660 | 0.169 | 0.534 | 0.240 | 0.137 | -0.417 | 0.212 |
+| Qwen2.5-VL-7B | 0.144 | -0.059 | 0.055 | 0.247 | 0.005 | -0.946 | 0.352 |
+| Lingshu-7B | 0.005 | 0.000 | 0.000 | 0.000 | 0.000 | -0.953 | 0.961 |
+| HuatuoGPT-Vision-7B | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | -1.000 | 1.000 |
+
+MedScope's token-probability AURC is 0.022 (stated-confidence AURC 0.171): its own answer probability
+ranks right and wrong answers well, unlike its stated confidence.
+
+External centres (CVC-ClinicDB, QaTa-COV19, BUS-BRA, BraTS-Africa; 169 cases, 526 views):
+MedScope CCR 0.752, ESG 0.664, claims erased lesion 0.109, claims finding on healthy 0.04, net utility
+0.534 [0.414, 0.650], token AURC 0.053; Qwen3-VL-8B ESG 0.227, net 0.037; MedGemma ESG 0.185, net -0.262.
+
+Scoring fix before the paper tables: Lingshu and HuatuoGPT answer in plain prose and never use the
+action format (100% "no action found"; e.g. "The image shows a polypoid lesion..."), Qwen2.5-VL in 35%
+of replies. Scoring those as malformed measures format-following, not the model. From now on a reply
+with no action tag is read as the model's decision for every model: a plain answer, or a request for a
+better image when it says the image is blurred, noisy, low resolution or the wrong image. Stored
+results are rescored without rerunning (notebook 13); the plain-prose rate is reported per model.
+
+Edit detector, first design: a ResNet-18 separates lesion-removed from random-edit views with AUC 0.929
+and lesion-removed from original with 0.932. Both pairs differ in whether the lesion is visible, so this
+measured lesion detection, not edit traces. Redesigned: the main test is now random edit vs original
+(both show the lesion, only one is edited); lesion-removed vs random edit is kept as a reference.
+
 ## Evaluation additions for the paper (2026-10-30)
 
 - **Confidence from token probabilities** for every local model (geometric mean of the greedy

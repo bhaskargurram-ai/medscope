@@ -1046,6 +1046,46 @@ print('failed:', failed or 'none')
     ]
 
 
+def nb13_paper_tables() -> list[dict]:
+    test_runs = ["v2_medscope_test"] + [b[0] for b in BASELINES] + ["v2_sft_v1_test"]
+    ext_runs = ["v2_medscope_ext"] + [b[0].replace("_test", "_ext") for b in BASELINES]
+    vqa_runs = ["v2_medscope_vqa"] + [b[0].replace("_test", "_vqa") for b in BASELINES]
+    return [
+        md("""
+# MedScope 13: paper tables
+
+Recomputes every result from the stored decisions and transcripts under the final scoring rules
+(no model is run): replies written in plain prose instead of the action format are read as the
+model's decision, identically for every model. Reruns the learned edit-trace test, then publishes
+all paper tables in one report: main test, significance, per imaging type, external centres,
+standard VQA, frontier models (if notebook 12 ran) and the edit-trace test.
+
+**Runtime:** any GPU (T4 is enough; the edit-trace test trains a small CNN), about 30-40 minutes.
+"""),
+        code(SETUP), code(RESTORE_ALL),
+        code(r"""
+for tar, check in ((f'{DRIVE}/external/external.tar', f'{WORK}/views_external/test/views_clean.jsonl'),
+                   (f'{DRIVE}/external/vqa.tar', f'{WORK}/vqa/views_vqa.jsonl')):
+    if not os.path.exists(check) and os.path.exists(tar):
+        !tar -C {WORK} -xf {tar}
+!python scripts/rescore_all.py --results {RESULTS}
+"""),
+        md("## Do the edits leave a visible trace? (learned classifier, about 20 minutes)"),
+        code("!python scripts/edit_detector.py --train {TRAIN_VIEWS} --test {TEST_VIEWS} --out {RESULTS}/v2_edit_detector"),
+        publish("MedScope report - 13 paper tables", f"""
+    ('Main test: leaderboard', compare_runs(RESULTS, 'v2_*_test')),
+    ('Main test: MedScope vs each model (paired bootstrap over cases)', significance_table(RESULTS, 'v2_medscope_test', {(test_runs[1:] + ['v2_openai_test', 'v2_gemini_test'])!r})),
+    ('Main test: by imaging type', by_dataset(RESULTS, {test_runs!r})),
+    ('External centres: leaderboard', compare_runs(RESULTS, 'v2_*_ext')),
+    ('External centres: MedScope vs each model', significance_table(RESULTS, 'v2_medscope_ext', {ext_runs[1:]!r})),
+    ('External centres: by source', by_dataset(RESULTS, {ext_runs!r})),
+    ('Standard medical VQA', vqa_table(RESULTS, {vqa_runs!r})),
+    ('Edit-trace test', read_text(f'{{RESULTS}}/v2_edit_detector/edit_detector.md')),
+    ('MedScope on test (full report)', read_text(f'{{RESULTS}}/v2_medscope_test/report.md')),
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -1060,6 +1100,7 @@ NOTEBOOKS = {
     "10_final_eval_export.ipynb": nb10,
     "11_generalization.ipynb": nb11_generalization,
     "12_frontier_models.ipynb": nb12_frontier,
+    "13_paper_tables.ipynb": nb13_paper_tables,
 }
 
 

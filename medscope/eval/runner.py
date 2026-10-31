@@ -13,8 +13,8 @@ import numpy as np
 
 from ..agent.episode import Policy, run_episodes
 from ..data.schema import View
-from ..actions import parse
-from ..rewards import Outcome, rejudge, rescore, with_vocab
+from ..actions import NO_ACTION, free_text_final, parse
+from ..rewards import Outcome, rejudge, rescore, score, with_vocab
 from .metrics import bootstrap
 
 
@@ -98,6 +98,10 @@ def evaluate(
     todo = [v for v in views if v.view_id not in done]
     log(f"{len(done)} views already done, {len(todo)} to run")
 
+    if policy is None:          # rescoring only: no model, use what is stored
+        if todo:
+            log(f"no model given: {len(todo)} views without results are left out")
+        todo = []
     t0 = time.time()
     with open(outcomes_path, "a") as fo, open(transcripts_path, "a") as ft:
         last_log = -10
@@ -118,15 +122,19 @@ def evaluate(
     by_id = {v.view_id: v for v in views}
     # correctness and rewards always follow the current rules: the model's decisions and answer
     # text are stored, the judging and the prices are recomputed
-    answers = {t["view_id"]: final_answer(t["turns"]) for t in _read_jsonl(transcripts_path) if t["view_id"] in keys}
+    trs = {t["view_id"]: t for t in _read_jsonl(transcripts_path) if t["view_id"] in keys}
     outcomes = []
     for r in _read_jsonl(outcomes_path):
         if r["view_id"] not in keys:
             continue
         v = by_id[r["view_id"]]
         o = Outcome(**{k: x for k, x in r.items() if k != "vkey"})
-        if r["view_id"] in answers:
-            o = rejudge(v, o, answers[r["view_id"]], cfg)
+        t = trs.get(r["view_id"])
+        if t is not None:
+            if o.malformed and t.get("error") == NO_ACTION:
+                o = free_text_outcome(v, o, t["turns"], cfg)
+            else:
+                o = rejudge(v, o, final_answer(t["turns"]), cfg)
         outcomes.append(rescore(v, o, cfg))
     summary = {"meta": meta, "n_views": len(outcomes), "n_cases": len({o.case_id for o in outcomes}),
                "metrics": bootstrap(outcomes, n_resamples=n_bootstrap)}
@@ -134,6 +142,18 @@ def evaluate(
     report = make_report(summary, outcomes, [t for t in _read_jsonl(transcripts_path) if t["view_id"] in keys])
     (out / "report.md").write_text(report)
     return summary
+
+
+def free_text_outcome(view: View, o: Outcome, turns: list[dict], cfg: dict) -> Outcome:
+    """Re-score an episode whose last reply had no action tag, reading that reply as plain prose."""
+    last = next((t["content"] for t in reversed(turns) if t["role"] == "assistant"), "")
+    final = free_text_final(last)
+    if final is None:
+        return o
+    new = score(view, final, cfg, tool_calls=o.tool_calls)
+    new.free_text = True
+    new.answer_prob = o.answer_prob
+    return new
 
 
 def final_answer(turns: list[dict]) -> str | None:
@@ -192,6 +212,7 @@ HEADLINE = [
     ("aurc_prob", "AURC, answer-token probability (lower is better)"),
     ("tool_calls_per_correct", "Tool calls per correct answer"),
     ("malformed_rate", "Malformed output rate"),
+    ("free_text_rate", "Replies in plain prose, read as the decision (no action tag)"),
     ("natural_hallucination_rate", "Natural negatives: claims the absent finding (lower is better)"),
     ("natural_safe_rate", "Natural negatives: safe (refers, or correctly says it isn't there)"),
     ("natural_correct_rate", "Natural negatives: correctly says it isn't there"),

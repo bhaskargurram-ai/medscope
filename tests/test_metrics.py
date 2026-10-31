@@ -148,3 +148,44 @@ class TestPairedBootstrap(unittest.TestCase):
         self.assertLess(r["p"], 0.01)
         same = paired_bootstrap(good, good, "ccr", n=100)
         self.assertEqual(same["diff"], 0.0)
+
+
+class TestFreeTextFallback(unittest.TestCase):
+    def test_free_text_final(self):
+        from medscope.actions import free_text_final
+        a = free_text_final("The image shows a polypoid lesion in the colon.")
+        self.assertEqual(a.kind.value, "answer")
+        self.assertEqual(free_text_final("The image is too blurry to identify anything.").kind.value, "clarify")
+        self.assertIsNone(free_text_final("<think>still going"))
+        self.assertIsNone(free_text_final("   "))
+
+    def test_stored_prose_replies_are_rescored(self):
+        import json
+        import tempfile
+        from pathlib import Path
+
+        from medscope.actions import NO_ACTION
+        from medscope.data.schema import View, ViewKind
+        from medscope.eval.runner import evaluate, view_key
+        from medscope.rewards import load_config
+
+        views = [View("c1__original", "c1", "p1", ViewKind.ORIGINAL, "x.png", "What abnormality is visible?", "Polyp",
+                      [], [100, 100, 300, 300], False),
+                 View("c1__target_removal", "c1", "p1", ViewKind.TARGET_REMOVAL, "x.png", "Is there a polyp?", "Yes",
+                      [], [100, 100, 300, 300], False)]
+        replies = ["The image shows a polypoid lesion.", "Yes, a polyp is visible in the image."]
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            rows, trs = [], []
+            for v, reply in zip(views, replies):
+                o = out("c1", v.kind.value, None, reward=-1.0)
+                rows.append({**o.to_dict(), "view_id": v.view_id, "vkey": view_key(v)})
+                trs.append({"view_id": v.view_id, "vkey": view_key(v), "kind": v.kind.value, "question": v.question,
+                            "gold": v.answer, "error": NO_ACTION, "turns": [{"role": "assistant", "content": reply}]})
+            (d / "outcomes.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+            (d / "transcripts.jsonl").write_text("\n".join(json.dumps(t) for t in trs))
+            m = evaluate(None, views, load_config(), d, {"name": "x"}, n_bootstrap=5, log=lambda s: None)["metrics"]
+            self.assertEqual(m["malformed_rate"]["value"], 0.0)
+            self.assertEqual(m["free_text_rate"]["value"], 1.0)
+            self.assertEqual(m["ccr"]["value"], 1.0)                       # "polypoid lesion" names the polyp
+            self.assertEqual(m["target_hallucination_rate"]["value"], 1.0)  # claims the erased polyp
