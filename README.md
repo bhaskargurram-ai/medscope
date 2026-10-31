@@ -42,6 +42,8 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `10_final_eval_export` | Final model, six open baselines and an ablation on the full test set; learned edit detector; significance tests; export | A100, High-RAM | 8–12 h |
 | `11_generalization` | External centres (CVC-ClinicDB, QaTa-COV19, BUS-BRA, BraTS-Africa) and standard medical VQA (VQA-RAD, SLAKE, PathVQA) for every model | A100 | 8–10 h |
 | `12_frontier_models` | GPT and Gemini through the same agent loop on a fixed test subset (API keys as Colab secrets) | CPU | 1–2 h |
+| `13_paper_tables` | Rescore every run under the final rules, edit-trace test, all paper tables in one report | any GPU | ~40 min |
+| `14_ablation` | Same fine-tuning without the counterfactual views, tested against SFT v2 | A100 | ~5 h |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.

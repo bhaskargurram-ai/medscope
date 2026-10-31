@@ -1047,8 +1047,8 @@ print('failed:', failed or 'none')
 
 
 def nb13_paper_tables() -> list[dict]:
-    test_runs = ["v2_medscope_test"] + [b[0] for b in BASELINES] + ["v2_sft_v1_test"]
-    ext_runs = ["v2_medscope_ext"] + [b[0].replace("_test", "_ext") for b in BASELINES]
+    test_runs = ["v2_medscope_test"] + [b[0] for b in BASELINES] + ["v2_sft_v1_test", "v2_sft_v2_test", "v2_nocf_test"]
+    ext_runs = ["v2_medscope_ext"] + [b[0].replace("_test", "_ext") for b in BASELINES] + ["v2_sft_v2_ext", "v2_nocf_ext"]
     vqa_runs = ["v2_medscope_vqa"] + [b[0].replace("_test", "_vqa") for b in BASELINES]
     return [
         md("""
@@ -1079,9 +1079,52 @@ for tar, check in ((f'{DRIVE}/external/external.tar', f'{WORK}/views_external/te
     ('External centres: leaderboard', compare_runs(RESULTS, 'v2_*_ext')),
     ('External centres: MedScope vs each model', significance_table(RESULTS, 'v2_medscope_ext', {ext_runs[1:]!r})),
     ('External centres: by source', by_dataset(RESULTS, {ext_runs!r})),
+    ('Ablation: counterfactual training vs the same fine-tuning without it (test)', significance_table(RESULTS, 'v2_sft_v2_test', ['v2_nocf_test'])),
+    ('Ablation on external centres', significance_table(RESULTS, 'v2_sft_v2_ext', ['v2_nocf_ext'])),
     ('Standard medical VQA', vqa_table(RESULTS, {vqa_runs!r})),
     ('Edit-trace test', read_text(f'{{RESULTS}}/v2_edit_detector/edit_detector.md')),
     ('MedScope on test (full report)', read_text(f'{{RESULTS}}/v2_medscope_test/report.md')),
+"""),
+    ]
+
+
+def nb14_ablation() -> list[dict]:
+    return [
+        md(f"""
+# MedScope 14: ablation (is it the counterfactual training, or just fine-tuning?)
+
+Trains the same model with the same recipe and the same number of optimizer steps as SFT v2, on the
+same images, but **without the counterfactual views**: only original lesion images (answer + box),
+real healthy images ("No") and degraded images (ask to clarify). No lesion-removed and no random-edit
+views. Then tests it and SFT v2 side by side on the main test set and the external centres.
+
+If the ablation still claims erased lesions (low evidence sensitivity gap) while SFT v2 does not,
+the gain comes from the counterfactual training itself, not from in-domain fine-tuning.
+
+**Runtime:** A100, about 5 hours (training about 2-3 hours, three evaluations). Everything resumes.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL),
+        code(r"""
+EXT_VIEWS = f'{WORK}/views_external/test/views_clean.jsonl {WORK}/external/negatives/views_negatives_external.jsonl'
+if not os.path.exists(f'{WORK}/views_external/test/views_clean.jsonl'):
+    !tar -C {WORK} -xf {DRIVE}/external/external.tar
+"""),
+        md("## Train without counterfactual views (same steps as SFT v2)"),
+        code(f"!python scripts/train_sft.py --model {BASE} --views {{TRAIN_VIEWS}} --negatives {{TRAIN_NEG}} "
+             "--kinds original natural_negative degraded --epochs 3 --max-steps 1980 --mode agentic --out {ADAPTERS}/sft_nocf"),
+        md("## Test: ablation and SFT v2, main test set and external centres"),
+        code(f"""
+for out, name, adapter in [('v2_nocf', 'ablation-no-counterfactual-sft', f'{{ADAPTERS}}/sft_nocf/final'),
+                           ('v2_sft_v2', 'medscope-sft-v2', f'{{ADAPTERS}}/sft_v2/final')]:
+    !python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/{{out}}_test --name {{name}} --split test
+    !python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{EXT_VIEWS}} --out {{RESULTS}}/{{out}}_ext --name {{name}} --split ext
+"""),
+        publish("MedScope report - 14 ablation", """
+    ('Training loss (ablation)', train_log_summary(f'{ADAPTERS}/sft_nocf/train_log.jsonl', window=20)),
+    ('Main test: SFT v2 vs the ablation (paired bootstrap)', significance_table(RESULTS, 'v2_sft_v2_test', ['v2_nocf_test'])),
+    ('External centres: SFT v2 vs the ablation', significance_table(RESULTS, 'v2_sft_v2_ext', ['v2_nocf_ext'])),
+    ('Main test by imaging type', by_dataset(RESULTS, ['v2_sft_v2_test', 'v2_nocf_test', 'v2_medscope_test'])),
+    ('Ablation on test (full report)', read_text(f'{RESULTS}/v2_nocf_test/report.md')),
 """),
     ]
 
@@ -1101,6 +1144,7 @@ NOTEBOOKS = {
     "11_generalization.ipynb": nb11_generalization,
     "12_frontier_models.ipynb": nb12_frontier,
     "13_paper_tables.ipynb": nb13_paper_tables,
+    "14_ablation.ipynb": nb14_ablation,
 }
 
 

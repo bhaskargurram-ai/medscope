@@ -24,6 +24,8 @@ def main() -> None:
     ap.add_argument("--views", required=True, nargs="+", help="one or more views files")
     ap.add_argument("--negatives", nargs="*", default=[], help="natural-negative views files to add")
     ap.add_argument("--init", default=None, help="continue training this adapter instead of a new one")
+    ap.add_argument("--kinds", nargs="*", default=None,
+                    help="train only on these view kinds (ablations), e.g. original natural_negative degraded")
     ap.add_argument("--subsample", type=int, default=None,
                     help="train on this many synthetic views (random, fixed seed) instead of all of them")
     ap.add_argument("--replays", default=None,
@@ -41,6 +43,10 @@ def main() -> None:
 
     views = [v for f in args.views for v in load_views(f)]
     negs = [v for f in args.negatives for v in load_views(f)]
+    if args.kinds:
+        views = [v for v in views if v.kind.value in args.kinds]
+        negs = [v for v in negs if v.kind.value in args.kinds]
+        print(f"ablation: only {args.kinds} views")
     by_id = {v.view_id: v for v in views + negs}     # before subsampling: kept episodes may be on any view
     if args.subsample and args.subsample < len(views) + len(negs):
         import numpy as np
