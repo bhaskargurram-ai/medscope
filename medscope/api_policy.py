@@ -130,7 +130,8 @@ def available_models(provider: str) -> Optional[list[str]]:
             from openai import OpenAI
             return sorted(m.id for m in OpenAI(api_key=os.environ["OPENAI_API_KEY"]).models.list())
         from google import genai
-        return sorted(m.name for m in genai.Client(api_key=os.environ["GEMINI_API_KEY"]).models.list())
+        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])   # keep a reference: the list is fetched lazily
+        return sorted(m.name for m in client.models.list())
     except Exception as e:  # noqa: BLE001
         print(f"could not list {provider} models: {e}")
         return None
