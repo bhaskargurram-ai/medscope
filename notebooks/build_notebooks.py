@@ -1145,16 +1145,17 @@ def nb15_sft_v3() -> list[dict]:
         md(f"""
 # MedScope 15: SFT v3 (keep general ability: replay of ordinary medical questions)
 
-SFT v2 lost some general medical VQA ability (open questions dropped, e.g. "Where are the kidneys?" ->
-"No abnormality"): every training question was about a lesion. SFT v3 trains the same way from scratch
-and mixes in ordinary questions from the **training** splits of VQA-RAD, SLAKE and PathVQA (no image
-near-identical to any evaluation image, and no SLAKE image used in our validation or test sets).
+The final model lost some general medical VQA ability (open questions dropped, e.g. "Where are the
+kidneys?" -> "No abnormality"): every training question was about a lesion. SFT v3 continues training
+the current final model (low learning rate, about 800 steps) on a mix of its task views and ordinary
+questions from the **training** splits of VQA-RAD, SLAKE and PathVQA (rehearsal), with no image
+near-identical to any evaluation image and no SLAKE image used in our validation or test sets.
 
 **Decision rule, fixed before testing:** SFT v3 becomes the final model if its validation net utility is
 no more than 0.02 below the current final model's. If so it is tested on the main test set, the
 external centres and standard VQA, and exported. Notebook 13 then uses it automatically.
 
-**Runtime:** A100, about 7 hours (training about 4.5 h, validation 40 min, tests about 2 h). Resumes.
+**Runtime:** A100, about 4 hours (training about 1.2 h, validation 40 min, tests about 2 h). Resumes.
 """ + SECRETS_NOTE),
         code(SETUP), code(GPU_STACK), code("!pip install -q datasets pyarrow"), code(RESTORE_ALL),
         code(r"""
@@ -1186,8 +1187,13 @@ if not os.path.exists(REPLAY):
 !wc -l {REPLAY}
 """),
         md("## Train SFT v3"),
-        code(f"!python scripts/train_sft.py --model {BASE} --views {{TRAIN_VIEWS}} {{REPLAY}} --negatives {{TRAIN_NEG}} "
-             "--mode agentic --out {ADAPTERS}/sft_v3"),
+        code(f"""
+# continue from the current final model (keeps its gains) on a mix of task views and ordinary questions
+INIT = json.load(open(f'{{ADAPTERS}}/final_choice.json'))
+INIT = INIT.get('previous_adapter', INIT['adapter']) if INIT.get('chosen') == 'sft_v3' else INIT['adapter']
+print('starting from', INIT)
+!python scripts/train_sft.py --model {BASE} --init {{INIT}} --views {{TRAIN_VIEWS}} {{REPLAY}} --negatives {{TRAIN_NEG}} --subsample 5000 --lr 5e-5 --mode agentic --out {{ADAPTERS}}/sft_v3
+"""),
         md("## Validation and decision"),
         code(f"""
 !python scripts/evaluate.py --model {BASE} --adapter {{ADAPTERS}}/sft_v3/final --views {{VAL_VIEWS}} {{VAL_NEG}} --out {{RESULTS}}/v2_sft_v3_val --name medscope-sft-v3 --split validation
@@ -1198,7 +1204,7 @@ USE_V3 = v3 >= current - 0.02
 print(f'validation net utility: current final {{current:.3f}}, SFT v3 {{v3:.3f}} ->', 'SFT v3 becomes the final model' if USE_V3 else 'keep the current final model')
 if USE_V3:
     choice.update({{'adapter': f'{{ADAPTERS}}/sft_v3/final', 'chosen': 'sft_v3', 'prefix': 'v2_medscope3',
-                   'previous': choice.get('chosen')}})
+                   'previous': choice.get('chosen'), 'previous_adapter': choice['adapter']}})
     choice['validation_net_utility']['sft_v3'] = v3
     json.dump(choice, open(f'{{ADAPTERS}}/final_choice.json', 'w'), indent=2)
 """),
