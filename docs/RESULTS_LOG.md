@@ -475,3 +475,26 @@ The counterfactual views are what teach evidence sensitivity; everything else in
   three benchmarks' train splits (images of the test splits excluded), the base model is zero-shot.
 - Final model: sft_v3 (prefix v2_medscope3). It keeps the evidence-sensitivity results and is a general
   medical VQA model as well; the cost is more false findings on healthy images (14.6% vs 8.3%).
+
+## 2026-10-31: nine frontier models, full test set (notebook 12)
+
+All 507 cases (1,115 views), same prompt, tools and scoring as every other model; each provider's
+default settings. MedScope-4B (final, v3) for reference: CCR 0.881, ESG 0.744, erased 13.7%, healthy 14.6%, net 0.714.
+
+| Model | CCR | ESG | Claims erased lesion | Claims finding on healthy | Grounded | Clarify on degraded | Net | Cost |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| gemini-4-argon | 0.874 | 0.470 | 41.1% | 9.0% | 0.726 | 0.941 | 0.565 | $6.08 (770 views) |
+| claude-sonnet-5-5 | 0.870 | 0.402 | 48.4% | 16.7% | 0.589 | 0.353 | 0.381 | $12.50 |
+| gemini-3.1-pro-preview | 0.849 | 0.384 | 51.6% | 26.7% | 0.712 | 0.412 | 0.306 | $12.40 |
+| gpt-6-sol | 0.829 | 0.342 | 51.6% | 25.7% | 0.639 | 0.506 | 0.261 | $2.45 (770 views) |
+| claude-fable-5-1 | 0.856 | 0.342 | 52.1% | 23.3% | 0.388 | 0.559 | 0.255 | $54.82 |
+| claude-opus-5-5 | 0.863 | 0.329 | 53.9% | 23.6% | 0.735 | 0.629 | 0.358 | $15.54 |
+| gpt-6.1-sol | 0.888 | 0.324 | 58.9% | 30.9% | 0.708 | 0.488 | 0.276 | $3.32 |
+| gpt-6-astra | 0.886 | 0.306 | 58.9% | 27.8% | 0.717 | 0.547 | 0.309 | $16.18 |
+| gemini-3.8-flash | 0.868 | 0.269 | 61.6% | 27.8% | 0.721 | 0.671 | 0.263 | $9.13 |
+
+Full-run API cost $132.42 (plus earlier 150-case runs and pilots). Every frontier model matches MedScope
+on real lesions (CCR 0.83-0.89) and claims an erased lesion in 41-62% of cases. Best frontier ESG 0.470
+(gemini-4-argon); gemini-4-argon also has the fewest healthy-image false findings of any model (9.0%,
+below MedScope v3's 14.6% and close to MedScope RFT's 8.3%). Frontier refer rates are near zero: they
+answer, rarely abstain. Paired tests against MedScope come from notebook 13.
