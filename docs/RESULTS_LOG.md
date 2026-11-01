@@ -526,3 +526,35 @@ different, p=0.48); HuatuoGPT-Vision-7B ESG 0.265, erased 30.1%, healthy 22.9% (
 Standard VQA after rescoring (all questions): Lingshu SLAKE 0.637, VQA-RAD 0.479, PathVQA 0.390; HuatuoGPT
 0.450 / 0.470 / 0.380; MedGemma 0.440 / 0.448 / 0.277; MedScope v3 0.767 / 0.554 / 0.520 stays best on all three.
 gpt-6-sol after rescoring: CCR 0.829 (MedScope +0.053, p=0.013).
+
+## 2026-10-31: robustness checks (notebooks 16 and 17, first results)
+
+Tools switched off (every tool call refused, main test, 507 cases):
+| Model | CCR | ESG | Erased-lesion claims | Healthy-image claims | Grounded | Net |
+| --- | --- | --- | --- | --- | --- | --- |
+| RFT, tools on / off | 0.865 / 0.847 | 0.758 / 0.726 | 11.4% / 11.9% | 8.3% / 11.1% | 0.813 / 0.804 | 0.752 / 0.675 |
+| v3, tools on / off | 0.881 / 0.783 | 0.744 / 0.703 | 13.7% / 6.8% | 14.6% / 12.8% | 0.817 / 0.758 | 0.714 / 0.601 |
+Evidence sensitivity comes mostly from training (ESG 0.70-0.73 with no tools); the tools add accuracy on real
+lesions (v3 CCR +0.10) and net utility (+0.08 to +0.11). Without tools v3 says "not there" more often overall
+(random-edit denials 22% vs 11%).
+
+Frontier flagships at the external centres (169 cases; MedScope v3: CCR 0.773, ESG 0.672, erased 10.1%,
+healthy 10.0%, net 0.522): gpt-6-astra CCR 0.945, ESG 0.277, erased 66.4%, healthy 24%, net 0.424;
+claude-opus-5-5 CCR 0.966, ESG 0.412, erased 53.8%, healthy 30%, net 0.544; gemini-4-argon CCR 0.950,
+ESG 0.370, erased 58.8%, healthy 18%, net 0.544. Externally the frontier models find more real lesions than
+MedScope (0.95-0.97 vs 0.77) and tie or edge it on net utility; MedScope's evidence sensitivity advantage holds
+(ESG 0.67 vs 0.28-0.41, erased-lesion claims 10% vs 54-66%).
+
+Cautious prompt (150 test cases): gpt-6-astra erased-lesion claims 47.1% (ESG 0.397), claude-opus-5-5 44.1%
+(0.382), gemini-4-argon 42.6% (0.412); random-edit denials rise to 13-16%. Full-set agent-prompt rates were
+58.9%, 53.9%, 41.1%. Prompting reduces the problem for two of three models but leaves it at 43-47%.
+
+Can a frontier model see the edits? (probability the image was edited, 219 cases x 3 views)
+- gemini-4-argon: random edit vs original AUC 0.524 [0.474, 0.575]; erased vs original 0.753; erased vs random 0.737.
+- gpt-6.1-sol: 0.546 [0.491, 0.598]; 0.698; 0.658.
+Edits on normal tissue are invisible to them; erasing a lesion leaves a region they find suspicious (72% of
+erased images rated >= 0.7 by gemini-4-argon). Does MedScope's "not there" depend on that? On the 61 erased
+images gemini-4-argon rates as unedited (p <= 0.3), MedScope v3 still claims the lesion in only 21% (RFT 18%),
+against 49-64% for gpt-6-sol, gpt-6-astra, gpt-6.1-sol and claude-fable-5-1; on obviously edited ones (p >= 0.7)
+11% (RFT 9%) vs 48-58%. Some dependence on edit visibility, but the gap to frontier models is as large on
+erasures that look clean.

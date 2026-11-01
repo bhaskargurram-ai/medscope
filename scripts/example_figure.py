@@ -58,7 +58,8 @@ def main() -> None:
         if cases:
             rows.append((ds, complete[cases[0]], pool[0] if pool else None))
 
-    fig, axes = plt.subplots(len(rows), len(COLUMNS), figsize=(2.2 * len(COLUMNS), 2.3 * len(rows)))
+    fig, axes = plt.subplots(len(rows), len(COLUMNS), figsize=(2.0 * len(COLUMNS), 2.0 * len(rows)),
+                             gridspec_kw={"wspace": 0.03, "hspace": 0.06})
     for r, (ds, d, neg) in enumerate(rows):
         for c, (kind, title) in enumerate(COLUMNS):
             ax = axes[r][c]
@@ -69,7 +70,7 @@ def main() -> None:
                 continue
             img = load_image(v.image_path)
             h, w = img.shape[:2]
-            ax.imshow(img, cmap="gray" if img.ndim == 2 else None)
+            ax.imshow(img, cmap="gray" if img.ndim == 2 else None, aspect="auto")
             if v.kind is ViewKind.ORIGINAL:
                 draw_box(ax, v.lesion_box, w, h)
             elif v.kind in (ViewKind.TARGET_REMOVAL, ViewKind.RANDOM_REMOVAL):
@@ -77,13 +78,13 @@ def main() -> None:
             if r == 0:
                 ax.set_title(title, fontsize=9)
             if c == 0:
-                ax.set_ylabel(ds.replace(" (", "\n("), fontsize=8)
+                ax.set_ylabel(ds.split(" (")[0], fontsize=8)
             if v.kind is ViewKind.DEGRADED:
                 ax.text(0.02, 0.98, (v.meta or {}).get("degradation", ""), transform=ax.transAxes, fontsize=7,
                         va="top", color="white", bbox=dict(fc="black", alpha=0.5, lw=0))
         axes[r][0].text(0.02, 0.02, d["original"].question, transform=axes[r][0].transAxes, fontsize=6,
                         color="white", bbox=dict(fc="black", alpha=0.5, lw=0), wrap=True)
-    fig.tight_layout()
+    fig.subplots_adjust(left=0.04, right=0.995, top=0.96, bottom=0.01)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     for ext in ("png", "pdf"):
