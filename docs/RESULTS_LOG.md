@@ -594,3 +594,11 @@ MedScope v3 vs each cautious flagship: ESG +0.32 to +0.35, erased claims -29 to 
 External centres, paired with MedScope v3: ESG better than all three flagships (+0.26 to +0.40, p<0.001), erased
 claims 10.1% vs 53.8-66.4% (p<0.001); CCR worse (0.773 vs 0.945-0.966, p<0.001); net utility not different
 (+0.098 vs gpt-6-astra p=0.12; -0.022 vs opus p=0.76; -0.021 vs argon p=0.78).
+
+External centres, three focal-lesion centres only (BraTS-Africa, CVC-ClinicDB, BUS-BRA; 149 cases; QaTa-COV19
+excluded because diffuse opacities cannot be erased): MedScope v3 CCR 0.818, ESG 0.778, erased claims 4.0%,
+healthy 10%, net 0.642 (RFT: 0.788 / 0.768 / 4.0% / 4% / 0.635). gpt-6-astra 0.955 / 0.354 / 59.6% / 24% / 0.490;
+claude-opus-5-5 0.975 / 0.475 / 48.5% / 30% / 0.602; gemini-4-argon 0.970 / 0.424 / 54.5% / 18% / 0.616. Paired v3 vs
+each: ESG +0.30 to +0.42 and erased claims -44 to -56 points (p<0.001); CCR -0.14 to -0.16 (p<0.001); net utility
++0.152 vs astra (p=0.024), +0.040 vs opus (p=0.59), +0.027 vs argon (p=0.72). QaTa alone (20 cases): every model fails
+the erasure (MedScope erased claims 40%, frontier 80-100%).
