@@ -1369,16 +1369,16 @@ def nb19_release() -> list[dict]:
         md("""
 # MedScope 19: label spot-check and release (CPU)
 
-1. **Label spot-check.** Shows the 20 SLAKE lesion-free test images that most models call abnormal. Look at them and
-   note the numbers of any whose "healthy" label is plainly wrong (you are checking the dataset's label, not making a
-   diagnosis; leave the list empty if none is clearly wrong). The main comparison is then recomputed without them.
+1. **Label check (automatic, no human judgement).** The nine frontier models act as an independent panel: a
+   "healthy" test image that at least 7 of them call abnormal is treated as a disputed label, and every result and
+   paired test is recomputed without those images. MedScope does not vote.
 2. **Release.** Prepares and uploads, as **private** Hugging Face repositories: the MedScope-4B and MedScope-4B-R
    adapters with model cards, and MedScope-Bench (view manifests without images, and every evaluation run). Make them
    public when the paper is submitted.
 
-**Runtime: CPU**, 10-20 minutes. Needs the Colab secret `HF_TOKEN` with **write** access (huggingface.co/settings/tokens).
+**Runtime: CPU**, 10-20 minutes, no input needed. Needs the Colab secret `HF_TOKEN` with **write** access (huggingface.co/settings/tokens).
 """),
-        code(SETUP), code("!pip install -q -U huggingface_hub matplotlib"), code(RESTORE_ALL),
+        code(SETUP), code("!pip install -q -U huggingface_hub"), code(RESTORE_ALL),
         code(r"""
 EXT_VIEWS = f'{WORK}/views_external/test/views_clean.jsonl {WORK}/external/negatives/views_negatives_external.jsonl'
 if not os.path.exists(f'{WORK}/views_external/test/views_clean.jsonl'):
@@ -1386,19 +1386,12 @@ if not os.path.exists(f'{WORK}/views_external/test/views_clean.jsonl'):
 if secret('HF_TOKEN'):
     os.environ['HF_TOKEN'] = secret('HF_TOKEN')
 """),
-        md("## 1. Label spot-check"),
+        md("## 1. Label check (automatic)"),
         code(f"""
 NEG_RUNS = {neg_runs!r}
+JUDGES = {FRONTIER_RUNS!r}
 LC = f'{{RESULTS}}/label_check'
-!python scripts/label_check.py make --views {{TEST_NEG}} --results {{RESULTS}} --runs {{' '.join(NEG_RUNS)}} --n 20 --out {{LC}}
-from IPython.display import Image as _Img, display
-display(_Img(f'{{LC}}/label_check.png', width=1100))
-"""),
-        md("Type the numbers (#) of images whose label is **plainly** wrong, e.g. `WRONG = [3, 11]`; leave `[]` if none."),
-        code(r"""
-WRONG = []
-json.dump(WRONG, open(f'{LC}/wrong_labels.json', 'w'))
-!python scripts/label_check.py apply --results {RESULTS} --runs {' '.join(NEG_RUNS)} --ref v2_medscope3_test --out {LC}
+!python scripts/label_check.py consensus --views {{TEST_NEG}} --results {{RESULTS}} --judges {{' '.join(JUDGES)}} --min-votes 7 --runs {{' '.join(NEG_RUNS)}} --ref v2_medscope3_test --out {{LC}}
 """),
         md("## 2. Release (private repositories)"),
         code(r"""
@@ -1410,8 +1403,7 @@ flag = '--upload' if UPLOAD and os.environ.get('HF_TOKEN') else ''
 !python scripts/release_hf.py --final {FINAL} --verify {VERIFY} --results {RESULTS} --views {TEST_VIEWS} {TEST_NEG} --external {EXT_VIEWS} --out {DRIVE}/release {flag}
 """),
         publish("MedScope report - 19 release", """
-    ('Label spot-check: images shown', read_text(f'{RESULTS}/label_check/label_check.json')),
-    ('Label spot-check: results without flagged labels', read_text(f'{RESULTS}/label_check/sensitivity.md')),
+    ('Label check: results without disputed labels (7 of 9 frontier models call the healthy image abnormal)', read_text(f'{RESULTS}/label_check/sensitivity_auto.md')),
     ('Model card (MedScope-4B)', read_text(f'{DRIVE}/release/MedScope-4B/README.md')),
 """),
     ]

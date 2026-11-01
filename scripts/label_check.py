@@ -8,6 +8,13 @@ so a person can flag labels that are plainly wrong, then re-run the main compari
      -> sensitivity.md: every metric with and without the flagged cases, and the paired tests again
 
 This is a check of dataset labels, not clinical annotation: it only removes cases whose label is visibly wrong.
+
+Automatic alternative with no human in the loop:
+     python scripts/label_check.py consensus --views TEST_NEG... --results RESULTS --judges FRONTIER_RUNS... \
+         --min-votes 7 --runs RUN... --ref v2_medscope3_test --out RESULTS/label_check
+     -> lesion-free images that at least 7 of the judge models call abnormal are treated as disputed labels, and
+        every metric and paired test is recomputed without them (sensitivity_auto.md). The model under test is not
+        a judge.
 """
 
 from __future__ import annotations
@@ -98,6 +105,58 @@ def apply(args) -> None:
     print(md)
 
 
+def results_without(results: Path, runs: list[str], ref: str, drop: set[str], header: str) -> str:
+    lines = [header, "", "| Run | " + " | ".join(f"{m} (all / without disputed)" for m in MAIN) + " |",
+             "| --- | " + " | ".join("---" for _ in MAIN) + " |"]
+    outs = {r: load_outcomes(results / r) for r in runs if (results / r / "outcomes.jsonl").exists()}
+    kept = {r: [o for o in os_ if o.case_id not in drop] for r, os_ in outs.items()}
+    for r in outs:
+        lines.append(f"| {r} | " + " | ".join(f"{METRICS[m](outs[r]):.3f} / {METRICS[m](kept[r]):.3f}" for m in MAIN) + " |")
+    if ref in kept:
+        lines += ["", f"Paired tests without the disputed images ({ref} minus other):", "",
+                  "| Other | " + " | ".join(MAIN) + " |", "| --- | " + " | ".join("---" for _ in MAIN) + " |"]
+        for r in kept:
+            if r == ref:
+                continue
+            cells = []
+            for m in MAIN:
+                d = paired_bootstrap(kept[ref], kept[r], m)
+                if "diff" not in d:
+                    cells.append("n/a")
+                    continue
+                p = "<0.001" if d["p"] < 0.001 else f"{d['p']:.3f}"
+                cells.append(f"{d['diff']:+.3f} (p {p})")
+            lines.append(f"| {r} | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def consensus(args) -> None:
+    from medscope.colab import dataset_of
+    results = Path(args.results)
+    negs = {v.view_id: v for f in args.views for v in load_views(f)}
+    votes, judges = Counter(), 0
+    for run in args.judges:
+        p = results / run
+        if not (p / "outcomes.jsonl").exists():
+            continue
+        judges += 1
+        for o in load_outcomes(p):
+            if o.view_id in negs and o.action == "answer" and not o.correct:
+                votes[negs[o.view_id].case_id] += 1
+    drop = {c for c, n in votes.items() if n >= args.min_votes}
+    by_ds = Counter(dataset_of(c) for c in drop)
+    total = Counter(dataset_of(v.case_id) for v in negs.values())
+    header = (f"Disputed labels: {len(drop)} of {len(negs)} lesion-free test images are called abnormal by at least "
+              f"{args.min_votes} of {judges} judge models (" +
+              ", ".join(f"{ds}: {by_ds[ds]}/{total[ds]}" for ds in sorted(total)) + ").")
+    md = results_without(results, args.runs, args.ref, drop, header)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "disputed_labels.json").write_text(json.dumps(sorted(drop), indent=1))
+    (out / "sensitivity_auto.md").write_text(md + "\n")
+    print(md)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -113,8 +172,16 @@ def main() -> None:
     a.add_argument("--runs", nargs="+", required=True)
     a.add_argument("--ref", default="v2_medscope3_test")
     a.add_argument("--out", required=True)
+    c = sub.add_parser("consensus")
+    c.add_argument("--views", nargs="+", required=True, help="natural-negative views files")
+    c.add_argument("--results", required=True)
+    c.add_argument("--judges", nargs="+", required=True, help="runs whose votes decide (not the model under test)")
+    c.add_argument("--min-votes", type=int, default=7)
+    c.add_argument("--runs", nargs="+", required=True, help="runs to report")
+    c.add_argument("--ref", default="v2_medscope3_test")
+    c.add_argument("--out", required=True)
     args = ap.parse_args()
-    make(args) if args.cmd == "make" else apply(args)
+    {"make": make, "apply": apply, "consensus": consensus}[args.cmd](args)
 
 
 if __name__ == "__main__":
