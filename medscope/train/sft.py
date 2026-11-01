@@ -95,6 +95,7 @@ def train_sft(
     replays: Optional[dict[str, list[str]]] = None,
     window_prob: float = 0.0,
     small_zoom: bool = False,
+    schedule_steps: Optional[int] = None,
 ) -> Path:
     import torch
 
@@ -103,7 +104,7 @@ def train_sft(
     views = mode_views(views, mode)
     order = view_order(views, epochs, seed)
     cfg = load_config() if replays else None
-    total_steps = max_steps or max(1, int(estimate_samples(views, mode) * epochs / grad_accum))
+    total_steps = schedule_steps or max_steps or max(1, int(estimate_samples(views, mode) * epochs / grad_accum))
 
     model = policy.model
     model.train()

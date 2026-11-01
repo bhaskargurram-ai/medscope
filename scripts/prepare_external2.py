@@ -42,8 +42,8 @@ SOURCES = {
             "questions": [("tumor", "Is there a tumor in this brain MRI slice?"),
                           ("abn", "Is there an abnormality in this brain MRI slice?")]},
     "siim": {"modality": "xray", "prefix": "siimext", "critical": True,
-             "questions": [("ptx", "Is there a pneumothorax in this chest X-ray?"),
-                           ("abn", "Is there an abnormality in this chest X-ray?")]},
+             # only the pneumothorax label is known: a "no pneumothorax" image may hold other findings
+             "questions": [("ptx", "Is there a pneumothorax in this chest X-ray?")]},
 }
 
 

@@ -57,10 +57,18 @@ class TestV4(unittest.TestCase):
             d = Path(d)
             views = build_views(make_case(d, "chestxdet1", 1), d / "v", np.random.default_rng(0))
             orig = views[0]
-            turns = build_trajectory(orig, np.random.default_rng(0), zoom_prob=1.0, window_prob=1.0)
-            self.assertIn('"name": "window"', turns[0].target)
-            self.assertIn('"name": "zoom"', turns[1].target)
+            turns = build_trajectory(orig, np.random.default_rng(0), zoom_prob=0.6, window_prob=1.0)
+            self.assertIn('"name": "window"', turns[0].target)          # window replaces the zoom
+            self.assertEqual(len(turns), 2)
             self.assertIn('"answer": "Yes"', turns[-1].target)
+            forced = build_trajectory(orig, np.random.default_rng(0), zoom_prob=1.0, window_prob=1.0)
+            self.assertIn('"name": "zoom"', forced[0].target)           # small lesions: always the zoom
+            from medscope.agent.trajectories import is_gray
+            img = np.full((8, 8, 3), 100, np.uint8)
+            img[..., 0] += 3                                              # inpainting leaves tiny channel differences
+            self.assertTrue(is_gray(img))
+            img[..., 2] = 200
+            self.assertFalse(is_gray(img))
             plain = build_trajectory(orig, np.random.default_rng(0), zoom_prob=0.0)
             self.assertEqual(len(plain), 1)
 

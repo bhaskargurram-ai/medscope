@@ -110,8 +110,11 @@ def window_for(img: np.ndarray, box) -> dict:
     return {"center": int(np.clip(np.median(g), 20, 235)), "width": int(np.clip(4 * g.std(), 40, 200))}
 
 
-def is_gray(img: np.ndarray) -> bool:
-    return img.ndim == 2 or (np.array_equal(img[..., 0], img[..., 1]) and np.array_equal(img[..., 1], img[..., 2]))
+def is_gray(img: np.ndarray, tol: int = 8) -> bool:
+    """Grey-scale content (CT, MRI, X-ray), allowing the small channel differences inpainting or JPEG leave."""
+    if img.ndim == 2:
+        return True
+    return int(np.abs(np.diff(img[..., :3].astype(np.int16), axis=-1)).max()) <= tol
 
 
 def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.6,
@@ -140,13 +143,16 @@ def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.
         emit(f"{reason} {_final(action='clarify', question=question)}")
         return samples
 
-    if (not direct_only) and window_prob > 0 and is_gray(img) and rng.random() < window_prob:
+    # a window call replaces the zoom (a zoom crops the unwindowed image); forced zooms (small lesions) stay zooms
+    windowed = ((not direct_only) and window_prob > 0 and zoom_prob < 1.0 and is_gray(img)
+                and rng.random() < window_prob)
+    if windowed:
         args = window_for(img, view.lesion_box)
         emit(f"{pick(ADJUST)} {_tool('window', **args)}")
         messages[-1] = assistant_message(tool_text(ToolCall("window", args)))
         messages.append(tool_result_message(env.call("window", args)))
 
-    zoom = (not direct_only) and view.lesion_box is not None and rng.random() < zoom_prob
+    zoom = (not direct_only) and not windowed and view.lesion_box is not None and rng.random() < zoom_prob
     if zoom:
         region = pad_box(view.lesion_box)
         emit(f"{pick(LOOK_CLOSER)} {_tool('zoom', box=region)}")

@@ -26,6 +26,11 @@ from medscope.data.loaders import extra  # noqa: E402
 from medscope.data.loaders.common import stable_index  # noqa: E402
 
 
+# sources split by patient: unused test-split patients give a clean fresh set (BUSI is split by near-copy groups,
+# so its leftover images could come from patients already in the test set)
+FRESH_SOURCES = ("chestxdet", "lgg")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True)
@@ -56,7 +61,7 @@ def main() -> None:
         # the split seed depends on the dataset name only, so preparing a subset gives the same splits
         splits = extra.split_and_cap(recs, seed=args.seed + stable_index(name, 1000),
                                      caps=extra.CAPS_V4 if args.v4 else None,
-                                     fresh=tuple(args.fresh) if args.v4 else None)
+                                     fresh=tuple(args.fresh) if args.v4 and name in FRESH_SOURCES else None)
         counts = extra.write_outputs(splits, out)
         lines += [f"{name} ({spec['repo']}): {dict(stats)}",
                   f"{name} labels: {dict(__import__('collections').Counter(r.label for r in recs))}",

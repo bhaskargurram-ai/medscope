@@ -28,8 +28,9 @@ def v4_mix(views, args):
     from medscope.data.schema import ViewKind
     from medscope.train.sft import SMALL_LESION, lesion_fraction
     if args.paraphrase_prob > 0:
-        views = [paraphrase_view(v, TRAIN) if stable_index(v.case_id + "para", 1000) < 1000 * args.paraphrase_prob else v
-                 for v in views]
+        views = [paraphrase_view(v, TRAIN) if "#rft" not in v.view_id
+                 and stable_index(v.case_id + "para", 1000) < 1000 * args.paraphrase_prob else v
+                 for v in views]       # recorded episodes (#rft) keep the wording they were sampled with
     if args.balance_health:
         health = [v for v in views if (v.meta or {}).get("benchmark") and asks_health(v.question)]
         by = {a: [v for v in health if normalise_answer(v.answer) == a] for a in ("yes", "no")}
@@ -87,6 +88,9 @@ def main() -> None:
                     help="repeat 'absent' views (lesion erased, healthy images) until they are at least this share")
     ap.add_argument("--balance-health", action="store_true",
                     help="general-VQA replay: keep as many 'Is X healthy/normal?' questions answered Yes as No")
+    ap.add_argument("--schedule-steps", type=int, default=None,
+                    help="length of the learning-rate schedule (default: --max-steps, else the estimated steps); "
+                         "an ablation arm uses the main arm's, so both follow the same schedule")
     ap.add_argument("--hard-repeat", type=int, default=1,
                     help="rejection sampling: repeat episodes kept from views the model mostly failed this many times")
     args = ap.parse_args()
@@ -143,7 +147,8 @@ def main() -> None:
     print(f"trainable LoRA parameters: {trainable / 1e6:.1f}M")
     train_sft(policy, views, args.mode, args.out, epochs=args.epochs, lr=args.lr,
               grad_accum=args.grad_accum, max_steps=args.max_steps, save_every=args.save_every,
-              replays=replays, seed=args.seed, window_prob=args.window_prob, small_zoom=args.small_zoom)
+              replays=replays, seed=args.seed, window_prob=args.window_prob, small_zoom=args.small_zoom,
+              schedule_steps=args.schedule_steps)
 
 
 if __name__ == "__main__":

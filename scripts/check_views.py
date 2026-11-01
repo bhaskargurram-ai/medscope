@@ -54,8 +54,13 @@ def by_case(path: Path) -> dict[str, dict[str, dict]]:
     return groups
 
 
+def unedited(g: dict[str, dict]) -> dict | None:
+    """The unedited image of a case: its original view, or the image of a natural negative."""
+    return g.get("original") or g.get("natural_negative")
+
+
 def original_hashes(groups: dict[str, dict[str, dict]]) -> dict[str, int]:
-    return {cid: dhash(load_image(g["original"]["image_path"])) for cid, g in groups.items() if "original" in g}
+    return {cid: dhash(load_image(unedited(g)["image_path"])) for cid, g in groups.items() if unedited(g)}
 
 
 def dataset_key(case_id: str) -> str:
@@ -105,8 +110,8 @@ def main() -> None:
             ref_groups.update(by_case(Path(f)))
 
         def same_image(qid: str, rid: str) -> bool:
-            return correlation(load_image(groups[qid]["original"]["image_path"]),
-                               load_image(ref_groups[rid]["original"]["image_path"])) >= args.min_correlation
+            return correlation(load_image(unedited(groups[qid])["image_path"]),
+                               load_image(unedited(ref_groups[rid])["image_path"])) >= args.min_correlation
 
         dupes = near_duplicates(original_hashes({c: groups[c] for c in passed}),
                                 original_hashes(ref_groups), confirm=same_image)

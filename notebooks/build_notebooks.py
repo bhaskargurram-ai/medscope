@@ -1681,7 +1681,7 @@ VQA_VIEWS = f'{WORK}/vqa/views_vqa.jsonl'
 S1_ARGS = ("--views {TRAIN_V4} --negatives {TRAIN_NEG_V4} --mode agentic --subsample 16000 --window-prob 0.3 "
            "--small-zoom --oversample-small 2 --paraphrase-prob 0.5")
 S1_NOCF_ARGS = ("--views {TRAIN_V4_BASE} --negatives {TRAIN_NEG_V4} --kinds original natural_negative degraded "
-                "--epochs 3 --max-steps {S1_STEPS} --mode agentic --window-prob 0.3 --small-zoom --oversample-small 2 "
+                "--epochs 3 --max-steps {S1_STEPS} --schedule-steps {S1_TOTAL} --mode agentic --window-prob 0.3 --small-zoom --oversample-small 2 "
                 "--paraphrase-prob 0.5")
 
 
@@ -1716,10 +1716,22 @@ os.makedirs(V4, exist_ok=True)
         code(r"""
 !python scripts/prepare_extra.py --out {V4}/extra --cache {WORK}/raw/extra --v4
 !wc -l {V4}/extra/cases_*.jsonl {V4}/extra/negatives/*.jsonl
+# the existing test set must be untouched: same test cases and test negatives as notebook 07 made
+cid = lambda f: {json.loads(l)['case_id'] for l in open(f) if l.strip()}
+old_test, new_test = cid(f'{VX}/test/views_clean.jsonl'), cid(f'{V4}/extra/cases_test.jsonl')
+old_neg, new_neg = cid(f'{NEG_X}/views_negatives.jsonl'), cid(f'{V4}/extra/negatives/views_negatives.jsonl')
+if not (old_test <= new_test and old_neg == new_neg):
+    raise SystemExit(f'The re-split differs from notebook 07 (test cases kept: {len(old_test & new_test)}/{len(old_test)}, '
+                     f'negatives equal: {old_neg == new_neg}). The source data changed; stop and report this.')
+for split in ('train', 'validation', 'fresh'):
+    clash = cid(f'{V4}/extra/cases_{split}.jsonl') & (old_test | old_neg)
+    if clash:
+        raise SystemExit(f'{len(clash)} existing test cases ended up in the v4 {split} split; stop and report this.')
+print('split check passed: the existing test set is unchanged and disjoint from v4 train, validation and fresh')
 !python scripts/build_views.py --manifest {V4}/extra/cases_train.jsonl --out {V4}/views/train --inpainter lama --v4-degradations
 for split in ['validation', 'fresh']:
     !python scripts/build_views.py --manifest {V4}/extra/cases_{split}.jsonl --out {V4}/views/{split} --inpainter lama
-!python scripts/check_views.py --views {V4}/views/train/views.jsonl
+!python scripts/check_views.py --views {V4}/views/train/views.jsonl --dedup-against {TEST_VIEWS} {TEST_NEG}
 !python scripts/check_views.py --views {V4}/views/validation/views.jsonl --dedup-against {V4}/views/train/views_clean.jsonl {VIEWS}/train/views_clean.jsonl
 !python scripts/check_views.py --views {V4}/views/fresh/views.jsonl --dedup-against {V4}/views/train/views_clean.jsonl {VIEWS}/train/views_clean.jsonl
 """),
@@ -1736,7 +1748,10 @@ TRAIN_NEG_V4 = f'{NEG_HK}/views_negatives_train.jsonl {V4}/extra/negatives/views
         code(r"""
 !python scripts/prepare_external2.py --out {V4}/external2 --cache {WORK}/raw/external2 --cap 50
 !python scripts/build_views.py --manifest {V4}/external2/cases_test.jsonl --out {V4}/views_external2/test --inpainter lama
-!python scripts/check_views.py --views {V4}/views_external2/test/views.jsonl --dedup-against {V4}/views/train/views_clean.jsonl {VIEWS}/train/views_clean.jsonl {TEST_VIEWS}
+REF = f'{V4}/views/train/views_clean.jsonl {VIEWS}/train/views_clean.jsonl {TEST_VIEWS} {TEST_NEG} {TRAIN_NEG_V4}'
+!python scripts/check_views.py --views {V4}/views_external2/test/views.jsonl --dedup-against {REF}
+# lesion-free images of the fresh external set: drop near-copies of any training or test image (SIIM and ChestX-Det share NIH sources)
+!python scripts/dedup_negatives.py --negatives {V4}/external2/negatives/views_negatives_external.jsonl --against {REF}
 """),
         md("## 5. Examples, save to Drive and report"),
         code(r"""
@@ -1905,13 +1920,14 @@ for tag, p, m in FLAGSHIPS:
         md("## 5. Robustness analyses from stored results (CPU)"),
         code(f"""
 !python scripts/rescore_all.py --results {{RESULTS}} --pattern 'v4_final*'
+!python scripts/rescore_all.py --results {{RESULTS}} --pattern 'v2_*'      # every compared run judged by the same current rules
 JUDGES = {FRONTIER_RUNS!r}
 !python scripts/label_check.py consensus --views {{TEST_NEG}} --results {{RESULTS}} --judges {{' '.join(JUDGES)}} --min-votes 7 --runs v4_final_test {{' '.join(JUDGES)}} --ref v4_final_test --out {{RESULTS}}/label_check_v4
 RUNS = ['v4_final_test=MedScope v4', 'v4_final_notools_test=MedScope v4, tools off'] + [f'{{r}}={{r}}' for r in JUDGES]
 q = lambda xs: ' '.join(f'"{{x}}"' for x in xs)
 !python scripts/extra_analysis.py --results {{RESULTS}} --views {{TEST_VIEWS}} {{TEST_NEG}} --runs {{q(RUNS)}} --tool-runs {{q(RUNS[:1] + RUNS[2:])}} --out {{RESULTS}}/extra_analysis_v4.md > /dev/null
 INP_LIST = ' '.join(t for t in ['telea', 'transplant', 'diffusion'] if os.path.exists(f'{{INP}}/{{t}}/views.jsonl'))
-!python scripts/inpainter_summary.py --results {{RESULTS}} --inpainters {{INP_LIST}} --model 'MedScope v4=v4_final_test' --model 'gpt-6-astra=v2_gpt6astra_test' --model 'claude-opus-5-5=v2_claudeopus_test' --model 'gemini-4-argon=v2_gemini_test' --ref 'MedScope v4' --out {{RESULTS}}/inpainters_v4.md
+!python scripts/inpainter_summary.py --results {{RESULTS}} --inpainters {{INP_LIST}} --model 'MedScope v4=v4_final_test' --model 'gpt-6-astra=v2_gpt6astra_test' --model 'claude-opus-5-5=v2_claudeopus_test' --model 'gemini-4-argon=v2_gemini_test' --ref 'MedScope v4' --training-tools lama transplant --out {{RESULTS}}/inpainters_v4.md
 if os.path.exists(f'{{RESULTS}}/edit_guess_gemini/scores.jsonl'):
     !python scripts/clean_split.py --scores {{RESULTS}}/edit_guess_gemini/scores.jsonl --results {{RESULTS}} --runs {{' '.join(r.split('=')[0] + '=' + r.split('=')[1].replace(' ', '_') for r in RUNS)}} --out {{RESULTS}}/clean_split_v4.md
 """),
@@ -1956,8 +1972,9 @@ split over sessions. MedGemma needs `HF_TOKEN` with its terms accepted (https://
 """ + SECRETS_NOTE),
         code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
         code(r"""
-S1_STEPS = json.load(open(f'{ADAPTERS}/v4_s1/state.json'))['opt_step']     # the no-CF arms get exactly as many steps
-print('stage-1 steps:', S1_STEPS)
+_s1 = json.load(open(f'{ADAPTERS}/v4_s1/state.json'))
+S1_STEPS, S1_TOTAL = _s1['opt_step'], _s1['total_steps']    # the no-CF arms take as many steps on the same LR schedule
+print('stage-1 steps:', S1_STEPS, '| schedule length:', S1_TOTAL)
 def test_all(model, adapter, name):
     for split, views in (('test', f'{TEST_VIEWS} {TEST_NEG}'), ('ext', EXT_VIEWS), ('ext2', EXT2)):
         !python scripts/evaluate.py --model {model} --adapter {adapter} --views {views} --out {RESULTS}/{name}_{split} --name {name} --split {split}
@@ -1981,6 +1998,9 @@ for model, tag, arm, seed in JOBS:
             !python scripts/train_sft.py --model {{model}} {s1} --seed {{seed}} --out {{out}}
         else:
             !python scripts/train_sft.py --model {{model}} {nocf} --seed {{seed}} --out {{out}}
+    done = json.load(open(f'{{out}}/state.json'))['opt_step']
+    if abs(done - S1_STEPS) > 0.02 * S1_STEPS:
+        print(f'WARNING: {{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like')
     test_all(model, f'{{out}}/final', name)
 """),
         code(r"""

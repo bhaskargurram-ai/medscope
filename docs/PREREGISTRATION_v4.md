@@ -25,7 +25,11 @@ unchanged.
 - Confirmatory test sets that no model has been evaluated on before v4 is selected:
   - **fresh internal**: unused images of test-split patients not in the existing test set (ChestX-Det, TCGA-LGG);
   - **fresh external**: new public sources not used anywhere before (colonoscopy, breast ultrasound, brain MRI,
-    chest X-ray), see notebook 22 for the exact sources.
+    chest X-ray): ETIS-LaribPolypDB (lesion images only), BUS-UCLM (no calipers/Doppler), BraTS 2023 meningioma
+    (no TCGA subjects) and SIIM-ACR pneumothorax (asked only about pneumothorax, the one label it has); near-copies
+    of any training or existing test image are removed, lesion-free images included.
+  - Before anything is built, notebook 22 checks that the existing test cases and negatives are unchanged and
+    absent from the v4 training, validation and fresh splits, and stops otherwise.
 
 ## Training (notebook 23)
 
@@ -56,4 +60,7 @@ on every test set (notebook 24); no further v4 variant is trained after any v4 t
 
 Every MedScope claim in the paper comes from the single selected v4 model, on every test set. Earlier
 checkpoints appear only as training history. Ablations (without counterfactual views), training seeds and the
-second base model use the v4 stage-1 recipe and are compared like-for-like at stage 1 (notebook 25).
+second base model use the v4 stage-1 recipe and are compared like-for-like at stage 1 (notebook 25): the arm
+without counterfactual views takes the same number of optimiser steps on the same learning-rate schedule. Seeds
+change LoRA initialisation, data order and trajectory randomness; the 16,000-view training draw is the same for
+every seed.

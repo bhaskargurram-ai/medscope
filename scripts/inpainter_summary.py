@@ -48,6 +48,7 @@ def main() -> None:
     ap.add_argument("--inpainters", nargs="+", required=True)
     ap.add_argument("--model", action="append", required=True, help='"label=LaMa run name"')
     ap.add_argument("--ref", required=True, help="label of the model compared with every other one")
+    ap.add_argument("--training-tools", nargs="+", default=["lama"], help="inpainting tools the reference model trained on")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
     res = Path(args.results)
@@ -65,8 +66,9 @@ def main() -> None:
     cases = set.intersection(*[{o.case_id for o in v} for v in outs.values()]) if outs else set()
     outs = {k: [o for o in v if o.case_id in cases] for k, v in outs.items()}
 
-    lines = [f"Edited views only, on the {len(cases)} cases every run covers. LaMa made every training and "
-             "main-test view; the other tools were never seen in training.", "",
+    seen = ", ".join(args.training_tools)
+    lines = [f"Edited views only, on the {len(cases)} cases every run covers. Tools used in training: {seen}; "
+             "every other tool was never seen in training.", "",
              "| Model | " + " | ".join(f"{n}: " + " / ".join(present) for _, n in SHOW) + " |",
              "| --- | " + " | ".join("---" for _ in SHOW) + " |"]
     for label, _ in models:
