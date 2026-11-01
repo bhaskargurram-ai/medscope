@@ -11,7 +11,9 @@ pair case by case with the LaMa runs.
 
 Inpainters: telea (OpenCV, classical), transplant (tissue copied from elsewhere in the same image,
 Poisson-blended), diffusion (Stable Diffusion inpainting; needs a GPU and `pip install diffusers`).
-A case is dropped (both views) if either edit cannot be made; reruns skip finished images.
+A case is dropped (both views) if either edit cannot be made, or if it fails the same automatic check the
+LaMa views passed (the lesion no longer stands out from its surroundings; the control leaves the lesion
+untouched), so an incomplete erasure is never scored as a hallucination. Reruns skip finished images.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from medscope.data.counterfactual import dilate, telea_inpaint  # noqa: E402
 from medscope.data.inpaint import diffusion_inpaint, transplant_inpaint  # noqa: E402
 from medscope.data.loaders.common import stable_index  # noqa: E402
+from medscope.data.quality import check_case  # noqa: E402
 from medscope.data.schema import View, ViewKind, box_to_pixels  # noqa: E402
 from medscope.data.views import load_image  # noqa: E402
 from medscope.eval.runner import load_views  # noqa: E402
@@ -109,14 +112,29 @@ def main() -> None:
             dropped.append({"case_id": case, "reason": "lesion-erased or control view missing"})
             continue
         try:
-            kept += [remake(d[k], args.inpainter, out) for k in EDITED]
+            pair = [remake(d[k], args.inpainter, out) for k in EDITED]
+            meta = d[ViewKind.TARGET_REMOVAL].meta
+            original = load_image(meta["original_image"])
+            lesion = _load_mask(meta["lesion_mask"], original.shape[:2])
+            qc = check_case(case, original, load_image(pair[0].image_path), load_image(pair[1].image_path),
+                            lesion, edit_mask(d[ViewKind.RANDOM_REMOVAL], lesion))
+            if not qc.passed:
+                reason = "lesion still stands out after erasure" if not qc.lesion_removed else "control touched the lesion"
+                dropped.append({"case_id": case, "reason": reason, "contrast_before": round(qc.contrast_before, 3),
+                                "contrast_after": round(qc.contrast_after, 3)})
+                continue
+            kept += pair
         except (ValueError, KeyError, OSError) as exc:
             dropped.append({"case_id": case, "reason": str(exc)})
         if (i + 1) % 25 == 0:
             print(f"  {i + 1}/{len(by_case)} cases", flush=True)
     (out / "views.jsonl").write_text("".join(json.dumps(v.to_dict()) + "\n" for v in kept))
     (out / "dropped.jsonl").write_text("".join(json.dumps(r) + "\n" for r in dropped))
-    print(f"{args.inpainter}: {len(kept) // 2} cases remade ({len(kept)} views), {len(dropped)} dropped; {out / 'views.jsonl'}")
+    from collections import Counter
+    why = Counter(r["reason"] if r["reason"] in ("lesion still stands out after erasure", "control touched the lesion")
+                  else "edit could not be made" for r in dropped)
+    print(f"{args.inpainter}: {len(kept) // 2} of {len(by_case)} cases kept ({len(kept)} views); dropped: {dict(why)}; "
+          f"{out / 'views.jsonl'}")
 
 
 if __name__ == "__main__":
