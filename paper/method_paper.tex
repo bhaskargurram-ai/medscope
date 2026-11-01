@@ -34,7 +34,7 @@
 \begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title=Draft status (remove before submission),fonttitle=\bfseries\small]
 \small
 All experiments are complete; every number below comes from the evaluation runs of 31 October 2026 and is
-regenerated from stored per-view transcripts by one script. Remaining: training seeds (notebook 18, running) and the funding statement. Adapters and benchmark are uploaded as private Hugging Face repositories.
+regenerated from stored per-view transcripts by one script. Remaining: training seeds 1--2 (notebook 18, running; seed 1 with counterfactual views done). Adapters and benchmark are uploaded as private Hugging Face repositories.
 \end{tcolorbox}
 
 \begin{abstract}
@@ -471,6 +471,12 @@ Counterfactual lesion erasure with an edit-matched control turns ``does the mode
 
 \paragraph{Data and code availability.} Code, view-building recipes, benchmark, per-view transcripts of every run and model weights: \url{https://github.com/bhaskargurram-ai/medscope}; adapters at \url{https://huggingface.co/bhaskar-ai/MedScope-4B} and \url{https://huggingface.co/bhaskar-ai/MedScope-4B-R}; benchmark manifests and all evaluation runs at \url{https://huggingface.co/datasets/bhaskar-ai/MedScope-Bench} (made public on submission). MedScope is a research model, not a medical device.
 
+\paragraph{Funding.} This research received no external funding.
+
+\paragraph{Competing interests.} The author declares no competing interests.
+
+\paragraph{Ethics.} Only public, de-identified datasets were used under their published licences; no new human data were collected, so no ethics approval was required.
+
 \begin{thebibliography}{99}\small
 \bibitem{llavamed} C.~Li et al. LLaVA-Med: Training a large language-and-vision assistant for biomedicine in one day. \emph{NeurIPS Datasets and Benchmarks}, 2023.
 \bibitem{huatuo} J.~Chen et al. HuatuoGPT-Vision: Towards injecting medical visual knowledge into multimodal LLMs at scale. \emph{EMNLP}, 2024.
@@ -585,7 +591,7 @@ Item & Section & Requirement & Where addressed \\
 41 & Discussion & Implications for practice & Sec.~6; research model, not for clinical use \\
 42 & Other & Protocol / technical details & Released notebooks, code and results log \\
 43 & Other & Availability of software, model, data & Data and code availability statement; Hugging Face adapters and MedScope-Bench \\
-44 & Other & Funding & No external funding; the author performed all work independently \pend{confirm} \\
+44 & Other & Funding & No external funding; the author performed all work independently \\
 \bottomrule
 \end{longtable}}
 \end{document}

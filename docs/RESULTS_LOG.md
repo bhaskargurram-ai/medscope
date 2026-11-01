@@ -613,3 +613,19 @@ utility stay at p<=0.001. Healthy-image claims vs v3: argon better (p=0.002), Fa
 other five frontier models worse.
 Released privately on Hugging Face: bhaskar-ai/MedScope-4B, bhaskar-ai/MedScope-4B-R (LoRA adapters with model cards)
 and datasets/bhaskar-ai/MedScope-Bench (view manifests without images, every evaluation run).
+
+## 2026-11-01 — Training seeds (notebook 18, partial)
+
+Stage-1 SFT with counterfactual views, seed 1 (`v2_sft_v2_s1_*`), compared with seed 0 (`v2_sft_v2_*`):
+
+| Split | Seed | CCR | ESG | Erased-lesion claims | Healthy-image claims | Net utility |
+| --- | --- | --- | --- | --- | --- | --- |
+| Internal | 0 | 0.877 | 0.758 | 11.9% | 8.7% | 0.760 |
+| Internal | 1 | 0.881 | 0.726 | 15.5% | 16.3% | 0.680 |
+| External | 0 | 0.761 | 0.655 | 10.9% | 8.0% | 0.519 |
+| External | 1 | 0.727 | 0.630 | 10.1% | 10.0% | 0.493 |
+
+The counterfactual effect replicates (seed-0 no-CF: ESG 0.402, erased 53.0%). Healthy-image claims on the internal
+test vary with the seed (8.7% vs 16.3%), so the paper reports mean ± sd over seeds. Seeds without CF and seed 2 pending.
+
+Declarations added to the method paper: no external funding, no competing interests, public de-identified data only.
