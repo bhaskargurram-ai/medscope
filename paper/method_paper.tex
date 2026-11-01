@@ -26,7 +26,7 @@
 
 \title{\textbf{Seeing Is Not Believing: Counterfactual Lesion Erasure Teaches a Small Medical Vision--Language Agent to Report Only What the Image Shows}}
 \author{Bhaskar Gurram\\ \small Independent researcher \quad \texttt{github.com/bhaskargurram-ai/medscope}}
-\date{\small Draft v0.4, 1 November 2026 --- method paper}
+\date{\small Draft v0.5, 1 November 2026 --- method paper}
 
 \begin{document}
 \maketitle
@@ -34,10 +34,7 @@
 \begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title=Draft status (remove before submission),fonttitle=\bfseries\small]
 \small
 All experiments are complete; every number below comes from the evaluation runs of 31 October 2026 and is
-regenerated from stored per-view transcripts by one script. Remaining items, marked \pend{\dots}: a manual check of
-about 20 SLAKE ``healthy'' labels; Hugging Face links; optional extra training seeds (notebook 18). The CLAIM 2024 checklist is in Appendix~\ref{app:claim}. Changes from v0.1: nine frontier models on the full test set; rescored open baselines; their native-prompt
-runs; tools-off, cautious-prompt, edit-visibility, lesion-size and cost-matrix analyses; frontier models at the
-external centres; real example figure; corrected and extended references.
+regenerated from stored per-view transcripts by one script. Remaining: training seeds (notebook 18, running) and the funding statement. Adapters and benchmark are uploaded as private Hugging Face repositories.
 \end{tcolorbox}
 
 \begin{abstract}
@@ -376,6 +373,7 @@ gemini-4-argon & 0.950 & 0.370 & 58.8 & 18.0 & 0.544 \\
 \paragraph{Is it the prompt? A cautious prompt for frontier models.} Adding an explicit warning that the question may name an absent finding lowers erased-lesion claims for gpt-6-astra (52.9\% $\to$ 47.1\%, $p=0.031$) and Claude Opus 5.5 (54.4\% $\to$ 44.1\%, $p=0.016$, at a cost in CCR) and not for gemini-4-argon (41.2\% $\to$ 42.6\%), on the same 150 cases. MedScope remains better than each cautious model by 29--34 points ($p<0.001$; Table~\ref{tab:robust}b).
 \paragraph{Is it the tools?} With every tool call refused at test time, ESG stays at 0.70--0.73 (paired change not significant), while CCR and net utility fall (final model: CCR $-0.098$, net $-0.114$, $p<0.001$; Table~\ref{tab:robust}c). Evidence sensitivity comes from training; the tools add accuracy on real lesions. MedScope makes 0.93--0.94 zoom calls per lesion view and its first zoom covers the lesion in 96--98\% of them; on erased views it zooms less (0.59--0.67 calls per view), 87--88\% of first zooms landing on the erased site. It never uses windowing. Of the frontier models, gpt-6-astra almost never calls a tool (0.01--0.07 calls per view), and Claude Sonnet 5.5 calls most (0.6--1.4).
 \paragraph{Is it the cost matrix?} The trivial always-refer policy earns $+0.110$ under the published matrix, a weakness of that matrix; with referral on lesion-free images paid 0 it earns $-0.118$, and $-0.300$ when referral costs $-0.3$ everywhere. the MedScope checkpoints rank first among all models under every one of five matrices (wrong-answer penalty $-2$, $-1$, $-0.5$; referral rewards as above), and the strict ESG equals the ESG within 0.005 for every model, since referral is rare.
+\paragraph{Is it label noise?} Without human review, we used the nine frontier models as an independent panel: a lesion-free test image that at least seven of them call abnormal is treated as a disputed label (26 of 288: 12 colonoscopy, 11 SLAKE, 2 breast ultrasound, 1 chest X-ray; MedScope does not vote). Without these images every model's healthy-image hallucination falls by 1--7 points, every comparison in Table~\ref{tab:paired} keeps its direction and significance, and against all nine frontier models the ESG, erased-lesion and net-utility differences remain at $p\le0.001$; MedScope's healthy-image claims become 13.0\% (MedScope-4B-R 7.3\%) against 4.6\% for gemini-4-argon and 10.3--24.4\% for the other frontier models.
 
 \begin{table}[t]
 \centering\footnotesize\setlength{\tabcolsep}{3.5pt}
@@ -464,14 +462,14 @@ The result is a gain in \emph{reliability}, not in perception: at external centr
 \item \textbf{Secondary signs.} Erasing a lesion can leave indirect signs (mass effect, oedema); for such views the expected ``absent'' answer is arguable for every model.
 \item \textbf{Single lesion per mask.} Target removal assumes the masked lesion is the only one; images with a second, unmasked lesion (Figure~\ref{fig:examples}, breast ultrasound) make the expected ``absent'' answer wrong for every model.
 \item \textbf{Diffuse findings and small lesions.} Erasing diffuse opacities is incomplete (QaTa-COV19 ESG 0.15), and the smallest lesions are hardest.
-\item \textbf{SLAKE regression} of the final model, and possible noise in SLAKE ``healthy'' labels. \pend{manual check of about 20 labels}
+\item \textbf{SLAKE regression} of the final model. Possible label noise in lesion-free images was examined with a model-consensus check (Section~\ref{sec:robust}), not by human review.
 \item \textbf{2D slices}, a \textbf{single base model} and \textbf{a single training seed} \pend{optional: two more seeds}; frontier models with their default settings only.
 \end{itemize}
 
 \section{Conclusion}
 Counterfactual lesion erasure with an edit-matched control turns ``does the model report what the image shows?'' into a measurable and trainable property. Trained on such views without any human annotation, a 4B agent matches nine frontier models on real lesions and hallucinates erased findings three to four times less often, robustly to prompting and at four external centres, while keeping general medical VQA ability.
 
-\paragraph{Data and code availability.} Code, view-building recipes, benchmark, per-view transcripts of every run and model weights: \url{https://github.com/bhaskargurram-ai/medscope} \pend{Hugging Face links}. MedScope is a research model, not a medical device.
+\paragraph{Data and code availability.} Code, view-building recipes, benchmark, per-view transcripts of every run and model weights: \url{https://github.com/bhaskargurram-ai/medscope}; adapters at \url{https://huggingface.co/bhaskar-ai/MedScope-4B} and \url{https://huggingface.co/bhaskar-ai/MedScope-4B-R}; benchmark manifests and all evaluation runs at \url{https://huggingface.co/datasets/bhaskar-ai/MedScope-Bench} (made public on submission). MedScope is a research model, not a medical device.
 
 \begin{thebibliography}{99}\small
 \bibitem{llavamed} C.~Li et al. LLaVA-Med: Training a large language-and-vision assistant for biomedicine in one day. \emph{NeurIPS Datasets and Benchmarks}, 2023.
@@ -560,7 +558,7 @@ Item & Section & Requirement & Where addressed \\
 14 & Reference standard & Method to obtain the reference standard & Expert segmentation masks and labels of each dataset; expected answers derived by rule (Sec.~3.2) \\
 15 & Reference standard & Rationale for the reference standard & Sec.~3.2; limitations of mask-derived labels in Sec.~6 (single lesion per mask, secondary signs) \\
 16 & Reference standard & Source of annotations & Original dataset annotations (cited); no new annotators \\
-17 & Reference standard & Annotation of test set & Same automated derivation as training; manual label spot-check of SLAKE negatives (notebook 19) \\
+17 & Reference standard & Annotation of test set & Same automated derivation as training; model-consensus check of lesion-free labels (Sec.~5.5) \\
 18 & Reference standard & Inter/intrarater variability & Not applicable (no new annotation); source-dataset variability noted as a limitation \\
 19 & Data partitions & Assignment to partitions & Table~\ref{tab:data}; group/patient-level splits with planned sizes \\
 20 & Data partitions & Level of disjointness & Patient or near-duplicate group level; perceptual-hash deduplication across splits (Sec.~3.3) \\

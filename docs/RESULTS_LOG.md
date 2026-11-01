@@ -602,3 +602,14 @@ claude-opus-5-5 0.975 / 0.475 / 48.5% / 30% / 0.602; gemini-4-argon 0.970 / 0.42
 each: ESG +0.30 to +0.42 and erased claims -44 to -56 points (p<0.001); CCR -0.14 to -0.16 (p<0.001); net utility
 +0.152 vs astra (p=0.024), +0.040 vs opus (p=0.59), +0.027 vs argon (p=0.72). QaTa alone (20 cases): every model fails
 the erasure (MedScope erased claims 40%, frontier 80-100%).
+
+## 2026-11-01: label check by frontier consensus, release (notebook 19)
+
+Disputed labels (lesion-free test images called abnormal by >= 7 of 9 frontier models; MedScope does not vote):
+26 of 288 (colonoscopy 12/91, SLAKE 11/90, BUSI 2/15, ChestX-Det 1/50, LGG 0/42). Without them, healthy-image
+claims: MedScope v3 13.0% (from 14.6%), RFT 7.3%, gemini-4-argon 4.6%, other frontier 10.3-24.4%. Every paired
+comparison keeps its direction and significance; vs all nine frontier models ESG, erased-lesion claims and net
+utility stay at p<=0.001. Healthy-image claims vs v3: argon better (p=0.002), Fable/Opus/Sonnet not different, the
+other five frontier models worse.
+Released privately on Hugging Face: bhaskar-ai/MedScope-4B, bhaskar-ai/MedScope-4B-R (LoRA adapters with model cards)
+and datasets/bhaskar-ai/MedScope-Bench (view manifests without images, every evaluation run).
