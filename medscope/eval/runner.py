@@ -73,7 +73,7 @@ def evaluate(
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     outcomes_path, transcripts_path = out / "outcomes.jsonl", out / "transcripts.jsonl"
-    cfg = with_vocab(cfg, views)
+    cfg = cfg if "answer_vocab" in cfg else with_vocab(cfg, views)   # a subset may score with the full set's vocabulary
     meta = {**meta, "scoring": SCORING_VERSION}
 
     # Each result row carries a key of the exact view (question, edits, degradation) and the

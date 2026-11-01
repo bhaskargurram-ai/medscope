@@ -64,6 +64,9 @@ def main() -> None:
                          "plus four solved training examples before each case (needs --fewshot)")
     ap.add_argument("--fewshot", nargs="+", default=None,
                     help="training views and natural-negative files to draw the few-shot examples from")
+    ap.add_argument("--vocab-from", nargs="+", default=None,
+                    help="views files whose answers define the answer vocabulary (default: the evaluated views); "
+                         "use the full test set when evaluating a subset, so replies are judged identically")
     ap.add_argument("--tool-budget", type=int, default=None,
                     help="override the tool budget (0 = tools switched off: calls are refused)")
     args = ap.parse_args()
@@ -95,6 +98,10 @@ def main() -> None:
     meta = {"name": args.name, "model": args.model, "adapter": args.adapter, "split": args.split,
             "views_file": " ".join(args.views), "precision": precision}
     cfg = load_config()
+    if args.vocab_from:
+        from medscope.rewards import with_vocab
+        cfg = with_vocab(cfg, [v for f in args.vocab_from for v in load_views(f)])
+        meta["vocab_from"] = " ".join(args.vocab_from)
     if args.tool_budget is not None:
         cfg = {**cfg, "tools": {**cfg["tools"], "budget": args.tool_budget,
                                 "max_turns": args.tool_budget + 2 if args.tool_budget == 0 else None}}

@@ -38,7 +38,11 @@ def main() -> None:
         set_prompt(meta.get("prompt", "agent"))   # results are keyed by the prompt they were run with
         set_fewshot([], meta.get("fewshot", []))  # and by the few-shot examples, if any (ids suffice)
         old = json.loads(s.read_text())["metrics"]["net_utility"]["value"]
-        new = evaluate(None, views, cfg, s.parent, meta, log=lambda m: None)
+        run_cfg = cfg
+        if meta.get("vocab_from"):
+            from medscope.rewards import with_vocab
+            run_cfg = with_vocab(cfg, [v for f in meta["vocab_from"].split() for v in load_views(f)])
+        new = evaluate(None, views, run_cfg, s.parent, meta, log=lambda m: None)
         nu = new["metrics"]["net_utility"]["value"]
         print(f"{s.parent.name}: net utility {old:+.3f} -> {nu:+.3f}, "
               f"malformed {new['metrics']['malformed_rate']['value']:.3f}, plain prose {new['metrics']['free_text_rate']['value']:.3f}")

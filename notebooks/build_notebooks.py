@@ -1517,7 +1517,7 @@ Two questions a reviewer will ask:
 
 **Runs on any runtime and resumes.** On a CPU runtime (e.g. while notebook 18 holds the A100) it does everything
 except the diffusion views and the MedScope runs; run it again on a GPU afterwards to finish those. **Cost:** about
-$30 for the few-shot runs and about $16 per held-out tool for the frontier runs (about $80 in total; the estimate is
+$40 for the few-shot runs and about $16 per held-out tool for the frontier runs (about $90 in total; the estimate is
 printed before spending). gemini-4-argon's price doubles on 1 December, so run the API parts before then.
 Colab secrets: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (and `HF_TOKEN` on the GPU run).
 """),
@@ -1553,16 +1553,17 @@ display(_Img(f'{RESULTS}/figures/inpainters.png', width=900))
         md("## 2. Few-shot frontier models (cautious prompt + four solved training examples; same 150 cases)"),
         code(r"""
 for tag, p, m in FLAGSHIPS:
-    !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --prompt fewshot --fewshot {TRAIN_VIEWS} {TRAIN_NEG} --out {RESULTS}/v2_fewshot_{tag}_test --name {p}-{m}-fewshot --split test --batch-size 8 | tail -5
+    !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --prompt fewshot --fewshot {TRAIN_VIEWS} {TRAIN_NEG} --out {RESULTS}/v2_fewshot_{tag}_test --name {p}-{m}-fewshot --split test --batch-size 8
 """),
         md("## 3. MedScope on the held-out tools (GPU)"),
         code(f"""
 if HAVE_GPU:
     choice = json.load(open(f'{{ADAPTERS}}/final_choice.json'))
-    MODELS = [('medscope3', choice['adapter']), ('medscope', choice.get('previous_adapter', f'{{ADAPTERS}}/rft_train/final'))]
+    MODELS = [('medscope3', choice['adapter']), ('medscope', choice.get('previous_adapter', f'{{ADAPTERS}}/rft_train/final')),
+              ('sft_v2', f'{{ADAPTERS}}/sft_v2/final'), ('nocf', f'{{ADAPTERS}}/sft_nocf/final')]   # stage 1 with and without CF
     for t in READY:
         for tag, adapter in MODELS:
-            !python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{INP}}/{{t}}/views.jsonl --out {{RESULTS}}/v2_inp_{{t}}_{{tag}}_test --name {{tag}}-{{t}} --split test
+            !python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{INP}}/{{t}}/views.jsonl --vocab-from {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/v2_inp_{{t}}_{{tag}}_test --name {{tag}}-{{t}} --split test
 else:
     print('No GPU in this session: MedScope runs skipped. Rerun this notebook on an A100 after notebook 18.')
 """),
@@ -1578,12 +1579,12 @@ for t in READY:
 print(f'estimated cost of the frontier runs still to do: ${est:.0f}')
 for t in READY:
     for tag, p, m in FLAGSHIPS:
-        !python scripts/evaluate.py --api {p} --model {m} --views {INP}/{t}/views.jsonl --out {RESULTS}/v2_inp_{t}_{tag}_test --name {p}-{m}-{t} --split test --batch-size 8 | tail -5
+        !python scripts/evaluate.py --api {p} --model {m} --views {INP}/{t}/views.jsonl --vocab-from {TEST_VIEWS} {TEST_NEG} --out {RESULTS}/v2_inp_{t}_{tag}_test --name {p}-{m}-{t} --split test --batch-size 8
 """),
         md("## 5. Summary"),
         code(r"""
 INP_LIST = ' '.join(READY)
-!python scripts/inpainter_summary.py --results {RESULTS} --inpainters {INP_LIST} --model 'MedScope-4B=v2_medscope3_test' --model 'MedScope-4B-R=v2_medscope_test' --model 'gpt-6-astra=v2_gpt6astra_test' --model 'claude-opus-5-5=v2_claudeopus_test' --model 'gemini-4-argon=v2_gemini_test' --ref MedScope-4B --out {RESULTS}/inpainters.md
+!python scripts/inpainter_summary.py --results {RESULTS} --inpainters {INP_LIST} --model 'MedScope-4B=v2_medscope3_test' --model 'MedScope-4B-R=v2_medscope_test' --model 'Stage 1 with CF=v2_sft_v2_test' --model 'Stage 1 without CF=v2_nocf_test' --model 'gpt-6-astra=v2_gpt6astra_test' --model 'claude-opus-5-5=v2_claudeopus_test' --model 'gemini-4-argon=v2_gemini_test' --ref MedScope-4B --out {RESULTS}/inpainters.md
 """),
         publish("MedScope report - 20 fairness", """
     ('Held-out inpainting tools (edited views only)', read_text(f'{RESULTS}/inpainters.md')),
