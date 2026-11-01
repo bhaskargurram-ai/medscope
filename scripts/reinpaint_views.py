@@ -101,6 +101,8 @@ def main() -> None:
     ap.add_argument("--views", nargs="+", required=True, help="LaMa test views files")
     ap.add_argument("--inpainter", required=True, choices=["telea", "transplant", "diffusion"])
     ap.add_argument("--out", required=True)
+    ap.add_argument("--fraction", type=float, default=1.0,
+                    help="remake only this share of cases (chosen deterministically), e.g. 0.5 for training copies")
     ap.add_argument("--id-suffix", default="",
                     help="append to view ids (training copies made with a second tool, e.g. '#transplant')")
     args = ap.parse_args()
@@ -111,6 +113,8 @@ def main() -> None:
     for v in (v for f in args.views for v in load_views(f)):
         if v.kind in EDITED:
             by_case.setdefault(v.case_id, {})[v.kind] = v
+    if args.fraction < 1:
+        by_case = {c: d for c, d in by_case.items() if stable_index(c + "frac", 10 ** 6) < args.fraction * 10 ** 6}
     kept, dropped = [], []
     for i, (case, d) in enumerate(sorted(by_case.items())):
         if len(d) < 2:

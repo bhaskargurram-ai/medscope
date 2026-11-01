@@ -130,7 +130,12 @@ def negatives_by_domain(results_dir: str | Path, views_file: str | Path | None =
     return "\n".join(rows) if len(rows) > 2 else "(no natural-negative results yet)"
 
 
-DATASET_PREFIXES = (("cvcext", "External colonoscopy (CVC-ClinicDB)"),
+DATASET_PREFIXES = (("etisext", "Fresh external colonoscopy (ETIS-Larib)"),
+                    ("uclmext", "Fresh external breast ultrasound (BUS-UCLM)"),
+                    ("bratsmenext", "Fresh external brain MRI (BraTS meningioma)"),
+                    ("siimext", "Fresh external chest X-ray (SIIM pneumothorax)"),
+                    ("ins_", "Lesion insertion (training)"),
+                    ("cvcext", "External colonoscopy (CVC-ClinicDB)"),
                     ("qataext", "External chest X-ray (QaTa-COV19)"),
                     ("busbraext", "External breast ultrasound (BUS-BRA)"),
                     ("bratsext", "External brain MRI (BraTS-Africa)"),

@@ -648,3 +648,15 @@ Open questions a reviewer will ask, and the runs that answer them:
 Paper (draft v0.6): checkpoint use stated explicitly (stage-3 headline fixed before testing; RFT beside it
 everywhere; ablation and seeds at stage 1, where stage 1 alone already reaches ESG 0.758); abstract now states the
 healthy-image result (14.6% vs 9.0% for gemini-4-argon) and the external sensitivity/net-utility trade-off.
+
+## 2026-11-01 — Audit and v4 plan
+
+Two independent audits of every result, review and code path found that notebooks 18, 20 and 21 only measure
+weaknesses. v4 is trained to remove them; recipe and selection rule are pre-registered in
+docs/PREREGISTRATION_v4.md (committed before any v4 data or model existed). Every MedScope claim in the paper
+will come from the single selected v4 model, tested on every set (notebook 24); confirmation on a fresh internal
+test (unused test-split patients of ChestX-Det and TCGA-LGG) and a fresh external test (ETIS-Larib, BUS-UCLM,
+BraTS 2023 meningioma, SIIM pneumothorax) that no model was evaluated on before v4 was chosen.
+Notebook 20 fixes: re-made erasures pass the same quality check, failures stop the notebook, held-out runs use
+the full test's answer vocabulary, stage-1 arms also run on the held-out tools. Notebook 18 stopped after
+seed 1 (v4 redoes seeds with its own recipe). Notebook 21 superseded by notebook 25.

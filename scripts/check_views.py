@@ -67,7 +67,8 @@ def dataset_key(case_id: str) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--views", required=True)
-    ap.add_argument("--dedup-against", default=None, help="views.jsonl of another split (e.g. train)")
+    ap.add_argument("--dedup-against", nargs="+", default=None,
+                    help="views files of other splits (e.g. train); a case whose image near-copies one of theirs is dropped")
     ap.add_argument("--max-shortcut-auc", type=float, default=0.6)
     ap.add_argument("--no-filter-shortcut", dest="filter_shortcut", action="store_false",
                     help="only measure the shortcut AUC; don't drop the most detectable edits")
@@ -99,7 +100,9 @@ def main() -> None:
 
     dupes = {}
     if args.dedup_against:
-        ref_groups = by_case(Path(args.dedup_against))
+        ref_groups = {}
+        for f in args.dedup_against:
+            ref_groups.update(by_case(Path(f)))
 
         def same_image(qid: str, rid: str) -> bool:
             return correlation(load_image(groups[qid]["original"]["image_path"]),

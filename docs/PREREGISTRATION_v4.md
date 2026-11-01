@@ -17,7 +17,7 @@ unchanged.
 - More training images from the existing training splits (ChestX-Det, BUSI, TCGA-LGG: every image the training
   split holds instead of the first 500 lesion / 250 lesion-free per source). Test images unchanged.
 - Validation enlarged to 100 lesion and 100 lesion-free images per added source, from the validation split.
-- Every training erasure in two versions: LaMa and tissue transplant. **Telea and Stable Diffusion are never
+- Training erasures in two versions where possible: LaMa for every case and tissue transplant for half of them. **Telea and Stable Diffusion are never
   used in training or validation**; they are test-only (held-out tools).
 - Lesion-insertion views (training only): a real lesion moved into a healthy training image, answer "present".
 - Degraded training views drawn from a larger set (adds resolution-relative low resolution, JPEG, motion blur).
@@ -29,14 +29,16 @@ unchanged.
 
 ## Training (notebook 23)
 
-1. Stage 1: SFT from Qwen3.5-4B on the v4 data; windowing trajectories on 30% of grey-scale images; always zoom
+1. Stage 1: SFT from Qwen3.5-4B on the v4 data (16,000 views drawn at random from the pools, one pass); windowing trajectories on 30% of grey-scale images; always zoom
    on lesions under 2% of the image and repeat their cases twice; 50% of templated questions paraphrased.
-2. Stage 2: rejection sampling from stage 1 (k = 8, temperature 1.2; 300 views per kind, 600 lesion-free and
-   400 lesion-erased views), episodes from views the model mostly failed repeated 3 times.
-3. Stage 3: general-VQA replay from stage 2 with "absent" views at no less than 35% of the mix and
+2. Stage 2: rejection sampling from stage 1 (k = 4, temperature 1.2; 200 views per kind, 500 lesion-free and
+   300 lesion-erased views), episodes from views the model mostly failed (at most half of the k tries right)
+   repeated 3 times; trained on these plus 3,000 synthetic views at learning rate 5e-5.
+3. Stage 3: general-VQA replay from stage 2 (5,000 views, learning rate 5e-5) with "absent" views at no less than 35% of the mix and
    "Is X healthy/normal?" replay questions balanced between Yes and No.
 
-LoRA settings, learning rates and the vision encoder (frozen) are as in v3.
+Windowing trajectories, always-zoom on small lesions and 50% paraphrased questions apply to the synthetic
+trajectories of every stage. LoRA settings, learning rates and the vision encoder (frozen) are as in v3.
 
 ## Selection rule (fixed now)
 

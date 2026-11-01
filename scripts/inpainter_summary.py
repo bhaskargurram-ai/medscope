@@ -1,7 +1,7 @@
 """Held-out inpainters: does evidence sensitivity survive erasures made by a tool the model never saw?
 
 For each model, its LaMa run (the main test) and its runs on the same cases with the edited views
-remade by other inpainters (scripts/reinpaint_views.py; run names v2_inp_<inpainter>_<rest>). Only the
+remade by other inpainters (scripts/reinpaint_views.py; run names <prefix>_inp_<inpainter>_<rest>). Only the
 two edited views count: ESG, erased-lesion claims and denials after an edit elsewhere, on the cases
 every compared run has.
 
@@ -27,7 +27,11 @@ SHOW = [("esg", "ESG"), ("target_hallucination_rate", "Erased-lesion claims"),
 
 
 def run_name(base: str, inpainter: str) -> str:
-    return base if inpainter == "lama" else base.replace("v2_", f"v2_inp_{inpainter}_", 1)
+    """v2_medscope3_test -> v2_inp_telea_medscope3_test; v4_final_test -> v4_inp_telea_final_test."""
+    if inpainter == "lama":
+        return base
+    head, rest = base.split("_", 1)
+    return f"{head}_inp_{inpainter}_{rest}"
 
 
 def edited(outs):

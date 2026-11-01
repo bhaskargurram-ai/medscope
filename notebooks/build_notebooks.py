@@ -1645,6 +1645,359 @@ for arm in ('cf', 'nocf'):
     ]
 
 
+# ---------------------------------------------------------------------------------------------
+# v4: one model, trained to remove the audited weaknesses, selected on validation, tested on everything
+# ---------------------------------------------------------------------------------------------
+
+RESTORE_V4 = r"""
+# --- restore the v4 data built in notebook 22 ---
+V4 = f'{WORK}/v4'
+if not os.path.exists(f'{V4}/views/train/views_clean.jsonl'):
+    if not os.path.exists(f'{DRIVE}/v4/v4.tar'):
+        raise SystemExit('The v4 data is missing: run notebook 22 first.')
+    !tar -C {WORK} -xf {DRIVE}/v4/v4.tar
+TRAIN_V4_BASE = f'{VIEWS}/train/views_clean.jsonl {V4}/views/train/views_clean.jsonl'
+TRAIN_V4 = f'{TRAIN_V4_BASE} {V4}/train_tp/views.jsonl {V4}/inserted/views.jsonl'
+TRAIN_NEG_V4 = f'{NEG_HK}/views_negatives_train.jsonl {V4}/extra/negatives/views_negatives_train.jsonl'
+VAL_V4 = f'{VIEWS}/validation/views_clean.jsonl {V4}/views/validation/views_clean.jsonl'
+VAL_NEG_V4 = f'{NEG_HK}/views_negatives_val.jsonl {V4}/extra/negatives/views_negatives_val.jsonl'
+FRESH = f'{V4}/views/fresh/views_clean.jsonl {V4}/extra/negatives/views_negatives_fresh.jsonl'
+EXT2 = f'{V4}/views_external2/test/views_clean.jsonl {V4}/external2/negatives/views_negatives_external.jsonl'
+for name in ('TRAIN_V4', 'TRAIN_NEG_V4', 'VAL_V4', 'VAL_NEG_V4', 'FRESH', 'EXT2'):
+    files = globals()[name].split()
+    print(f'{name}: ' + ', '.join(f'{sum(1 for _ in open(f)) if os.path.exists(f) else "missing"}' for f in files))
+"""
+
+RESTORE_EVAL = r"""
+for tar, check in ((f'{DRIVE}/external/external.tar', f'{WORK}/views_external/test/views_clean.jsonl'),
+                   (f'{DRIVE}/external/vqa.tar', f'{WORK}/vqa/views_vqa.jsonl')):
+    if not os.path.exists(check):
+        !tar -C {WORK} -xf {tar}
+EXT_VIEWS = f'{WORK}/views_external/test/views_clean.jsonl {WORK}/external/negatives/views_negatives_external.jsonl'
+VQA_VIEWS = f'{WORK}/vqa/views_vqa.jsonl'
+"""
+
+# the pre-registered v4 stage-1 recipe (docs/PREREGISTRATION_v4.md); notebooks 23 and 25 use exactly this
+S1_ARGS = ("--views {TRAIN_V4} --negatives {TRAIN_NEG_V4} --mode agentic --subsample 16000 --window-prob 0.3 "
+           "--small-zoom --oversample-small 2 --paraphrase-prob 0.5")
+S1_NOCF_ARGS = ("--views {TRAIN_V4_BASE} --negatives {TRAIN_NEG_V4} --kinds original natural_negative degraded "
+                "--epochs 3 --max-steps {S1_STEPS} --mode agentic --window-prob 0.3 --small-zoom --oversample-small 2 "
+                "--paraphrase-prob 0.5")
+
+
+def nb22_v4_data() -> list[dict]:
+    return [
+        md("""
+# MedScope 22: v4 data
+
+Builds everything the v4 model is trained, selected and confirmed on (docs/PREREGISTRATION_v4.md):
+
+1. **More images** from the existing training splits of ChestX-Det, BUSI and TCGA-LGG (every training image instead
+   of the first 500), a **larger validation set** (100 + 100 per source) and a **fresh internal test set** from
+   test-split patients the existing test set does not use. The existing test images do not change.
+2. **A second inpainting tool in training**: tissue transplant for half of the training cases (LaMa for all).
+   Telea and Stable Diffusion stay unseen: they are test-only.
+3. **Lesion-insertion views** (training only): a real lesion moved into a healthy training image, answer "present".
+4. **A fresh external test set** from public sources never used before (see the report for which).
+
+New training views use the extended set of degradations; validation and test views use the original protocol.
+
+**Runtime:** A100 or L4 (LaMa), about 3-4 hours; downloads a few GB. Every step can be rerun.
+""" + SECRETS_NOTE),
+        code(SETUP),
+        code("!pip install -q huggingface_hub pyarrow nibabel"),
+        code(LAMA_CELL),
+        code(RESTORE_ALL),
+        code(r"""
+V4 = f'{WORK}/v4'
+os.makedirs(V4, exist_ok=True)
+"""),
+        md("## 1. More training and validation images, and a fresh internal test set"),
+        code(r"""
+!python scripts/prepare_extra.py --out {V4}/extra --cache {WORK}/raw/extra --v4
+!wc -l {V4}/extra/cases_*.jsonl {V4}/extra/negatives/*.jsonl
+!python scripts/build_views.py --manifest {V4}/extra/cases_train.jsonl --out {V4}/views/train --inpainter lama --v4-degradations
+for split in ['validation', 'fresh']:
+    !python scripts/build_views.py --manifest {V4}/extra/cases_{split}.jsonl --out {V4}/views/{split} --inpainter lama
+!python scripts/check_views.py --views {V4}/views/train/views.jsonl
+!python scripts/check_views.py --views {V4}/views/validation/views.jsonl --dedup-against {V4}/views/train/views_clean.jsonl {VIEWS}/train/views_clean.jsonl
+!python scripts/check_views.py --views {V4}/views/fresh/views.jsonl --dedup-against {V4}/views/train/views_clean.jsonl {VIEWS}/train/views_clean.jsonl
+"""),
+        md("## 2. Second inpainting tool for training (tissue transplant, half of the cases)"),
+        code(r"""
+!python scripts/reinpaint_views.py --views {VIEWS}/train/views_clean.jsonl {V4}/views/train/views_clean.jsonl --inpainter transplant --fraction 0.5 --id-suffix '#tp' --out {V4}/train_tp
+"""),
+        md("## 3. Lesion-insertion views (training only)"),
+        code(r"""
+TRAIN_NEG_V4 = f'{NEG_HK}/views_negatives_train.jsonl {V4}/extra/negatives/views_negatives_train.jsonl'
+!python scripts/insert_lesions.py --views {VIEWS}/train/views_clean.jsonl {V4}/views/train/views_clean.jsonl --negatives {TRAIN_NEG_V4} --out {V4}/inserted --max-per-dataset 300
+"""),
+        md("## 4. Fresh external test set (sources never used before)"),
+        code(r"""
+!python scripts/prepare_external2.py --out {V4}/external2 --cache {WORK}/raw/external2 --cap 50
+!python scripts/build_views.py --manifest {V4}/external2/cases_test.jsonl --out {V4}/views_external2/test --inpainter lama
+!python scripts/check_views.py --views {V4}/views_external2/test/views.jsonl --dedup-against {V4}/views/train/views_clean.jsonl {VIEWS}/train/views_clean.jsonl {TEST_VIEWS}
+"""),
+        md("## 5. Examples, save to Drive and report"),
+        code(r"""
+import matplotlib.pyplot as plt
+from PIL import Image
+from medscope.eval.runner import load_views
+ins = load_views(f'{V4}/inserted/views.jsonl')[:4]
+tp = [v for v in load_views(f'{V4}/train_tp/views.jsonl') if v.kind.value == 'target_removal'][:4]
+fig, axes = plt.subplots(2, 4, figsize=(12, 6), squeeze=False)
+for c, v in enumerate(ins):
+    axes[0, c].imshow(Image.open(v.image_path)); axes[0, c].set_title('inserted: ' + v.question[:30], fontsize=7)
+for c, v in enumerate(tp):
+    axes[1, c].imshow(Image.open(v.image_path)); axes[1, c].set_title('transplant erasure', fontsize=7)
+for ax in axes.flat:
+    ax.axis('off')
+plt.tight_layout(); plt.savefig(f'{RESULTS}/22_examples.png', dpi=80)
+os.makedirs(f'{DRIVE}/v4', exist_ok=True)
+!tar -C {WORK} -cf {DRIVE}/v4/v4.tar v4
+!du -sh {DRIVE}/v4/v4.tar
+def quality(path):
+    r = json.load(open(path))
+    r.pop('cases', None); r.pop('filtered', None)
+    return json.dumps(r, indent=2)
+"""),
+        publish("MedScope report - 22 v4 data", """
+    ('Datasets (more training images, larger validation, fresh internal test)', read_text(f'{V4}/extra/extra_report.txt')),
+    ('Quality: v4 training views', quality(f'{V4}/views/train/quality_report.json')),
+    ('Quality: v4 validation views', quality(f'{V4}/views/validation/quality_report.json')),
+    ('Quality: fresh internal test', quality(f'{V4}/views/fresh/quality_report.json')),
+    ('Fresh external sources', read_text(f'{V4}/external2/external_report.txt')),
+    ('Quality: fresh external test', quality(f'{V4}/views_external2/test/quality_report.json')),
+"""),
+    ]
+
+
+def nb23_v4_train() -> list[dict]:
+    s1 = S1_ARGS
+    return [
+        md(f"""
+# MedScope 23: train MedScope v4 and select it on validation
+
+The recipe and the selection rule were fixed before training (docs/PREREGISTRATION_v4.md):
+
+1. **Stage 1** (SFT from `{BASE}`): v4 data, windowing trajectories, always zoom on small lesions (and repeat them),
+   paraphrased questions.
+2. **Stage 2** (rejection sampling): more tries on healthy and lesion-erased images, higher temperature, episodes
+   from views the model mostly failed repeated.
+3. **Stage 3** (general-VQA replay): at least 35% "absent" targets, health questions balanced Yes/No.
+
+Each stage is checked on the v4 validation set; `scripts/select_v4.py` applies the pre-registered rule. **No test
+set is touched here.**
+
+**Runtime:** A100, about 12-14 hours in total; every step resumes, so it can be split over sessions.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4),
+        md("## Stage 1"),
+        code(f"""
+!python scripts/train_sft.py --model {BASE} {s1} --out {{ADAPTERS}}/v4_s1
+!python scripts/evaluate.py --model {BASE} --adapter {{ADAPTERS}}/v4_s1/final --views {{VAL_V4}} {{VAL_NEG_V4}} --out {{RESULTS}}/v4_s1_val --name v4-stage1 --split validation
+"""),
+        md("## Stage 2: rejection sampling"),
+        code(f"""
+!python scripts/sample_rft.py --model {BASE} --adapter {{ADAPTERS}}/v4_s1/final --views {{TRAIN_V4}} --negatives {{TRAIN_NEG_V4}} --per-kind 200 --per-kind-override natural_negative=500 target_removal=300 --k 4 --temperature 1.2 --out {{ADAPTERS}}/v4_rft/samples.jsonl
+!python scripts/train_sft.py --model {BASE} --init {{ADAPTERS}}/v4_s1/final --views {{TRAIN_V4}} --negatives {{TRAIN_NEG_V4}} --subsample 3000 --replays {{ADAPTERS}}/v4_rft/samples.jsonl --hard-repeat 3 --lr 5e-5 --mode agentic --window-prob 0.3 --small-zoom --paraphrase-prob 0.5 --out {{ADAPTERS}}/v4_s2
+!python scripts/evaluate.py --model {BASE} --adapter {{ADAPTERS}}/v4_s2/final --views {{VAL_V4}} {{VAL_NEG_V4}} --out {{RESULTS}}/v4_s2_val --name v4-stage2 --split validation
+"""),
+        md("## Stage 3: general-VQA replay, negatives-aware"),
+        code(f"""
+REPLAY = f'{{DRIVE}}/external/vqa_train/views_vqa_train.jsonl'
+if not os.path.exists(REPLAY):
+    raise SystemExit('The replay set is missing: it was built in notebook 15.')
+!python scripts/train_sft.py --model {BASE} --init {{ADAPTERS}}/v4_s2/final --views {{TRAIN_V4}} {{REPLAY}} --negatives {{TRAIN_NEG_V4}} --subsample 5000 --lr 5e-5 --mode agentic --min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5 --out {{ADAPTERS}}/v4_s3
+!python scripts/evaluate.py --model {BASE} --adapter {{ADAPTERS}}/v4_s3/final --views {{VAL_V4}} {{VAL_NEG_V4}} --out {{RESULTS}}/v4_s3_val --name v4-stage3 --split validation
+"""),
+        md("## Pre-registered selection"),
+        code(r"""
+!python scripts/select_v4.py --results {RESULTS} --adapters {ADAPTERS} --out {ADAPTERS}/final_choice_v4.json
+"""),
+        publish("MedScope report - 23 v4 training", """
+    ('Selection (pre-registered rule)', read_text(f'{ADAPTERS}/final_choice_v4.json')),
+    ('Stage 1 training loss', train_log_summary(f'{ADAPTERS}/v4_s1/train_log.jsonl', window=20)),
+    ('Rejection sampling', read_text(f'{ADAPTERS}/v4_rft/rft_summary.md')),
+    ('Validation by imaging type', by_dataset(RESULTS, ['v4_s1_val', 'v4_s2_val', 'v4_s3_val'])),
+    ('Validation: stage 3 vs stage 2 (paired)', significance_table(RESULTS, 'v4_s3_val', ['v4_s2_val', 'v4_s1_val'])),
+"""),
+    ]
+
+
+def nb24_v4_eval() -> list[dict]:
+    flag_runs = [f"v2_{t}_test" for t, _, _ in FLAGSHIP_TAGS]
+    base_runs = [b[0] for b in BASELINES]
+    open_rows = "\n".join(f"    ({out.replace('v2_', '').replace('_test', '')!r}, {name!r}, {model!r})," for out, name, model in BASELINES)
+    return [
+        md("""
+# MedScope 24: the selected v4 model on every test
+
+One adapter (from `final_choice_v4.json`, chosen on validation by the pre-registered rule) is tested on:
+
+| Test | What it answers |
+| --- | --- |
+| Main test (507 cases) | the benchmark, paired against all 9 frontier and 6 open models already run |
+| External centres (169 cases) | other institutions |
+| **Fresh internal and fresh external tests** | confirmation on images no model was evaluated on before v4 was chosen |
+| Three standard VQA benchmarks | general medical VQA |
+| Erasures by Telea and Stable Diffusion (never in training), and by transplant | the inpainting-tool shortcut |
+| Questions in wordings never used in training | template shortcut |
+| Tools switched off | where the gain comes from |
+| Few-shot and cautious-prompt frontier runs (notebooks 17, 20) | fair comparison |
+| Label-noise check, cost matrices, lesion size, tool use, clean-looking erasures | robustness |
+
+The three frontier flagships and the six open models are also run on the two fresh test sets.
+
+**Runtime:** A100, about 10-12 hours for the GPU parts; API about $40-60. Run notebook 20 first (it builds the
+held-out-tool views). Every step resumes.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code("!pip install -q -U openai anthropic google-genai"),
+        code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(f"""
+for name in ('OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY'):
+    if secret(name):
+        os.environ[name] = secret(name)
+FLAGSHIPS = {FLAGSHIP_TAGS!r}
+FLAGSHIPS = [f for f in FLAGSHIPS if os.environ.get({{'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}}[f[1]])]
+choice = json.load(open(f'{{ADAPTERS}}/final_choice_v4.json'))
+FINAL = choice['adapter']
+print('v4 final model:', choice['chosen'], FINAL)
+INP = f'{{DRIVE}}/inpaint_test'
+"""),
+        md("## 1. The v4 model on every test set"),
+        code(f"""
+SETS = [('test', f'{{TEST_VIEWS}} {{TEST_NEG}}', ''), ('ext', EXT_VIEWS, ''), ('fresh', FRESH, ''), ('ext2', EXT2, ''),
+        ('vqa', VQA_VIEWS, ''), ('notools_test', f'{{TEST_VIEWS}} {{TEST_NEG}}', '--tool-budget 0')]
+for split, views, extra in SETS:
+    !python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{views}} {{extra}} --out {{RESULTS}}/v4_final_{{split}} --name medscope-v4 --split {{split}}
+"""),
+        md("## 2. Held-out inpainting tools and held-out question wordings"),
+        code(f"""
+for t in ['telea', 'transplant', 'diffusion']:
+    if os.path.exists(f'{{INP}}/{{t}}/views.jsonl'):
+        !python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{INP}}/{{t}}/views.jsonl --vocab-from {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/v4_inp_{{t}}_final_test --name medscope-v4-{{t}} --split test
+    else:
+        print(f'{{t}}: views missing, run notebook 20 first')
+PARA = f'{{V4}}/paraphrase/views.jsonl'
+!python scripts/paraphrase_views.py --views {{TEST_VIEWS}} {{TEST_NEG}} --out {{PARA}}
+!python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{PARA}} --vocab-from {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/v4_final_para_test --name medscope-v4-paraphrase --split test
+"""),
+        md("## 3. Open models on the fresh test sets (GPU)"),
+        code(f"""
+OPEN = [
+{open_rows}
+]
+for tag, name, model in OPEN:
+    for split, views in (('fresh', FRESH), ('ext2', EXT2)):
+        try:
+            !python scripts/evaluate.py --model {{model}} --views {{views}} --out {{RESULTS}}/v2_{{tag}}_{{split}} --name {{name}} --split {{split}}
+        except SystemExit:
+            print(f'{{name}} failed on {{split}}: see above')
+"""),
+        md("## 4. Frontier flagships on the fresh test sets and the held-out wordings (API)"),
+        code(r"""
+for tag, p, m in FLAGSHIPS:
+    for split, views in (('fresh', FRESH), ('ext2', EXT2)):
+        !python scripts/evaluate.py --api {p} --model {m} --views {views} --out {RESULTS}/v2_{tag}_{split} --name {p}-{m} --split {split} --batch-size 8
+    !python scripts/evaluate.py --api {p} --model {m} --views {PARA} --vocab-from {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --out {RESULTS}/v2_para_{tag}_test --name {p}-{m}-paraphrase --split test --batch-size 8
+"""),
+        md("## 5. Robustness analyses from stored results (CPU)"),
+        code(f"""
+!python scripts/rescore_all.py --results {{RESULTS}} --pattern 'v4_final*'
+JUDGES = {FRONTIER_RUNS!r}
+!python scripts/label_check.py consensus --views {{TEST_NEG}} --results {{RESULTS}} --judges {{' '.join(JUDGES)}} --min-votes 7 --runs v4_final_test {{' '.join(JUDGES)}} --ref v4_final_test --out {{RESULTS}}/label_check_v4
+RUNS = ['v4_final_test=MedScope v4', 'v4_final_notools_test=MedScope v4, tools off'] + [f'{{r}}={{r}}' for r in JUDGES]
+q = lambda xs: ' '.join(f'"{{x}}"' for x in xs)
+!python scripts/extra_analysis.py --results {{RESULTS}} --views {{TEST_VIEWS}} {{TEST_NEG}} --runs {{q(RUNS)}} --tool-runs {{q(RUNS[:1] + RUNS[2:])}} --out {{RESULTS}}/extra_analysis_v4.md > /dev/null
+INP_LIST = ' '.join(t for t in ['telea', 'transplant', 'diffusion'] if os.path.exists(f'{{INP}}/{{t}}/views.jsonl'))
+!python scripts/inpainter_summary.py --results {{RESULTS}} --inpainters {{INP_LIST}} --model 'MedScope v4=v4_final_test' --model 'gpt-6-astra=v2_gpt6astra_test' --model 'claude-opus-5-5=v2_claudeopus_test' --model 'gemini-4-argon=v2_gemini_test' --ref 'MedScope v4' --out {{RESULTS}}/inpainters_v4.md
+if os.path.exists(f'{{RESULTS}}/edit_guess_gemini/scores.jsonl'):
+    !python scripts/clean_split.py --scores {{RESULTS}}/edit_guess_gemini/scores.jsonl --results {{RESULTS}} --runs {{' '.join(r.split('=')[0] + '=' + r.split('=')[1].replace(' ', '_') for r in RUNS)}} --out {{RESULTS}}/clean_split_v4.md
+"""),
+        publish("MedScope report - 24 v4 everywhere", f"""
+    ('Main test: v4 vs every model (paired)', significance_table(RESULTS, 'v4_final_test', {FRONTIER_RUNS + base_runs + ['v2_medscope3_test', 'v2_medscope_test']!r})),
+    ('Main test by imaging type', by_dataset(RESULTS, ['v4_final_test', 'v2_medscope3_test'] + {flag_runs!r})),
+    ('External centres: v4 vs flagships and open models (paired)', significance_table(RESULTS, 'v4_final_ext', {[r.replace('_test', '_ext') for r in flag_runs + base_runs] + ['v2_medscope3_ext']!r})),
+    ('Fresh internal test (confirmatory)', significance_table(RESULTS, 'v4_final_fresh', {[r.replace('_test', '_fresh') for r in flag_runs] + [f"v2_{b[0].replace('v2_', '').replace('_test', '')}_fresh" for b in BASELINES]!r})),
+    ('Fresh external test (confirmatory)', significance_table(RESULTS, 'v4_final_ext2', {[r.replace('_test', '_ext2') for r in flag_runs] + [f"v2_{b[0].replace('v2_', '').replace('_test', '')}_ext2" for b in BASELINES]!r})),
+    ('Fresh external by source', by_dataset(RESULTS, ['v4_final_ext2'] + {[r.replace('_test', '_ext2') for r in flag_runs]!r})),
+    ('Standard VQA', vqa_table(RESULTS, ['v4_final_vqa', 'v2_medscope3_vqa', 'v2_base_qwen35_vqa'])),
+    ('Held-out inpainting tools', read_text(f'{{RESULTS}}/inpainters_v4.md')),
+    ('Held-out question wordings: v4 vs its own original-wording run (paired)', significance_table(RESULTS, 'v4_final_para_test', ['v4_final_test'])),
+    ('Held-out wordings: v4 vs flagships (paired, 150 cases)', significance_table(RESULTS, 'v4_final_para_test', {[f"v2_para_{t}_test" for t, _, _ in FLAGSHIP_TAGS]!r})),
+    ('Few-shot flagships vs v4 (paired, 150 cases)', significance_table(RESULTS, 'v4_final_test', {[f"v2_fewshot_{t}_test" for t, _, _ in FLAGSHIP_TAGS]!r})),
+    ('Cautious-prompt flagships vs v4 (paired, 150 cases)', significance_table(RESULTS, 'v4_final_test', {[f"v2_cautious_{t}_test" for t, _, _ in FLAGSHIP_TAGS]!r})),
+    ('Tools switched off', significance_table(RESULTS, 'v4_final_test', ['v4_final_notools_test'])),
+    ('Label check (without disputed healthy images)', read_text(f'{{RESULTS}}/label_check_v4/sensitivity_auto.md')),
+    ('Clean-looking vs visible erasures', read_text(f'{{RESULTS}}/clean_split_v4.md')),
+    ('Extra analyses (decisions, cost matrices, tool use, lesion size)', read_text(f'{{RESULTS}}/extra_analysis_v4.md')),
+"""),
+    ]
+
+
+def nb25_v4_recipe() -> list[dict]:
+    s1, nocf = S1_ARGS, S1_NOCF_ARGS      # inserted as text into the f-strings below: braces stay single
+    return [
+        md(f"""
+# MedScope 25: the v4 recipe, like-for-like (ablation, seeds, second base model)
+
+Everything here is stage 1 of the v4 recipe, compared at stage 1:
+
+1. **Ablation:** the same data and number of steps **without counterfactual views** (no erasures, no edits elsewhere,
+   no insertions).
+2. **Seeds:** seeds 1 and 2 for both arms (seed 0 is notebook 23's stage 1 and the ablation above).
+3. **Second base model:** **MedGemma 1.5 4B** with and without counterfactual views.
+
+Each model is tested on the main test, the external centres and the fresh external test.
+
+**Runtime:** A100, about 35 hours in total (seven trainings of about 5 hours); every step resumes, so it can be
+split over sessions. MedGemma needs `HF_TOKEN` with its terms accepted (https://huggingface.co/{MEDGEMMA}).
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(r"""
+S1_STEPS = json.load(open(f'{ADAPTERS}/v4_s1/state.json'))['opt_step']     # the no-CF arms get exactly as many steps
+print('stage-1 steps:', S1_STEPS)
+def test_all(model, adapter, name):
+    for split, views in (('test', f'{TEST_VIEWS} {TEST_NEG}'), ('ext', EXT_VIEWS), ('ext2', EXT2)):
+        !python scripts/evaluate.py --model {model} --adapter {adapter} --views {views} --out {RESULTS}/{name}_{split} --name {name} --split {split}
+"""),
+        md("## Quick check that MedGemma trains (3 steps on 50 views)"),
+        code(f"""
+if not os.path.exists(f'{{ADAPTERS}}/v4mg_cf_s0/state.json'):
+    !python scripts/train_sft.py --model {MEDGEMMA} --views {{TRAIN_V4}} --negatives {{TRAIN_NEG_V4}} --subsample 50 --max-steps 3 --grad-accum 2 --mode agentic --out {{WORK}}/mg_smoke
+    print('MedGemma training works')
+"""),
+        md("## Train and test (order: ablation seed 0, seeds 1-2 of both arms, MedGemma)"),
+        code(f"""
+JOBS = [('{BASE}', 'v4q', 'nocf', 0), ('{BASE}', 'v4q', 'cf', 1), ('{BASE}', 'v4q', 'nocf', 1),
+        ('{BASE}', 'v4q', 'cf', 2), ('{BASE}', 'v4q', 'nocf', 2), ('{MEDGEMMA}', 'v4mg', 'cf', 0), ('{MEDGEMMA}', 'v4mg', 'nocf', 0)]
+test_all('{BASE}', f'{{ADAPTERS}}/v4_s1/final', 'v4q_cf_s0')        # seed 0 with CF = notebook 23's stage 1
+for model, tag, arm, seed in JOBS:
+    name = f'{{tag}}_{{arm}}_s{{seed}}'
+    out = f'{{ADAPTERS}}/{{name}}'
+    if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+        if arm == 'cf':
+            !python scripts/train_sft.py --model {{model}} {s1} --seed {{seed}} --out {{out}}
+        else:
+            !python scripts/train_sft.py --model {{model}} {nocf} --seed {{seed}} --out {{out}}
+    test_all(model, f'{{out}}/final', name)
+"""),
+        code(r"""
+for split in ('test', 'ext', 'ext2'):
+    !python scripts/seed_summary.py --results {RESULTS} --arm 'With CF=v4q_cf_s0_{split},v4q_cf_s1_{split},v4q_cf_s2_{split}' --arm 'Without CF=v4q_nocf_s0_{split},v4q_nocf_s1_{split},v4q_nocf_s2_{split}' --out {RESULTS}/v4_seeds_{split}.md
+"""),
+        publish("MedScope report - 25 v4 recipe", f"""
+    ('Main test: three seeds per arm', read_text(f'{{RESULTS}}/v4_seeds_test.md')),
+    ('External centres: three seeds per arm', read_text(f'{{RESULTS}}/v4_seeds_ext.md')),
+    ('Fresh external: three seeds per arm', read_text(f'{{RESULTS}}/v4_seeds_ext2.md')),
+    ('MedGemma with vs without counterfactual views (main test)', significance_table(RESULTS, 'v4mg_cf_s0_test', ['v4mg_nocf_s0_test', 'v2_base_medgemma15_test'])),
+    ('MedGemma with vs without counterfactual views (fresh external)', significance_table(RESULTS, 'v4mg_cf_s0_ext2', ['v4mg_nocf_s0_ext2', 'v2_base_medgemma15_ext2'])),
+    ('Qwen vs MedGemma base, same v4 stage-1 recipe', significance_table(RESULTS, 'v4q_cf_s0_test', ['v4mg_cf_s0_test'])),
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -1668,6 +2021,10 @@ NOTEBOOKS = {
     "19_release.ipynb": nb19_release,
     "20_fairness.ipynb": nb20_fairness,
     "21_medgemma.ipynb": nb21_medgemma,
+    "22_v4_data.ipynb": nb22_v4_data,
+    "23_v4_train.ipynb": nb23_v4_train,
+    "24_v4_everywhere.ipynb": nb24_v4_eval,
+    "25_v4_recipe.ipynb": nb25_v4_recipe,
 }
 
 

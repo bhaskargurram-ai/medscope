@@ -20,7 +20,8 @@ from medscope.eval.compare import load_outcomes, paired_bootstrap  # noqa: E402
 from medscope.eval.metrics import METRICS  # noqa: E402
 
 METRIC_NAMES = [("ccr", "CCR"), ("esg", "ESG"), ("target_hallucination_rate", "Erased-lesion claims"),
-                ("natural_hallucination_rate", "Healthy-image claims"), ("net_utility", "Net utility")]
+                ("natural_hallucination_rate", "Healthy-image claims"), ("net_utility", "Net utility"),
+                ("clarify_rate_degraded", "Clarify on degraded"), ("aurc_prob", "AURC (token probability)")]
 
 
 def main() -> None:
