@@ -16,15 +16,17 @@
 \usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
 \usepackage{tcolorbox}
 \usepackage{listings}
+\usepackage{longtable}
 \lstset{basicstyle=\ttfamily\scriptsize,breaklines=true,columns=fullflexible,frame=single,framerule=0.3pt}
 \newcommand{\pend}[1]{\textcolor{orange!80!black}{[TO DO: #1]}}
 \newcommand{\best}[1]{\textbf{#1}}
 \captionsetup{font=small,labelfont=bf}
 \setlength{\parskip}{3pt}
+\renewcommand{\topfraction}{0.9}\renewcommand{\textfraction}{0.07}\renewcommand{\floatpagefraction}{0.7}\setcounter{topnumber}{3}\setcounter{totalnumber}{5}
 
 \title{\textbf{Seeing Is Not Believing: Counterfactual Lesion Erasure Teaches a Small Medical Vision--Language Agent to Report Only What the Image Shows}}
 \author{Bhaskar Gurram\\ \small Independent researcher \quad \texttt{github.com/bhaskargurram-ai/medscope}}
-\date{\small Draft v0.3, 31 October 2026 --- method paper}
+\date{\small Draft v0.4, 1 November 2026 --- method paper}
 
 \begin{document}
 \maketitle
@@ -33,8 +35,7 @@
 \small
 All experiments are complete; every number below comes from the evaluation runs of 31 October 2026 and is
 regenerated from stored per-view transcripts by one script. Remaining items, marked \pend{\dots}: a manual check of
-about 20 SLAKE ``healthy'' labels; Hugging Face links; the CLAIM 2024 checklist (appendix); optional extra training
-seeds. Changes from v0.1: nine frontier models on the full test set; rescored open baselines; their native-prompt
+about 20 SLAKE ``healthy'' labels; Hugging Face links; optional extra training seeds (notebook 18). The CLAIM 2024 checklist is in Appendix~\ref{app:claim}. Changes from v0.1: nine frontier models on the full test set; rescored open baselines; their native-prompt
 runs; tools-off, cautious-prompt, edit-visibility, lesion-size and cost-matrix analyses; frontier models at the
 external centres; real example figure; corrected and extended references.
 \end{tcolorbox}
@@ -110,9 +111,9 @@ Lesions under 20 pixels or over 20\% of the image are excluded. Target removal a
 \label{fig:views}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!tp]
 \centering
-\includegraphics[width=\linewidth]{examples.png}
+\includegraphics[width=0.92\linewidth]{examples.png}
 \caption{Real test views, one case per imaging type. Yellow: lesion (reference-standard mask); dashed cyan: edited region. Note the second dark region in the breast-ultrasound image that the mask does not cover (Section~\ref{sec:limits}).}
 \label{fig:examples}
 \end{figure}
@@ -534,5 +535,59 @@ Keep answers short, using the wording a radiologist would use. Never report a fi
 \textbf{Cautious prompt} (Table~\ref{tab:robust}b): the agent prompt followed by ``Important: a question may name a finding that is not in the image. Do not assume the question is correct. Before answering, check carefully whether the finding is actually visible. If you cannot clearly see it, say it is not there (``No''). Reporting a finding that is not visible is a serious error.''
 
 \section{Reproducibility}\label{app:repro}
-Every stage runs on one A100 40\,GB in Google Colab: stage-1 SFT about 4 hours, RFT about 4 hours, replay about 4 hours; one local model on the main test about 1 hour. Frontier models run on CPU. Measured API cost of the full main-test runs (provider token counts, list prices of 31 October 2026): gpt-6-sol \$2.63 (770 views; 345 run earlier), gpt-6-astra \$16.92, gpt-6.1-sol \$3.49, Claude Fable 5.1 \$57.12, Claude Opus 5.5 \$16.22, Claude Sonnet 5.5 \$13.03, gemini-4-argon \$6.44 (770 views), gemini-3.1-pro-preview \$12.40, gemini-3.8-flash \$9.13. All results are stored as per-view decisions and transcripts and rescored by a single script, so every number in this paper can be regenerated from the released files. \pend{CLAIM 2024 checklist}
+Every stage runs on one A100 40\,GB in Google Colab: stage-1 SFT about 4 hours, RFT about 4 hours, replay about 4 hours; one local model on the main test about 1 hour. Frontier models run on CPU. Measured API cost of the full main-test runs (provider token counts, list prices of 31 October 2026): gpt-6-sol \$2.63 (770 views; 345 run earlier), gpt-6-astra \$16.92, gpt-6.1-sol \$3.49, Claude Fable 5.1 \$57.12, Claude Opus 5.5 \$16.22, Claude Sonnet 5.5 \$13.03, gemini-4-argon \$6.44 (770 views), gemini-3.1-pro-preview \$12.40, gemini-3.8-flash \$9.13. All results are stored as per-view decisions and transcripts and rescored by a single script, so every number in this paper can be regenerated from the released files.
+
+\section{CLAIM 2024 checklist}\label{app:claim}
+{\footnotesize
+\begin{longtable}{p{0.5cm}p{2.3cm}p{4.2cm}p{8.0cm}}
+\toprule
+Item & Section & Requirement & Where addressed \\
+\midrule
+\endhead
+1 & Title/abstract & Identification as AI methodology & Title; Abstract (vision--language agent, LoRA fine-tuning) \\
+2 & Abstract & Structured summary of design, methods, results, conclusions & Abstract (retrospective public data, patient/group-level splits, paired bootstrap, code/model availability) \\
+3 & Introduction & Background, intended use, role of the AI approach & Sec.~1; research use only, not a medical device \\
+4 & Introduction & Aims, objectives, hypotheses & Sec.~1 (hypothesis: counterfactual training reduces presupposition hallucination; contributions) \\
+5 & Study design & Prospective or retrospective & Sec.~4.1: retrospective, public de-identified datasets \\
+6 & Study design & Study goal & Sec.~4.1: model creation and benchmark; intended use: evidence-gated image question answering (research) \\
+7 & Data & Data sources & Table~\ref{tab:data}; Sec.~4.1; public datasets with citations \\
+8 & Data & Inclusion and exclusion criteria & Sec.~3.2 (lesion 20 px to 20\% of image), Table~\ref{tab:data} notes (diffuse findings, oversized lesions, slices with little brain) \\
+9 & Data & Preprocessing & Sec.~3.2--3.3; images as RGB, long side $\le$768 px for API models; LaMa inpainting, 5-px mask dilation \\
+10 & Data & Selection of data subsets & Sec.~3.3 automated quality control and adversarial filtering; no manual selection \\
+11 & Data & De-identification & Public datasets de-identified by their providers; no new patient data \\
+12 & Data & Missing data & SLAKE masks with undocumented grey levels skipped (Sec.~4.1); no imputation \\
+13 & Data & Image acquisition protocol & As documented by each source dataset (cited); not altered \\
+14 & Reference standard & Method to obtain the reference standard & Expert segmentation masks and labels of each dataset; expected answers derived by rule (Sec.~3.2) \\
+15 & Reference standard & Rationale for the reference standard & Sec.~3.2; limitations of mask-derived labels in Sec.~6 (single lesion per mask, secondary signs) \\
+16 & Reference standard & Source of annotations & Original dataset annotations (cited); no new annotators \\
+17 & Reference standard & Annotation of test set & Same automated derivation as training; manual label spot-check of SLAKE negatives (notebook 19) \\
+18 & Reference standard & Inter/intrarater variability & Not applicable (no new annotation); source-dataset variability noted as a limitation \\
+19 & Data partitions & Assignment to partitions & Table~\ref{tab:data}; group/patient-level splits with planned sizes \\
+20 & Data partitions & Level of disjointness & Patient or near-duplicate group level; perceptual-hash deduplication across splits (Sec.~3.3) \\
+21 & Testing data & Intended sample size & Determined by available annotated cases; precision reported by 95\% bootstrap CIs \\
+22 & Model & Detailed model description & Sec.~3.1, 3.5; base Qwen3.5-4B (cited) with LoRA $r=16$; agent protocol and prompts (Appendix~\ref{app:prompt}) \\
+23 & Model & Software and versions & PyTorch 2.11, Transformers 5.22.1, PEFT 0.21.2, bitsandbytes 0.50.2; A100 40\,GB (Appendix~\ref{app:repro}) \\
+24 & Model & Initialisation & Pretrained base weights; LoRA initialised by PEFT defaults; vision encoder frozen \\
+25 & Training & Training details and hyperparameters & Sec.~3.5 (learning rates, steps, accumulation, epochs, data mixtures, augmentation by trajectory jitter) \\
+26 & Training & Selection of final model & Sec.~3.5: rule fixed before testing (validation net utility within 0.02) \\
+27 & Training & Ensembling & Not used \\
+28 & Evaluation & Performance metrics & Sec.~3.6 (CCR, ESG, hallucination rates, grounding, net utility, AURC); comparison with 15 published models \\
+29 & Evaluation & Uncertainty and significance & 95\% bootstrap CIs over cases; paired bootstrap tests with two-sided $p$ (Sec.~3.6); NumPy implementation in released code \\
+30 & Evaluation & Robustness or sensitivity analysis & Sec.~5.5--5.6: prompts, tools off, cost matrices, lesion size, edit visibility; training seeds (notebook 18) \\
+31 & Evaluation & Explainability & Evidence boxes and grounded accuracy; tool-use analysis (Sec.~5.5) \\
+32 & Evaluation & Evaluation on internal data & Sec.~5.1--5.3 (internal test, by imaging type) \\
+33 & Evaluation & Testing on external data & Sec.~5.4: four external centres, never used for training \\
+34 & Evaluation & Clinical trial registration & Not applicable \\
+35 & Results & Numbers included and excluded & Sec.~4.1, Table~\ref{tab:data}, exclusion counts in the released results log \\
+36 & Results & Demographic and clinical characteristics & Not available in most source datasets; reported where the source provides it in the released log; limitation \\
+37 & Results & Performance with uncertainty & Tables~\ref{tab:main}, \ref{tab:paired}, \ref{tab:ext} \\
+38 & Results & Diagnostic performance estimates & Per-view-kind decision rates, CIs, by imaging type and lesion size (Tables~\ref{tab:types}, \ref{tab:size}) \\
+39 & Results & Failure analysis & Sec.~5.3 (small lesions, chest X-ray, SLAKE regression), external QaTa-COV19, example failures in released reports \\
+40 & Discussion & Limitations & Sec.~6 \\
+41 & Discussion & Implications for practice & Sec.~6; research model, not for clinical use \\
+42 & Other & Protocol / technical details & Released notebooks, code and results log \\
+43 & Other & Availability of software, model, data & Data and code availability statement; Hugging Face adapters and MedScope-Bench \\
+44 & Other & Funding & No external funding; the author performed all work independently \pend{confirm} \\
+\bottomrule
+\end{longtable}}
 \end{document}
