@@ -184,7 +184,7 @@ DATASETS: dict[str, dict] = {
 # per split: cap on lesion images and on negative images, so evaluation stays affordable
 CAPS = {"train": (500, 250), "validation": (25, 25), "test": (50, 50)}
 # v4: every training image the split holds, a larger validation set for model selection; test unchanged
-CAPS_V4 = {"train": (10 ** 6, 10 ** 6), "validation": (100, 100), "test": (50, 50)}
+CAPS_V4 = {"train": (10 ** 6, 10 ** 6), "validation": (100, 100), "test": (0, 0)}   # v4 keeps the existing test files
 MAX_PER_PATIENT = {"lgg": (5, 3)}   # brain MRI: neighbouring slices are near-copies; keep a few per patient
 
 
@@ -257,7 +257,7 @@ def scan(name: str, rows: Iterable[dict], out_dir: Path, log: Callable[[str], No
 
 
 def split_and_cap(recs: list[Record], seed: int, caps: Optional[dict] = None,
-                  fresh: Optional[tuple[int, int]] = None) -> dict[str, list[Record]]:
+                  fresh: Optional[tuple[int, int]] = None, fresh_exclude: frozenset = frozenset()) -> dict[str, list[Record]]:
     """Assign whole groups to splits, then cap lesion and negative images per split (and per patient).
 
     The selection is deterministic, so raising the train or validation caps adds images without changing which
@@ -293,7 +293,7 @@ def split_and_cap(recs: list[Record], seed: int, caps: Optional[dict] = None,
         if fresh and split == "test":
             used = {r.group for r in out["test"]}          # patients the existing test set already shows
             for negative in (False, True):
-                rest = [r for r in leftovers[negative] if r.group not in used]
+                rest = [r for r in leftovers[negative] if r.group not in used and r.group not in fresh_exclude]
                 out["fresh"] += rest[:fresh[1] if negative else fresh[0]]
     return out
 

@@ -26,6 +26,48 @@ from medscope.data.loaders import extra  # noqa: E402
 from medscope.data.loaders.common import stable_index  # noqa: E402
 
 
+def protected_keys(files: list[str]) -> dict[str, str]:
+    """Record key -> image path of every unedited image (original or natural negative) in the views files.
+    Case ids are '<key>_<tag>' for lesion cases and '<key>neg_<tag>' for lesion-free images."""
+    import json
+    out = {}
+    for f in files:
+        for line in open(f):
+            if not line.strip():
+                continue
+            v = json.loads(line)
+            if v["kind"] == "original":
+                out[v["case_id"].rsplit("_", 1)[0]] = v["image_path"]
+            elif v["kind"] == "natural_negative":
+                out[v["case_id"].split("neg_")[0]] = v["image_path"]
+    return out
+
+
+def protect(name, recs, test_keys, seen_keys):
+    """Drop every group holding an existing test image; return the groups of earlier images (kept out of fresh).
+    Keys are row indices of the source parquet; each protected key is checked to be the same image."""
+    import numpy as np
+    from medscope.data.quality import correlation
+    from medscope.data.views import load_image
+    by_key = {r.key: r for r in recs}
+    mine_test = {k: p for k, p in test_keys.items() if k.startswith(name) and k[len(name):].isdigit()}
+    mine_seen = {k: p for k, p in seen_keys.items() if k.startswith(name) and k[len(name):].isdigit()}
+    missing = [k for k in mine_test if k not in by_key]
+    checked = [k for k in mine_test if k in by_key]
+    differ = [k for k in checked if correlation(load_image(by_key[k].image_path), load_image(mine_test[k])) < 0.99]
+    if len(missing) > 0.05 * max(1, len(mine_test)) or len(differ) > 0.02 * max(1, len(checked)):
+        raise SystemExit(f"{name}: {len(missing)} existing test images are not in the source any more and {len(differ)} "
+                         f"of {len(checked)} differ: the source data changed; stop and report this.")
+    test_groups = {by_key[k].group for k in checked}
+    seen_groups = {by_key[k].group for k in mine_seen if k in by_key} | test_groups
+    kept = [r for r in recs if r.group not in test_groups]
+    line = (f"{name}: {len(checked)} existing test images found ({len(differ)} differ, {len(missing)} no longer read); "
+            f"their {len(test_groups)} patients/groups "
+            f"({len(recs) - len(kept)} images) removed from every v4 split; {len(seen_groups)} groups seen before are "
+            f"kept out of the fresh set")
+    return kept, frozenset(seen_groups), line
+
+
 # sources split by patient: unused test-split patients give a clean fresh set (BUSI is split by near-copy groups,
 # so its leftover images could come from patients already in the test set)
 FRESH_SOURCES = ("chestxdet", "lgg")
@@ -41,7 +83,13 @@ def main() -> None:
                     help="v4 data: every training image, 100+100 validation images per dataset, the same test images, "
                          "and a fresh confirmatory test set (cases_fresh.jsonl) from test-split patients not yet used")
     ap.add_argument("--fresh", type=int, nargs=2, default=(60, 40), metavar=("LESION", "NEGATIVE"))
+    ap.add_argument("--protect-test", nargs="*", default=[],
+                    help="v4: views files of the EXISTING test set. Every patient (group) holding one of their images is "
+                         "removed from the new splits, so v4 trains, selects and confirms on none of them")
+    ap.add_argument("--protect-seen", nargs="*", default=[],
+                    help="v4: views files of earlier training/validation images; their patients are kept out of the fresh set")
     args = ap.parse_args()
+    test_keys, seen_keys = protected_keys(args.protect_test), protected_keys(args.protect_seen)
 
     out = Path(args.out)
     for p in [*out.glob("cases_*.jsonl"), out / "negatives"]:
@@ -59,7 +107,12 @@ def main() -> None:
             raise SystemExit(f"{name}: {kinds[False]} lesion images and {kinds[True]} lesion-free images were found; "
                              f"the dataset layout may have changed ({dict(stats)})")
         # the split seed depends on the dataset name only, so preparing a subset gives the same splits
-        splits = extra.split_and_cap(recs, seed=args.seed + stable_index(name, 1000),
+        excluded = frozenset()
+        if test_keys or seen_keys:
+            recs, excluded, line = protect(name, recs, test_keys, seen_keys)
+            lines.append(line)
+            print(line, flush=True)
+        splits = extra.split_and_cap(recs, seed=args.seed + stable_index(name, 1000), fresh_exclude=excluded,
                                      caps=extra.CAPS_V4 if args.v4 else None,
                                      fresh=tuple(args.fresh) if args.v4 and name in FRESH_SOURCES else None)
         counts = extra.write_outputs(splits, out)

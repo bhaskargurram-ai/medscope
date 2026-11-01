@@ -118,18 +118,32 @@ class TestV4(unittest.TestCase):
         self.assertEqual(choose({"stage 1": (0.70, 0.10), "stage 2": (0.72, 0.09), "stage 3": (0.75, 0.15)}), "stage 2")
         self.assertEqual(choose({"stage 1": (0.70, 0.10), "stage 2": (0.60, 0.09), "stage 3": (0.50, 0.30)}), "stage 1")
 
-    def test_v4_caps_keep_the_test_split_and_add_a_fresh_set(self):
-        recs = [extra.Record(key=f"lgg{i}", dataset="lgg", modality="mri", image_path="x", mask_path=None,
-                             group=f"p{i // 4}", label="tumor", negative=(i % 3 == 0)) for i in range(2000)]
-        old = extra.split_and_cap(recs, seed=7)
-        new = extra.split_and_cap(recs, seed=7, caps=extra.CAPS_V4, fresh=(60, 40))
-        self.assertEqual([r.key for r in old["test"]], [r.key for r in new["test"]])
-        self.assertGreater(len(new["train"]), len(old["train"]))
-        self.assertTrue({r.key for r in old["validation"]} <= {r.key for r in new["validation"]})
-        used = {r.group for r in new["test"]}
-        self.assertTrue(new["fresh"])
-        self.assertFalse({r.group for r in new["fresh"]} & used)
-        self.assertFalse({r.key for r in new["fresh"]} & {r.key for s in ("train", "validation", "test") for r in new[s]})
+    def test_v4_split_protects_the_existing_test_set(self):
+        import sys as _s
+        _s.path.insert(0, str(ROOT / "scripts"))
+        from prepare_extra import protect
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            recs = []
+            for i in range(400):
+                p = d / f"lgg{i:05d}.png"
+                Image.fromarray((np.random.default_rng(i).random((16, 16, 3)) * 255).astype(np.uint8)).save(p)
+                recs.append(extra.Record(key=f"lgg{i:05d}", dataset="lgg", modality="mri", image_path=str(p), mask_path=None,
+                                         group=f"p{i // 4}", label="tumor", negative=(i % 3 == 0)))
+            test_keys = {f"lgg{i:05d}": str(d / f"lgg{i:05d}.png") for i in range(0, 400, 37)}
+            kept, excluded, _ = protect("lgg", recs, test_keys, {})
+            gone = {f"p{int(k[3:]) // 4}" for k in test_keys}
+            self.assertFalse({r.group for r in kept} & gone)
+            new = extra.split_and_cap(kept, seed=7, caps=extra.CAPS_V4, fresh=(60, 40), fresh_exclude=excluded)
+            self.assertEqual(new["test"], [])
+            self.assertTrue(new["fresh"])
+            keys = [r.key for s in new.values() for r in s]
+            self.assertEqual(len(keys), len(set(keys)))
+            self.assertFalse(set(keys) & set(test_keys))
+            # a changed source (same key, different image) stops the build
+            bad = {k: str(d / "lgg00001.png") for k in list(test_keys)[:5]}
+            with self.assertRaises(SystemExit):
+                protect("lgg", recs, bad, {})
 
     def test_paraphrase_view_keeps_ids(self):
         with tempfile.TemporaryDirectory() as d:

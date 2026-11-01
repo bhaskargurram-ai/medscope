@@ -14,8 +14,9 @@ unchanged.
 
 ## Data (notebook 22)
 
-- More training images from the existing training splits (ChestX-Det, BUSI, TCGA-LGG: every image the training
-  split holds instead of the first 500 lesion / 250 lesion-free per source). Test images unchanged.
+- More training images (ChestX-Det, BUSI, TCGA-LGG: every image of the v4 training split instead of the first
+  500 lesion / 250 lesion-free per source). The v4 split of these sources is drawn afresh (the earlier split
+  used a seed formula that was later changed), with the existing test set protected as below.
 - Validation enlarged to 100 lesion and 100 lesion-free images per added source, from the validation split.
 - Training erasures in two versions where possible: LaMa for every case and tissue transplant for half of them. **Telea and Stable Diffusion are never
   used in training or validation**; they are test-only (held-out tools).
@@ -28,8 +29,9 @@ unchanged.
     chest X-ray): ETIS-LaribPolypDB (lesion images only), BUS-UCLM (no calipers/Doppler), BraTS 2023 meningioma
     (no TCGA subjects) and SIIM-ACR pneumothorax (asked only about pneumothorax, the one label it has); near-copies
     of any training or existing test image are removed, lesion-free images included.
-  - Before anything is built, notebook 22 checks that the existing test cases and negatives are unchanged and
-    absent from the v4 training, validation and fresh splits, and stops otherwise.
+  - The existing test set is kept exactly as it is. Every patient (or near-copy group) holding one of its images is
+    removed from all v4 splits, and every patient seen in earlier training or validation is kept out of the fresh
+    set; notebook 22 stops if any existing test image is missing from the source or differs from the stored copy.
 
 ## Training (notebook 23)
 

@@ -1714,20 +1714,23 @@ os.makedirs(V4, exist_ok=True)
 """),
         md("## 1. More training and validation images, and a fresh internal test set"),
         code(r"""
-!python scripts/prepare_extra.py --out {V4}/extra --cache {WORK}/raw/extra --v4
+# the existing test set stays exactly as it is: its patients are removed from every v4 split (and every earlier
+# image's patient from the fresh set); the script stops if any existing test image is missing or different
+vx = lambda split: f'{VX}/{split}/views.jsonl' if os.path.exists(f'{VX}/{split}/views.jsonl') else f'{VX}/{split}/views_clean.jsonl'
+PROTECT_TEST = f"{vx('test')} {NEG_X}/views_negatives.jsonl"
+PROTECT_SEEN = f"{vx('train')} {vx('validation')} {NEG_X}/views_negatives_train.jsonl {NEG_X}/views_negatives_val.jsonl"
+!python scripts/prepare_extra.py --out {V4}/extra --cache {WORK}/raw/extra --v4 --protect-test {PROTECT_TEST} --protect-seen {PROTECT_SEEN}
 !wc -l {V4}/extra/cases_*.jsonl {V4}/extra/negatives/*.jsonl
-# the existing test set must be untouched: same test cases and test negatives as notebook 07 made
-cid = lambda f: {json.loads(l)['case_id'] for l in open(f) if l.strip()}
-old_test, new_test = cid(f'{VX}/test/views_clean.jsonl'), cid(f'{V4}/extra/cases_test.jsonl')
-old_neg, new_neg = cid(f'{NEG_X}/views_negatives.jsonl'), cid(f'{V4}/extra/negatives/views_negatives.jsonl')
-if not (old_test <= new_test and old_neg == new_neg):
-    raise SystemExit(f'The re-split differs from notebook 07 (test cases kept: {len(old_test & new_test)}/{len(old_test)}, '
-                     f'negatives equal: {old_neg == new_neg}). The source data changed; stop and report this.')
-for split in ('train', 'validation', 'fresh'):
-    clash = cid(f'{V4}/extra/cases_{split}.jsonl') & (old_test | old_neg)
+key = lambda c: c.split('neg_')[0] if 'neg_' in c else c.rsplit('_', 1)[0]
+keys = lambda files: {key(json.loads(l)['case_id']) for f in files.split() for l in open(f) if l.strip()}
+old_test = keys(PROTECT_TEST)
+for split, f in (('train', 'cases_train.jsonl'), ('validation', 'cases_validation.jsonl'), ('fresh', 'cases_fresh.jsonl'),
+                 ('train negatives', 'negatives/views_negatives_train.jsonl'), ('validation negatives', 'negatives/views_negatives_val.jsonl'),
+                 ('fresh negatives', 'negatives/views_negatives_fresh.jsonl')):
+    clash = keys(f'{V4}/extra/{f}') & old_test
     if clash:
-        raise SystemExit(f'{len(clash)} existing test cases ended up in the v4 {split} split; stop and report this.')
-print('split check passed: the existing test set is unchanged and disjoint from v4 train, validation and fresh')
+        raise SystemExit(f'{len(clash)} existing test images ended up in the v4 {split}; stop and report this.')
+print('split check passed: no existing test image (or its patient) is in v4 train, validation or fresh')
 !python scripts/build_views.py --manifest {V4}/extra/cases_train.jsonl --out {V4}/views/train --inpainter lama --v4-degradations
 for split in ['validation', 'fresh']:
     !python scripts/build_views.py --manifest {V4}/extra/cases_{split}.jsonl --out {V4}/views/{split} --inpainter lama
