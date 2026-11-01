@@ -45,7 +45,7 @@ def _mask(path: str, shape) -> np.ndarray:
 
 
 def insert(src: np.ndarray, lesion: np.ndarray, host: np.ndarray, rng: np.random.Generator,
-           min_contrast: float = 1.0, max_tries: int = 200, margin: int = 6):
+           min_contrast: float = 1.0, max_tries: int = 25, margin: int = 6):
     """(edited host image, placed lesion mask) or None if no position works.
 
     The lesion is cut out with a `margin`-pixel ring of its own surrounding tissue, so its edges travel
@@ -114,7 +114,10 @@ def main() -> None:
             stats[f"{ds}: no lesion-free training images to host insertions"] += len(vs)
             continue
         vs = sorted(vs, key=lambda v: stable_index(v.case_id + "ins", 10 ** 9))[:args.max_per_dataset]
-        for v in vs:
+        print(f"{ds}: inserting into up to {len(vs)} healthy images", flush=True)
+        for n, v in enumerate(vs):
+            if n and n % 25 == 0:
+                print(f"  {ds}: {n}/{len(vs)} done, {stats[f'{ds}: inserted']} inserted", flush=True)
             host = hosts[ds][stable_index(v.case_id + "host", len(hosts[ds]))]
             case_id = f"ins_{v.case_id}"
             path = out / case_id / "inserted.png"
