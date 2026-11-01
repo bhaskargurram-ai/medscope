@@ -672,3 +672,12 @@ Stage-1 SFT, with vs without counterfactual views, internal test (CCR / ESG / er
 
 External (seed 1): with CF ESG 0.630, erased 10.1%, healthy 10.0%, net 0.493; without CF ESG 0.529, erased 34.5%,
 healthy 78.0%, net 0.344. The counterfactual effect replicates on the second seed, larger than on seed 0.
+
+## 2026-11-01 — Notebook 22, first attempt stopped by the split check (no data built, no model trained)
+
+The safety check found that re-deriving the ChestX-Det/BUSI/TCGA-LGG split reproduced only 19 of the 119 existing
+test cases: notebook 07 ran with an earlier split-seed formula (seed + 10 + dataset index), changed minutes later
+in commit 16c5bf7. The v4 split no longer tries to reproduce the old one: the existing test files are kept as they
+are, every patient holding an existing test image is removed from all v4 splits (after checking that each such
+image is identical in the source), and patients seen in earlier training or validation are kept out of the fresh
+set. Pre-registration updated accordingly before any v4 data existed.
