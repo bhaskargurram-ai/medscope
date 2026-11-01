@@ -558,3 +558,39 @@ images gemini-4-argon rates as unedited (p <= 0.3), MedScope v3 still claims the
 against 49-64% for gpt-6-sol, gpt-6-astra, gpt-6.1-sol and claude-fable-5-1; on obviously edited ones (p >= 0.7)
 11% (RFT 9%) vs 48-58%. Some dependence on edit visibility, but the gap to frontier models is as large on
 erasures that look clean.
+
+## 2026-10-31: notebooks 16 and 17, final
+
+Plain native prompt for the open baselines (one reply, no action format), main test, vs MedScope v3 (paired):
+| Model (plain prompt) | CCR | ESG | Erased-lesion claims | Healthy-image claims | Net |
+| --- | --- | --- | --- | --- | --- |
+| Qwen3.5-4B | 0.890 (tie, p=0.73) | 0.183 | 72.1% | 45.1% | -0.137 |
+| MedGemma 1.5 4B | 0.849 (tie, p=0.23) | 0.192 | 72.1% | 49.0% | -0.219 |
+| Lingshu-7B | 0.728 | 0.301 | 53.0% | 21.5% | -0.174 |
+| HuatuoGPT-Vision-7B | 0.799 | 0.265 | 59.8% | 46.9% | -0.214 |
+| Qwen2.5-VL-7B | 0.699 | 0.192 | 56.2% | 50.3% | -0.426 |
+| Qwen3-VL-8B | 0.811 | 0.260 | 55.7% | 41.0% | -0.170 |
+With their own prompt every open model hallucinates more than under the agent prompt; MedScope is better on ESG,
+both hallucination rates and net utility against all six (p<0.001; healthy vs Lingshu p=0.032). The agent prompt
+helps the baselines, so the format is not what makes them look bad.
+
+Tools off, paired: RFT ESG -0.032 (p=0.21), net -0.077 (p=0.002); v3 CCR -0.098, net -0.114 (both p<0.001), ESG -0.041
+(p=0.09). Tool use: MedScope zooms on 93% of lesion views and the first zoom covers the lesion in 96-98%; on erased
+views it zooms less (59-67%) and 87-88% of those zooms land on the erased site; it never uses windowing. gpt-6-astra
+almost never calls a tool (0.01-0.07 per view).
+
+Strict ESG (only explicit "not there" answers) equals ESG within 0.005 for every model (refer is rare). Trivial
+policies: ESG 0 for all four; net utility always-refer +0.110 under the published matrix, -0.118 when referring on
+lesion-free images pays 0, -0.300 at -0.3 everywhere; MedScope ranks first under all five matrices.
+
+Lesion size (quartiles of lesion area): MedScope is weakest on the smallest lesions (Q1, <1.8% of the image: ESG 0.51,
+erased claims 25%) and strong above (ESG 0.78-0.86, claims 7-11%). Frontier models do not improve with size: gpt-6-astra
+claims a large erased lesion (Q4) in 75% of cases.
+
+Cautious prompt vs standard, same model, same 150 cases (paired): gpt-6-astra erased claims 52.9% -> 47.1% (p=0.031);
+claude-opus-5-5 54.4% -> 44.1% (p=0.016), with lower CCR (-0.044, p=0.041); gemini-4-argon 41.2% -> 42.6% (p=0.83).
+MedScope v3 vs each cautious flagship: ESG +0.32 to +0.35, erased claims -29 to -34 points (all p<0.001).
+
+External centres, paired with MedScope v3: ESG better than all three flagships (+0.26 to +0.40, p<0.001), erased
+claims 10.1% vs 53.8-66.4% (p<0.001); CCR worse (0.773 vs 0.945-0.966, p<0.001); net utility not different
+(+0.098 vs gpt-6-astra p=0.12; -0.022 vs opus p=0.76; -0.021 vs argon p=0.78).
