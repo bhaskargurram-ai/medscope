@@ -681,3 +681,16 @@ in commit 16c5bf7. The v4 split no longer tries to reproduce the old one: the ex
 are, every patient holding an existing test image is removed from all v4 splits (after checking that each such
 image is identical in the source), and patients seen in earlier training or validation are kept out of the fresh
 set. Pre-registration updated accordingly before any v4 data existed.
+
+## 2026-11-01 — v4 data built (notebook 22)
+
+- Protection of the existing test set: every protected test image found and identical in the source
+  (ChestX-Det 93, BUSI 57, TCGA-LGG 79 images; 0 differ, 0 missing); their patients/groups removed from all v4
+  splits (ChestX-Det 93 images, BUSI 71, TCGA-LGG 537 slices of 14 patients).
+- v4 training cases added from these sources: 1,792 after quality checks (earlier: 1,055); lesion-free training
+  images: ChestX-Det 404, BUSI 91, TCGA-LGG 195. Hand-crafted shortcut AUC 0.59 (no filtering needed).
+- v4 validation: 218 cases after checks (+ 129 lesion-free) from these sources, plus the existing SLAKE/Kvasir set.
+- Fresh internal test: ChestX-Det only, 36 cases and 40 lesion-free images. TCGA-LGG gives none: all 14
+  test-split patients already hold existing test images (pre-registration listed it; noted here).
+- Fresh external test: 168 cases after checks (ETIS-Larib, BUS-UCLM, BraTS meningioma, SIIM pneumothorax; 13
+  failed the erasure check) and 150 lesion-free images (ETIS has none); 0 near-copies of training or test images.
