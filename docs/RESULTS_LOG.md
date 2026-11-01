@@ -694,3 +694,22 @@ set. Pre-registration updated accordingly before any v4 data existed.
   test-split patients already hold existing test images (pre-registration listed it; noted here).
 - Fresh external test: 168 cases after checks (ETIS-Larib, BUS-UCLM, BraTS meningioma, SIIM pneumothorax; 13
   failed the erasure check) and 150 lesion-free images (ETIS has none); 0 near-copies of training or test images.
+
+## 2026-11-01 — Notebook 20: held-out inpainting tools and few-shot frontier models (v3-era models)
+
+Held-out tools, edited views only, 125 cases common to every run (ESG LaMa / Telea / transplant / Stable Diffusion):
+MedScope-4B 0.704 / 0.536 / 0.640 / 0.640; MedScope-4B-R 0.728 / 0.600 / 0.616 / 0.624; stage 1 with CF
+0.720 / 0.536 / 0.656 / 0.632; stage 1 without CF 0.440 / 0.232 / 0.320 / 0.416; gpt-6-astra 0.312 / 0.256 /
+0.240 / 0.256; claude-opus-5-5 0.376 / 0.296 / 0.264 / 0.352; gemini-4-argon 0.536 / 0.560 / 0.488 / 0.392.
+- MedScope-4B on transplant and diffusion: changes not significant (ESG -0.064, p 0.20 and 0.15). Telea: ESG -0.168,
+  erased claims 14% -> 33% (p<0.001); the no-CF arm drops as much on Telea (-0.208), so the Telea drop is not
+  specific to counterfactual training. CF vs no-CF advantage holds on every tool (ESG +0.22 to +0.32, p<0.001).
+- MedScope-4B beats every flagship on every tool (ESG p<=0.006) except gemini-4-argon on Telea (ESG -0.024, n.s.):
+  gemini recognises Telea's smooth patches as edits (erased claims 33% -> 9%), i.e. its absent answers follow
+  visible edit traces.
+Few-shot (cautious prompt + 4 solved training examples, 150 cases): gpt-6-astra improves (erased 52.9% -> 38.2%,
+ESG 0.34 -> 0.50, p<=0.003); Claude Opus 5.5 unchanged; gemini-4-argon unchanged on ESG with more healthy-image
+claims (6.1% -> 15.9%, p=0.001). MedScope-4B vs few-shot flagships: ESG +0.24 to +0.43, erased claims -24 to -40
+points (all p<=0.001).
+Note for v4: Telea is the weakest tool for the v3-era models; v4 trains on LaMa + transplant and is tested on Telea
+and Stable Diffusion as unseen tools.
