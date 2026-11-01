@@ -37,6 +37,8 @@ def main() -> None:
     ap.add_argument("--grad-accum", type=int, default=8)
     ap.add_argument("--max-steps", type=int, default=None)
     ap.add_argument("--save-every", type=int, default=50)
+    ap.add_argument("--seed", type=int, default=0,
+                    help="training seed: LoRA initialisation, dropout, data order and trajectory jitter")
     args = ap.parse_args()
 
     from medscope.train.hf_policy import HFPolicy
@@ -68,6 +70,12 @@ def main() -> None:
     views += negs
     print(f"training on {len(views)} views ({len(negs)} natural negatives)")
 
+    import random
+    import numpy as np
+    import torch
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
     if args.init:
         policy = HFPolicy(args.model, adapter=args.init, trainable=True)
     else:
@@ -76,7 +84,7 @@ def main() -> None:
     print(f"trainable LoRA parameters: {trainable / 1e6:.1f}M")
     train_sft(policy, views, args.mode, args.out, epochs=args.epochs, lr=args.lr,
               grad_accum=args.grad_accum, max_steps=args.max_steps, save_every=args.save_every,
-              replays=replays)
+              replays=replays, seed=args.seed)
 
 
 if __name__ == "__main__":

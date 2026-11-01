@@ -1320,6 +1320,103 @@ display(_Img(f'{RESULTS}/figures/examples.png', width=900))
     ]
 
 
+def nb18_seeds() -> list[dict]:
+    return [
+        md("""
+# MedScope 18: training-seed variability (ablation with three seeds)
+
+The main ablation (counterfactual views vs none) used one training seed. This notebook trains the same two
+stage-1 recipes with seeds 1 and 2 and tests each on the main test set and the external centres, so the paper can
+report mean and standard deviation over three seeds (seed 0 is the existing pair from notebooks 08 and 14).
+
+**Order:** seed 1 with CF, seed 1 without CF, seed 2 with CF, seed 2 without CF. Each pair alone already gives a
+two-seed result. **Runtime:** A100, about 4-5 hours per model (training about 3.5 h, testing about 1.3 h), about
+18-20 hours in total; every step resumes, so it can be split over several sessions.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL),
+        code(r"""
+EXT_VIEWS = f'{WORK}/views_external/test/views_clean.jsonl {WORK}/external/negatives/views_negatives_external.jsonl'
+if not os.path.exists(f'{WORK}/views_external/test/views_clean.jsonl'):
+    !tar -C {WORK} -xf {DRIVE}/external/external.tar
+"""),
+        code(f"""
+JOBS = [(1, 'cf'), (1, 'nocf'), (2, 'cf'), (2, 'nocf')]
+for seed, arm in JOBS:
+    name = f'sft_v2_s{{seed}}' if arm == 'cf' else f'nocf_s{{seed}}'
+    out = f'{{ADAPTERS}}/{{name}}'
+    if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+        if arm == 'cf':
+            !python scripts/train_sft.py --model {BASE} --views {{TRAIN_VIEWS}} --negatives {{TRAIN_NEG}} --mode agentic --seed {{seed}} --out {{out}}
+        else:
+            !python scripts/train_sft.py --model {BASE} --views {{TRAIN_VIEWS}} --negatives {{TRAIN_NEG}} --kinds original natural_negative degraded --epochs 3 --max-steps 1980 --mode agentic --seed {{seed}} --out {{out}}
+    !python scripts/evaluate.py --model {BASE} --adapter {{out}}/final --views {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/v2_{{name}}_test --name {{name}} --split test
+    !python scripts/evaluate.py --model {BASE} --adapter {{out}}/final --views {{EXT_VIEWS}} --out {{RESULTS}}/v2_{{name}}_ext --name {{name}} --split ext
+"""),
+        code(r"""
+for split in ('test', 'ext'):
+    !python scripts/seed_summary.py --results {RESULTS} --arm 'With CF=v2_sft_v2_{split},v2_sft_v2_s1_{split},v2_sft_v2_s2_{split}' --arm 'Without CF=v2_nocf_{split},v2_nocf_s1_{split},v2_nocf_s2_{split}' --out {RESULTS}/seeds_{split}.md
+"""),
+        publish("MedScope report - 18 seeds", """
+    ('Main test: three seeds per arm', read_text(f'{RESULTS}/seeds_test.md')),
+    ('External centres: three seeds per arm', read_text(f'{RESULTS}/seeds_ext.md')),
+"""),
+    ]
+
+
+def nb19_release() -> list[dict]:
+    neg_runs = ["v2_medscope3_test", "v2_medscope_test"] + FRONTIER_RUNS + [b[0] for b in BASELINES]
+    return [
+        md("""
+# MedScope 19: label spot-check and release (CPU)
+
+1. **Label spot-check.** Shows the 20 SLAKE lesion-free test images that most models call abnormal. Look at them and
+   note the numbers of any whose "healthy" label is plainly wrong (you are checking the dataset's label, not making a
+   diagnosis; leave the list empty if none is clearly wrong). The main comparison is then recomputed without them.
+2. **Release.** Prepares and uploads, as **private** Hugging Face repositories: the MedScope-4B and MedScope-4B-R
+   adapters with model cards, and MedScope-Bench (view manifests without images, and every evaluation run). Make them
+   public when the paper is submitted.
+
+**Runtime: CPU**, 10-20 minutes. Needs the Colab secret `HF_TOKEN` with **write** access (huggingface.co/settings/tokens).
+"""),
+        code(SETUP), code("!pip install -q -U huggingface_hub matplotlib"), code(RESTORE_ALL),
+        code(r"""
+EXT_VIEWS = f'{WORK}/views_external/test/views_clean.jsonl {WORK}/external/negatives/views_negatives_external.jsonl'
+if not os.path.exists(f'{WORK}/views_external/test/views_clean.jsonl'):
+    !tar -C {WORK} -xf {DRIVE}/external/external.tar
+if secret('HF_TOKEN'):
+    os.environ['HF_TOKEN'] = secret('HF_TOKEN')
+"""),
+        md("## 1. Label spot-check"),
+        code(f"""
+NEG_RUNS = {neg_runs!r}
+LC = f'{{RESULTS}}/label_check'
+!python scripts/label_check.py make --views {{TEST_NEG}} --results {{RESULTS}} --runs {{' '.join(NEG_RUNS)}} --n 20 --out {{LC}}
+from IPython.display import Image as _Img, display
+display(_Img(f'{{LC}}/label_check.png', width=1100))
+"""),
+        md("Type the numbers (#) of images whose label is **plainly** wrong, e.g. `WRONG = [3, 11]`; leave `[]` if none."),
+        code(r"""
+WRONG = []
+json.dump(WRONG, open(f'{LC}/wrong_labels.json', 'w'))
+!python scripts/label_check.py apply --results {RESULTS} --runs {' '.join(NEG_RUNS)} --ref v2_medscope3_test --out {LC}
+"""),
+        md("## 2. Release (private repositories)"),
+        code(r"""
+choice = json.load(open(f'{ADAPTERS}/final_choice.json'))
+FINAL = choice['adapter']
+VERIFY = choice.get('previous_adapter', f'{ADAPTERS}/rft_train/final')
+UPLOAD = True     # False: only prepare the folders in Drive
+flag = '--upload' if UPLOAD and os.environ.get('HF_TOKEN') else ''
+!python scripts/release_hf.py --final {FINAL} --verify {VERIFY} --results {RESULTS} --views {TEST_VIEWS} {TEST_NEG} --external {EXT_VIEWS} --out {DRIVE}/release {flag}
+"""),
+        publish("MedScope report - 19 release", """
+    ('Label spot-check: images shown', read_text(f'{RESULTS}/label_check/label_check.json')),
+    ('Label spot-check: results without flagged labels', read_text(f'{RESULTS}/label_check/sensitivity.md')),
+    ('Model card (MedScope-4B)', read_text(f'{DRIVE}/release/MedScope-4B/README.md')),
+"""),
+    ]
+
+
 def nb15_sft_v3() -> list[dict]:
     return [
         md(f"""
@@ -1425,6 +1522,8 @@ NOTEBOOKS = {
     "15_sft_v3_replay.ipynb": nb15_sft_v3,
     "16_robustness.ipynb": nb16_robustness,
     "17_frontier_checks.ipynb": nb17_frontier_checks,
+    "18_seeds.ipynb": nb18_seeds,
+    "19_release.ipynb": nb19_release,
 }
 
 

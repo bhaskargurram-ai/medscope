@@ -47,6 +47,8 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `15_sft_v3_replay` | Continue the final model with replay of ordinary medical questions (keeps general VQA ability); becomes final if not worse on validation | A100 | ~4 h |
 | `16_robustness` | Tools switched off, open baselines with their own plain prompt, strict ESG, trivial policies, cost-matrix sensitivity, tool use, lesion size | A100 | 4–6 h |
 | `17_frontier_checks` | Frontier flagships on the external centres, a cautious-prompt check, and whether a frontier model can see the edits | CPU | 1–2 h |
+| `18_seeds` | Two more training seeds for stage-1 SFT with and without counterfactual views; mean and standard deviation | A100 | 18–20 h (resumes) |
+| `19_release` | SLAKE label spot-check, then private Hugging Face release of both adapters and MedScope-Bench | CPU | 10–20 min |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.
