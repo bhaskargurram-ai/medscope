@@ -660,3 +660,15 @@ BraTS 2023 meningioma, SIIM pneumothorax) that no model was evaluated on before 
 Notebook 20 fixes: re-made erasures pass the same quality check, failures stop the notebook, held-out runs use
 the full test's answer vocabulary, stage-1 arms also run on the held-out tools. Notebook 18 stopped after
 seed 1 (v4 redoes seeds with its own recipe). Notebook 21 superseded by notebook 25.
+
+## 2026-11-01 — Seed 1 complete (notebook 18 stopped here; v4 redoes seeds)
+
+Stage-1 SFT, with vs without counterfactual views, internal test (CCR / ESG / erased claims / healthy claims / net):
+
+| Seed | With CF | Without CF |
+| --- | --- | --- |
+| 0 | 0.877 / 0.758 / 11.9% / 8.7% / 0.760 | 0.929 / 0.402 / 53.0% / 22.2% / 0.494 |
+| 1 | 0.881 / 0.726 / 15.5% / 16.3% / 0.680 | 0.927 / 0.237 / 68.9% / 26.0% / 0.370 |
+
+External (seed 1): with CF ESG 0.630, erased 10.1%, healthy 10.0%, net 0.493; without CF ESG 0.529, erased 34.5%,
+healthy 78.0%, net 0.344. The counterfactual effect replicates on the second seed, larger than on seed 0.
