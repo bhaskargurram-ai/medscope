@@ -44,11 +44,13 @@ class Episode:
     refused_calls: int
     outcome: Outcome
     tool_log: list[dict] = field(default_factory=list)
+    n_prefix: int = 1       # system prompt plus any few-shot example turns, before the case
 
     def transcript(self) -> list[dict]:
-        """Text-only transcript for logging (images replaced by a placeholder)."""
+        """Text-only transcript for logging (images replaced by a placeholder); starts at the case,
+        so few-shot examples never appear in it."""
         out = []
-        for m in self.messages[1:]:  # skip system prompt
+        for m in self.messages[self.n_prefix:]:
             parts = []
             for c in m["content"]:
                 parts.append("[image]" if c["type"] == "image" else c["text"])
@@ -63,6 +65,7 @@ class _State:
         self.view, self.img = view, img
         self.env = ToolEnv(img, budget=budget)
         self.messages = start_messages(img, view.question)
+        self.n_prefix = len(self.messages) - 1
         self.turns: list[Turn] = []
         self.final: Optional[FinalAction] = None
         self.malformed, self.error, self.done = False, "", False
@@ -92,7 +95,7 @@ class _State:
         if outcome.action == "answer" and self.turns and isinstance(self.turns[-1].extra, dict):
             outcome.answer_prob = self.turns[-1].extra.get("answer_prob")
         return Episode(self.view, self.messages, self.turns, self.final, self.malformed, self.error,
-                       self.env.calls, self.env.refused, outcome, self.env.log)
+                       self.env.calls, self.env.refused, outcome, self.env.log, self.n_prefix)
 
 
 def generate_many(policy: Policy, conversations: list[list[dict]], sample: bool) -> list[Generation]:

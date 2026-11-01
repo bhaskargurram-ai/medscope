@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from medscope.eval.runner import evaluate, load_views  # noqa: E402
-from medscope.agent.prompts import set_prompt  # noqa: E402
+from medscope.agent.prompts import set_fewshot, set_prompt  # noqa: E402
 from medscope.rewards import load_config  # noqa: E402
 
 
@@ -36,6 +36,7 @@ def main() -> None:
             continue
         views = [v for f in files for v in load_views(f)]
         set_prompt(meta.get("prompt", "agent"))   # results are keyed by the prompt they were run with
+        set_fewshot([], meta.get("fewshot", []))  # and by the few-shot examples, if any (ids suffice)
         old = json.loads(s.read_text())["metrics"]["net_utility"]["value"]
         new = evaluate(None, views, cfg, s.parent, meta, log=lambda m: None)
         nu = new["metrics"]["net_utility"]["value"]

@@ -1495,6 +1495,155 @@ if USE_V3:
     ]
 
 
+FLAGSHIP_TAGS = [("gpt6astra", "openai", "gpt-6-astra"), ("claudeopus", "anthropic", "claude-opus-5-5"),
+                 ("gemini", "gemini", "gemini-4-argon")]
+
+
+def nb20_fairness() -> list[dict]:
+    return [
+        md("""
+# MedScope 20: fairness checks (held-out inpainters, few-shot frontier models)
+
+Two questions a reviewer will ask:
+
+1. **Did MedScope learn the inpainting tool instead of the lesion?** Every training and test view was made with
+   LaMa. Here the two edited views of every main-test case (lesion erased, same edit elsewhere) are remade on
+   exactly the same edit masks with three tools MedScope never saw: **Telea** (classical OpenCV), **transplant**
+   (tissue copied from elsewhere in the same image, Poisson-blended; no generator) and **diffusion** (Stable
+   Diffusion inpainting). MedScope (both versions) and three frontier flagships are tested on them.
+2. **Were the frontier models only disadvantaged by seeing no examples?** The same flagships get the cautious prompt
+   plus four solved examples from the *training* split (a lesion, the same image with it erased, an edit elsewhere
+   with the lesion intact, a healthy image) before every case, on the same 150 test cases as the cautious-prompt run.
+
+**Runs on any runtime and resumes.** On a CPU runtime (e.g. while notebook 18 holds the A100) it does everything
+except the diffusion views and the MedScope runs; run it again on a GPU afterwards to finish those. **Cost:** about
+$30 for the few-shot runs and about $16 per held-out tool for the frontier runs (about $80 in total; the estimate is
+printed before spending). gemini-4-argon's price doubles on 1 December, so run the API parts before then.
+Colab secrets: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (and `HF_TOKEN` on the GPU run).
+"""),
+        code(SETUP), code(GPU_STACK), code("!pip install -q -U openai anthropic google-genai diffusers"),
+        code(RESTORE_ALL),
+        code(f"""
+for name in ('OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY'):
+    if secret(name):
+        os.environ[name] = secret(name)
+FLAGSHIPS = {FLAGSHIP_TAGS!r}
+FLAGSHIPS = [f for f in FLAGSHIPS if os.environ.get({{'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}}[f[1]])]
+HAVE_GPU = torch.cuda.is_available()
+INP = f'{{DRIVE}}/inpaint_test'
+print('frontier models:', [m for _, _, m in FLAGSHIPS], '| GPU:', HAVE_GPU)
+"""),
+        md("## 1. Remake the edited test views with three held-out inpainting tools (same masks)"),
+        code(r"""
+READY = []
+for t in ['telea', 'transplant', 'diffusion']:
+    if t == 'diffusion' and not HAVE_GPU:
+        print('diffusion: needs a GPU, skipped in this session (rerun this notebook on a GPU)')
+        continue
+    try:
+        !python scripts/reinpaint_views.py --views {TEST_VIEWS} --inpainter {t} --out {INP}/{t}
+        READY.append(t)
+    except SystemExit:
+        print(f'{t} failed: see above')
+VARIANTS = ' '.join(f'--variant {t}={INP}/{t}/views.jsonl' for t in READY)
+!python scripts/inpainter_figure.py --views {TEST_VIEWS} {VARIANTS} --out {RESULTS}/figures
+from IPython.display import Image as _Img, display
+display(_Img(f'{RESULTS}/figures/inpainters.png', width=900))
+"""),
+        md("## 2. Few-shot frontier models (cautious prompt + four solved training examples; same 150 cases)"),
+        code(r"""
+for tag, p, m in FLAGSHIPS:
+    !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --prompt fewshot --fewshot {TRAIN_VIEWS} {TRAIN_NEG} --out {RESULTS}/v2_fewshot_{tag}_test --name {p}-{m}-fewshot --split test --batch-size 8 | tail -5
+"""),
+        md("## 3. MedScope on the held-out tools (GPU)"),
+        code(f"""
+if HAVE_GPU:
+    choice = json.load(open(f'{{ADAPTERS}}/final_choice.json'))
+    MODELS = [('medscope3', choice['adapter']), ('medscope', choice.get('previous_adapter', f'{{ADAPTERS}}/rft_train/final'))]
+    for t in READY:
+        for tag, adapter in MODELS:
+            !python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{INP}}/{{t}}/views.jsonl --out {{RESULTS}}/v2_inp_{{t}}_{{tag}}_test --name {{tag}}-{{t}} --split test
+else:
+    print('No GPU in this session: MedScope runs skipped. Rerun this notebook on an A100 after notebook 18.')
+"""),
+        md("## 4. Frontier flagships on the held-out tools"),
+        code(r"""
+PER_VIEW = {'gpt-6-astra': 0.0145, 'claude-opus-5-5': 0.0139, 'gemini-4-argon': 0.0079}   # measured in notebook 12
+from medscope.eval.runner import load_views, remaining
+est = 0.0
+for t in READY:
+    vs = load_views(f'{INP}/{t}/views.jsonl')
+    for tag, p, m in FLAGSHIPS:
+        est += len(remaining(vs, f'{RESULTS}/v2_inp_{t}_{tag}_test', 'api')) * PER_VIEW[m]
+print(f'estimated cost of the frontier runs still to do: ${est:.0f}')
+for t in READY:
+    for tag, p, m in FLAGSHIPS:
+        !python scripts/evaluate.py --api {p} --model {m} --views {INP}/{t}/views.jsonl --out {RESULTS}/v2_inp_{t}_{tag}_test --name {p}-{m}-{t} --split test --batch-size 8 | tail -5
+"""),
+        md("## 5. Summary"),
+        code(r"""
+INP_LIST = ' '.join(READY)
+!python scripts/inpainter_summary.py --results {RESULTS} --inpainters {INP_LIST} --model 'MedScope-4B=v2_medscope3_test' --model 'MedScope-4B-R=v2_medscope_test' --model 'gpt-6-astra=v2_gpt6astra_test' --model 'claude-opus-5-5=v2_claudeopus_test' --model 'gemini-4-argon=v2_gemini_test' --ref MedScope-4B --out {RESULTS}/inpainters.md
+"""),
+        publish("MedScope report - 20 fairness", """
+    ('Held-out inpainting tools (edited views only)', read_text(f'{RESULTS}/inpainters.md')),
+    ('Few-shot vs standard prompt, same model, same 150 cases', '\\n\\n'.join(significance_table(RESULTS, f'v2_fewshot_{t}_test', [f'v2_{t}_test']) for t, _, _ in FLAGSHIPS)),
+    ('Few-shot vs cautious prompt, same model, same 150 cases', '\\n\\n'.join(significance_table(RESULTS, f'v2_fewshot_{t}_test', [f'v2_cautious_{t}_test']) for t, _, _ in FLAGSHIPS)),
+    ('MedScope-4B vs few-shot flagships (paired, 150 cases)', significance_table(RESULTS, 'v2_medscope3_test', [f'v2_fewshot_{t}_test' for t, _, _ in FLAGSHIPS])),
+    ('MedScope-4B-R vs few-shot flagships (paired, 150 cases)', significance_table(RESULTS, 'v2_medscope_test', [f'v2_fewshot_{t}_test' for t, _, _ in FLAGSHIPS])),
+"""),
+    ]
+
+
+def nb21_medgemma() -> list[dict]:
+    return [
+        md(f"""
+# MedScope 21: the same recipe on a second base model (MedGemma 1.5 4B)
+
+All MedScope results use one base model (Qwen3.5-4B). This notebook trains **MedGemma 1.5 4B** with exactly the
+stage-1 recipe, with and without the counterfactual views (same data, same steps, same LoRA settings), and tests
+both on the main test set and the external centres. If counterfactual training lifts MedGemma the way it lifted
+Qwen, the method is not specific to one model. Untrained MedGemma (notebook 10/11) is the zero-shot reference.
+
+Run after notebook 18 (both need the A100). **Runtime:** A100, about 9-10 hours (two trainings of about 3.5 h,
+four test runs); every step resumes, so it can be split over sessions. Needs `HF_TOKEN` with the MedGemma terms
+accepted (https://huggingface.co/{MEDGEMMA}).
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL),
+        code(r"""
+EXT_VIEWS = f'{WORK}/views_external/test/views_clean.jsonl {WORK}/external/negatives/views_negatives_external.jsonl'
+if not os.path.exists(f'{WORK}/views_external/test/views_clean.jsonl'):
+    !tar -C {WORK} -xf {DRIVE}/external/external.tar
+"""),
+        md("## Quick check that MedGemma trains (3 steps on 50 views, about 2 minutes; skipped once training has started)"),
+        code(f"""
+if not os.path.exists(f'{{ADAPTERS}}/mg_cf/state.json'):
+    !python scripts/train_sft.py --model {MEDGEMMA} --views {{TRAIN_VIEWS}} --negatives {{TRAIN_NEG}} --subsample 50 --max-steps 3 --grad-accum 2 --mode agentic --out {{WORK}}/mg_smoke
+    print('MedGemma training works')
+"""),
+        md("## Train with and without counterfactual views, then test both"),
+        code(f"""
+for arm in ('cf', 'nocf'):
+    out = f'{{ADAPTERS}}/mg_{{arm}}'
+    if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+        if arm == 'cf':
+            !python scripts/train_sft.py --model {MEDGEMMA} --views {{TRAIN_VIEWS}} --negatives {{TRAIN_NEG}} --mode agentic --out {{out}}
+        else:
+            !python scripts/train_sft.py --model {MEDGEMMA} --views {{TRAIN_VIEWS}} --negatives {{TRAIN_NEG}} --kinds original natural_negative degraded --epochs 3 --max-steps 1980 --mode agentic --out {{out}}
+    !python scripts/evaluate.py --model {MEDGEMMA} --adapter {{out}}/final --views {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/v2_mg_{{arm}}_test --name medgemma-{{arm}} --split test
+    !python scripts/evaluate.py --model {MEDGEMMA} --adapter {{out}}/final --views {{EXT_VIEWS}} --out {{RESULTS}}/v2_mg_{{arm}}_ext --name medgemma-{{arm}} --split ext
+"""),
+        publish("MedScope report - 21 medgemma", f"""
+    ('Training loss (MedGemma, counterfactual views)', train_log_summary(f'{{ADAPTERS}}/mg_cf/train_log.jsonl', window=20)),
+    ('Main test: MedGemma with vs without counterfactual views (paired)', significance_table(RESULTS, 'v2_mg_cf_test', ['v2_mg_nocf_test', 'v2_base_medgemma15_test'])),
+    ('External centres: MedGemma with vs without counterfactual views (paired)', significance_table(RESULTS, 'v2_mg_cf_ext', ['v2_mg_nocf_ext', 'v2_base_medgemma15_ext'])),
+    ('Main test: Qwen recipe vs MedGemma recipe (stage 1, both with CF)', significance_table(RESULTS, 'v2_sft_v2_test', ['v2_mg_cf_test'])),
+    ('Main test: MedGemma with CF vs frontier flagships (paired)', significance_table(RESULTS, 'v2_mg_cf_test', {[f"v2_{t}_test" for t, _, _ in FLAGSHIP_TAGS]!r})),
+    ('Main test by imaging type', by_dataset(RESULTS, ['v2_mg_cf_test', 'v2_mg_nocf_test', 'v2_base_medgemma15_test', 'v2_sft_v2_test'])),
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -1516,6 +1665,8 @@ NOTEBOOKS = {
     "17_frontier_checks.ipynb": nb17_frontier_checks,
     "18_seeds.ipynb": nb18_seeds,
     "19_release.ipynb": nb19_release,
+    "20_fairness.ipynb": nb20_fairness,
+    "21_medgemma.ipynb": nb21_medgemma,
 }
 
 

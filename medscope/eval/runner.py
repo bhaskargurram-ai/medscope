@@ -178,8 +178,10 @@ PROMPT_KEY = hashlib.sha1(SYSTEM_PROMPT.encode()).hexdigest()[:8]
 
 def prompt_key() -> str:
     """Fingerprint of the system prompt in use (the benchmark prompt gives PROMPT_KEY)."""
-    from ..agent.prompts import active_prompt
-    return hashlib.sha1(active_prompt().encode()).hexdigest()[:8]
+    from ..agent.prompts import active_prompt, fewshot_ids
+    ids = fewshot_ids()
+    text = active_prompt() + ("|fewshot=" + ",".join(ids) if ids else "")
+    return hashlib.sha1(text.encode()).hexdigest()[:8]
 
 
 def view_key(view: View, precision=None) -> str:

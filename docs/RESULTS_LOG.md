@@ -629,3 +629,22 @@ The counterfactual effect replicates (seed-0 no-CF: ESG 0.402, erased 53.0%). He
 test vary with the seed (8.7% vs 16.3%), so the paper reports mean ± sd over seeds. Seeds without CF and seed 2 pending.
 
 Declarations added to the method paper: no external funding, no competing interests, public de-identified data only.
+
+## 2026-11-01 — Fairness checks prepared (notebooks 20 and 21)
+
+Open questions a reviewer will ask, and the runs that answer them:
+
+- *Did MedScope learn LaMa's traces?* Every training and test view used LaMa. Notebook 20 remakes the two edited
+  views of each main-test case on the same masks with Telea, tissue transplant (Poisson-blended copy of tissue from
+  the same image) and Stable Diffusion inpainting (`scripts/reinpaint_views.py`), then runs MedScope-4B, MedScope-4B-R
+  and three frontier flagships on them (`scripts/inpainter_summary.py`).
+- *Were frontier models disadvantaged by seeing no examples?* Notebook 20 gives the flagships the cautious prompt
+  plus four solved training examples (lesion; same image erased; edit elsewhere, lesion intact; healthy image) on
+  the same 150 cases as the cautious run (`--prompt fewshot --fewshot TRAIN...`; examples never enter transcripts or
+  rescoring keys beyond their ids).
+- *Is it one base model?* Notebook 21 trains MedGemma 1.5 4B with the same stage-1 recipe, with and without
+  counterfactual views.
+
+Paper (draft v0.6): checkpoint use stated explicitly (stage-3 headline fixed before testing; RFT beside it
+everywhere; ablation and seeds at stage 1, where stage 1 alone already reaches ESG 0.758); abstract now states the
+healthy-image result (14.6% vs 9.0% for gemini-4-argon) and the external sensitivity/net-utility trade-off.

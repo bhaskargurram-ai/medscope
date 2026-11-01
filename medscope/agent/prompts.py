@@ -47,8 +47,15 @@ CAUTIOUS_SUFFIX = """
 Important: a question may name a finding that is not in the image. Do not assume the question is
 correct. Before answering, check carefully whether the finding is actually visible. If you cannot
 clearly see it, say it is not there ("No"). Reporting a finding that is not visible is a serious error."""
-PROMPTS = {"agent": SYSTEM_PROMPT, "plain": PLAIN_PROMPT, "cautious": SYSTEM_PROMPT + CAUTIOUS_SUFFIX}
+FEWSHOT_SUFFIX = """
+
+The conversation starts with solved example cases from other patients (earlier turns). They show how to
+answer from what the image actually shows. Only the last image is the case you must answer."""
+PROMPTS = {"agent": SYSTEM_PROMPT, "plain": PLAIN_PROMPT, "cautious": SYSTEM_PROMPT + CAUTIOUS_SUFFIX,
+           "fewshot": SYSTEM_PROMPT + CAUTIOUS_SUFFIX + FEWSHOT_SUFFIX}
 _active = "agent"
+_fewshot: list[dict] = []        # solved example turns placed before the case (in-context learning)
+_fewshot_ids: list[str] = []     # their view ids: part of the result key, so runs never mix example sets
 
 
 def set_prompt(name: str) -> None:
@@ -61,6 +68,17 @@ def set_prompt(name: str) -> None:
 
 def active_prompt() -> str:
     return PROMPTS[_active]
+
+
+def set_fewshot(messages: list[dict], ids: list[str]) -> None:
+    """Solved example turns (user image + question, assistant reply) shown before every case.
+    Rescoring needs only the ids (to rebuild the result key), so messages may be empty there."""
+    global _fewshot, _fewshot_ids
+    _fewshot, _fewshot_ids = list(messages), list(ids)
+
+
+def fewshot_ids() -> list[str]:
+    return list(_fewshot_ids)
 
 
 def text(s: str) -> dict:
@@ -90,4 +108,5 @@ def tool_result_message(result: ToolResult) -> dict:
 
 
 def start_messages(img: np.ndarray, question: str) -> list[dict]:
-    return [system_message(), first_user_message(img, question)]
+    """System prompt, any few-shot example turns, then the case. The case is always the last message."""
+    return [system_message(), *_fewshot, first_user_message(img, question)]

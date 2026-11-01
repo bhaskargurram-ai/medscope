@@ -57,15 +57,30 @@ def main() -> None:
                          "--model is its id")
     ap.add_argument("--batch-size", type=int, default=8,
                     help="episodes advanced together; each sees exactly what it would see alone")
-    ap.add_argument("--prompt", choices=["agent", "plain", "cautious"], default="agent",
+    ap.add_argument("--prompt", choices=["agent", "plain", "cautious", "fewshot"], default="agent",
                     help="agent: the benchmark prompt (default); plain: a short native VQA prompt with no "
                          "action format (replies are read as plain prose); cautious: the agent prompt plus a "
-                         "warning that the question may name an absent finding")
+                         "warning that the question may name an absent finding; fewshot: the cautious prompt "
+                         "plus four solved training examples before each case (needs --fewshot)")
+    ap.add_argument("--fewshot", nargs="+", default=None,
+                    help="training views and natural-negative files to draw the few-shot examples from")
     ap.add_argument("--tool-budget", type=int, default=None,
                     help="override the tool budget (0 = tools switched off: calls are refused)")
     args = ap.parse_args()
-    from medscope.agent.prompts import set_prompt
+    from medscope.agent.prompts import set_fewshot, set_prompt
     set_prompt(args.prompt)
+    fewshot = None
+    if args.prompt == "fewshot":
+        if not args.fewshot:
+            ap.error("--prompt fewshot needs --fewshot TRAIN_VIEWS... TRAIN_NEG...")
+        from medscope.agent.fewshot import example_messages, pick_examples
+        from medscope.data.schema import ViewKind
+        pool = [v for f in args.fewshot for v in load_views(f)]
+        examples = pick_examples([v for v in pool if v.kind is not ViewKind.NATURAL_NEGATIVE],
+                                 [v for v in pool if v.kind is ViewKind.NATURAL_NEGATIVE])
+        fewshot = [v.view_id for v in examples]
+        set_fewshot(example_messages(examples), fewshot)
+        print("few-shot examples:", ", ".join(f"{v.view_id} ({v.question} -> {v.kind.value})" for v in examples))
 
     views = select_cases([v for f in args.views for v in load_views(f)], args.limit_cases)
     if args.api:
@@ -87,6 +102,8 @@ def main() -> None:
     if args.prompt == "plain":
         cfg = {**cfg, "tools": {**cfg["tools"], "max_turns": 1}}   # one reply, no tools offered
     meta["prompt"] = args.prompt
+    if fewshot:
+        meta["fewshot"] = fewshot
     summary = evaluate(policy, views, cfg, args.out, meta, batch_size=args.batch_size)
     if args.api:
         record_usage(policy, Path(args.out), summary["n_run"])
