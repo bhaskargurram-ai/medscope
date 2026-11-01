@@ -1,0 +1,57 @@
+# MedScope v4: pre-registered training and selection plan
+
+Written and committed on 1 November 2026, before any v4 data was built or any v4 model was trained.
+The git history of this file is the record that the rules below were fixed in advance.
+
+## Why a v4
+
+The audit of all results (docs/RESULTS_LOG.md, 1 November 2026) found weaknesses of MedScope-4B that training
+can address: false findings on healthy images above the best frontier model, a SLAKE CT/MRI regression after
+general-VQA replay, lower sensitivity to real lesions at external centres, weak chest X-ray and small-lesion
+results, a possible dependence on one inpainting tool (LaMa), a never-used windowing tool, and stages 2-3 that
+did not improve on stage 1. v4 changes the training recipe only; the benchmark, metrics and cost matrix are
+unchanged.
+
+## Data (notebook 22)
+
+- More training images from the existing training splits (ChestX-Det, BUSI, TCGA-LGG: every image the training
+  split holds instead of the first 500 lesion / 250 lesion-free per source). Test images unchanged.
+- Validation enlarged to 100 lesion and 100 lesion-free images per added source, from the validation split.
+- Every training erasure in two versions: LaMa and tissue transplant. **Telea and Stable Diffusion are never
+  used in training or validation**; they are test-only (held-out tools).
+- Lesion-insertion views (training only): a real lesion moved into a healthy training image, answer "present".
+- Degraded training views drawn from a larger set (adds resolution-relative low resolution, JPEG, motion blur).
+- Training questions reworded with four training paraphrases; three further paraphrases are test-only.
+- Confirmatory test sets that no model has been evaluated on before v4 is selected:
+  - **fresh internal**: unused images of test-split patients not in the existing test set (ChestX-Det, TCGA-LGG);
+  - **fresh external**: new public sources not used anywhere before (colonoscopy, breast ultrasound, brain MRI,
+    chest X-ray), see notebook 22 for the exact sources.
+
+## Training (notebook 23)
+
+1. Stage 1: SFT from Qwen3.5-4B on the v4 data; windowing trajectories on 30% of grey-scale images; always zoom
+   on lesions under 2% of the image and repeat their cases twice; 50% of templated questions paraphrased.
+2. Stage 2: rejection sampling from stage 1 (k = 8, temperature 1.2; 300 views per kind, 600 lesion-free and
+   400 lesion-erased views), episodes from views the model mostly failed repeated 3 times.
+3. Stage 3: general-VQA replay from stage 2 with "absent" views at no less than 35% of the mix and
+   "Is X healthy/normal?" replay questions balanced between Yes and No.
+
+LoRA settings, learning rates and the vision encoder (frozen) are as in v3.
+
+## Selection rule (fixed now)
+
+Every candidate is evaluated on the v4 validation set (validation views and validation natural negatives) only.
+Let U be validation net utility and H the validation rate of claimed findings on healthy images.
+
+- The final model is **stage 3** if U(stage 3) >= U(stage 2) - 0.02 and H(stage 3) <= H(stage 2) + 0.02.
+- Otherwise **stage 2** if U(stage 2) >= U(stage 1) - 0.02 and H(stage 2) <= H(stage 1) + 0.02.
+- Otherwise **stage 1**.
+
+No decision threshold, prompt or setting is tuned after this choice. The selected model is then evaluated once
+on every test set (notebook 24); no further v4 variant is trained after any v4 test result is seen.
+
+## Reporting rule
+
+Every MedScope claim in the paper comes from the single selected v4 model, on every test set. Earlier
+checkpoints appear only as training history. Ablations (without counterfactual views), training seeds and the
+second base model use the v4 stage-1 recipe and are compared like-for-like at stage 1 (notebook 25).

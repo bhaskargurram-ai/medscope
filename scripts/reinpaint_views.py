@@ -6,6 +6,9 @@ edit elsewhere (random_removal), with another inpainter, on exactly the same edi
 cases, same questions, same edit regions, only the tool differs. View ids are kept, so results
 pair case by case with the LaMa runs.
 
+v4 training uses the same script on the training views with --id-suffix, to give every training case a
+second copy of its edited views made with tissue transplant (Telea and diffusion stay unseen for testing).
+
     python scripts/reinpaint_views.py --views TEST_VIEWS... --inpainter transplant --out DIR
     -> DIR/views.jsonl (target_removal and random_removal views), DIR/dropped.jsonl, DIR/<case>/*.png
 
@@ -77,7 +80,7 @@ def inpaint(name: str, image: np.ndarray, hole: np.ndarray, lesion: np.ndarray, 
     raise ValueError(f"unknown held-out inpainter {name!r}")
 
 
-def remake(view: View, name: str, out: Path) -> View:
+def remake(view: View, name: str, out: Path, suffix: str = "") -> View:
     meta = view.meta or {}
     original = load_image(meta["original_image"])
     lesion = _load_mask(meta["lesion_mask"], original.shape[:2])
@@ -90,7 +93,7 @@ def remake(view: View, name: str, out: Path) -> View:
             raise ValueError("the edit changed pixels outside the edit region")
         path.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(img).save(path)
-    return replace(view, image_path=str(path), meta={**meta, "inpainter": name})
+    return replace(view, view_id=view.view_id + suffix, image_path=str(path), meta={**meta, "inpainter": name})
 
 
 def main() -> None:
@@ -98,6 +101,8 @@ def main() -> None:
     ap.add_argument("--views", nargs="+", required=True, help="LaMa test views files")
     ap.add_argument("--inpainter", required=True, choices=["telea", "transplant", "diffusion"])
     ap.add_argument("--out", required=True)
+    ap.add_argument("--id-suffix", default="",
+                    help="append to view ids (training copies made with a second tool, e.g. '#transplant')")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -112,7 +117,7 @@ def main() -> None:
             dropped.append({"case_id": case, "reason": "lesion-erased or control view missing"})
             continue
         try:
-            pair = [remake(d[k], args.inpainter, out) for k in EDITED]
+            pair = [remake(d[k], args.inpainter, out, args.id_suffix) for k in EDITED]
             meta = d[ViewKind.TARGET_REMOVAL].meta
             original = load_image(meta["original_image"])
             lesion = _load_mask(meta["lesion_mask"], original.shape[:2])

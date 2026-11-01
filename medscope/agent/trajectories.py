@@ -58,6 +58,12 @@ CLARIFY = {
                "Could you provide a higher-resolution image?"),
     "mismatch": ("This image does not seem to show the anatomy the question is about.",
                  "Could you confirm this is the correct image for the question?"),
+    "lowres_rel": ("The image resolution is too low to assess this.",
+                   "Could you provide a higher-resolution image?"),
+    "jpeg": ("Heavy compression artefacts hide the detail needed to assess this.",
+             "Could you provide the image without compression?"),
+    "motion": ("The image is blurred by motion, so fine detail cannot be assessed.",
+               "Could you provide an acquisition without motion blur?"),
 }
 
 
@@ -87,12 +93,35 @@ class SFTSample:
     kind: str
 
 
+ADJUST = [
+    "Adjusting the contrast will make the relevant region easier to judge.",
+    "Let me window the image to bring out the tissue in this region.",
+]
+
+
+def window_for(img: np.ndarray, box) -> dict:
+    """Window centre and width (0-255) that spread the intensities of the region of interest."""
+    g = img.astype(np.float32).mean(axis=-1) if img.ndim == 3 else img.astype(np.float32)
+    h, w = g.shape
+    if box:
+        x1, y1, x2, y2 = pad_box(box)
+        g = g[int(y1 / 1000 * h):max(int(y2 / 1000 * h), int(y1 / 1000 * h) + 1),
+              int(x1 / 1000 * w):max(int(x2 / 1000 * w), int(x1 / 1000 * w) + 1)]
+    return {"center": int(np.clip(np.median(g), 20, 235)), "width": int(np.clip(4 * g.std(), 40, 200))}
+
+
+def is_gray(img: np.ndarray) -> bool:
+    return img.ndim == 2 or (np.array_equal(img[..., 0], img[..., 1]) and np.array_equal(img[..., 1], img[..., 2]))
+
+
 def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.6,
-                     direct_only: bool = False, image: np.ndarray | None = None) -> list[SFTSample]:
+                     direct_only: bool = False, image: np.ndarray | None = None,
+                     window_prob: float = 0.0) -> list[SFTSample]:
     """One correct trajectory for `view`, split into per-turn samples.
 
     direct_only=True gives single-turn samples without tools (used for the
-    grounding-only adapter).
+    grounding-only adapter). window_prob > 0 (v4): on grey-scale images (CT, MRI, X-ray) the
+    trajectory sometimes starts by windowing the region of interest.
     """
     img = image if image is not None else load_image(view.image_path)
     messages = start_messages(img, view.question)
@@ -110,6 +139,12 @@ def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.
         reason, question = CLARIFY.get(view.meta.get("degradation", "blur"), CLARIFY["blur"])
         emit(f"{reason} {_final(action='clarify', question=question)}")
         return samples
+
+    if (not direct_only) and window_prob > 0 and is_gray(img) and rng.random() < window_prob:
+        args = window_for(img, view.lesion_box)
+        emit(f"{pick(ADJUST)} {_tool('window', **args)}")
+        messages[-1] = assistant_message(tool_text(ToolCall("window", args)))
+        messages.append(tool_result_message(env.call("window", args)))
 
     zoom = (not direct_only) and view.lesion_box is not None and rng.random() < zoom_prob
     if zoom:

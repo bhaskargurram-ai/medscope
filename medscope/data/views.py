@@ -53,6 +53,7 @@ def build_views(
     degradation: Optional[str] = None,
     inpaint_fn: InpaintFn = telea_inpaint,
     other_modality: Optional[str] = None,
+    degradations: tuple[str, ...] = DEGRADATIONS,
 ) -> list[View]:
     """Build original, target-removal, random-removal and degraded views.
 
@@ -72,7 +73,7 @@ def build_views(
     target_img, target_mask = make_target_removal(image, mask, inpaint_fn=inpaint_fn)
 
     if degradation is None:
-        choices = [d for d in DEGRADATIONS if d != "mismatch" or other_image is not None]
+        choices = [d for d in degradations if d != "mismatch" or other_image is not None]
         degradation = str(rng.choice(choices))
     degraded_img = make_degraded(image, degradation, rng, other_image)
 

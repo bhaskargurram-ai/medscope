@@ -32,8 +32,12 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--inpainter", choices=["telea", "lama"], default="telea",
                     help="use lama for real builds (needs torch; fast on a GPU)")
+    ap.add_argument("--v4-degradations", action="store_true",
+                    help="draw the degraded view from the v4 set (adds resolution-relative low resolution, JPEG, motion)")
     args = ap.parse_args()
     inpaint_fn = get_inpainter(args.inpainter)
+    from medscope.data.counterfactual import DEGRADATIONS, DEGRADATIONS_V4
+    degradations = DEGRADATIONS_V4 if args.v4_degradations else DEGRADATIONS
 
     rng = np.random.default_rng(args.seed)
     out = Path(args.out)
@@ -56,7 +60,7 @@ def main() -> None:
             other_img = load_image(other.image_path) if other else None
             try:
                 views = build_views(case, out, rng, other_image=other_img, inpaint_fn=inpaint_fn,
-                                    other_modality=other.modality if other else None)
+                                    other_modality=other.modality if other else None, degradations=degradations)
             except ValueError as exc:
                 views, reason = [], str(exc)
             else:

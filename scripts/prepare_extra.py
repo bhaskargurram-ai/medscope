@@ -32,6 +32,10 @@ def main() -> None:
     ap.add_argument("--cache", required=True, help="where the parquet files are downloaded")
     ap.add_argument("--datasets", nargs="+", default=list(extra.DATASETS), choices=list(extra.DATASETS))
     ap.add_argument("--seed", type=int, default=2026)
+    ap.add_argument("--v4", action="store_true",
+                    help="v4 data: every training image, 100+100 validation images per dataset, the same test images, "
+                         "and a fresh confirmatory test set (cases_fresh.jsonl) from test-split patients not yet used")
+    ap.add_argument("--fresh", type=int, nargs=2, default=(60, 40), metavar=("LESION", "NEGATIVE"))
     args = ap.parse_args()
 
     out = Path(args.out)
@@ -50,7 +54,9 @@ def main() -> None:
             raise SystemExit(f"{name}: {kinds[False]} lesion images and {kinds[True]} lesion-free images were found; "
                              f"the dataset layout may have changed ({dict(stats)})")
         # the split seed depends on the dataset name only, so preparing a subset gives the same splits
-        splits = extra.split_and_cap(recs, seed=args.seed + stable_index(name, 1000))
+        splits = extra.split_and_cap(recs, seed=args.seed + stable_index(name, 1000),
+                                     caps=extra.CAPS_V4 if args.v4 else None,
+                                     fresh=tuple(args.fresh) if args.v4 else None)
         counts = extra.write_outputs(splits, out)
         lines += [f"{name} ({spec['repo']}): {dict(stats)}",
                   f"{name} labels: {dict(__import__('collections').Counter(r.label for r in recs))}",

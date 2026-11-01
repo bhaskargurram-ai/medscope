@@ -18,6 +18,42 @@ from medscope.eval.runner import load_views  # noqa: E402
 from medscope.train.sft import MODES, train_sft  # noqa: E402
 
 
+def v4_mix(views, args):
+    """The v4 data options: paraphrases, small-lesion oversampling, 'absent' share, balanced health questions."""
+    from collections import Counter
+    from dataclasses import replace
+    from medscope.actions import asks_health, normalise_answer
+    from medscope.data.loaders.common import stable_index
+    from medscope.data.paraphrase import TRAIN, paraphrase_view
+    from medscope.data.schema import ViewKind
+    from medscope.train.sft import SMALL_LESION, lesion_fraction
+    if args.paraphrase_prob > 0:
+        views = [paraphrase_view(v, TRAIN) if stable_index(v.case_id + "para", 1000) < 1000 * args.paraphrase_prob else v
+                 for v in views]
+    if args.balance_health:
+        health = [v for v in views if (v.meta or {}).get("benchmark") and asks_health(v.question)]
+        by = {a: [v for v in health if normalise_answer(v.answer) == a] for a in ("yes", "no")}
+        n = min(len(by["yes"]), len(by["no"]))
+        drop = {v.view_id for a in by for v in sorted(by[a], key=lambda v: stable_index(v.view_id, 10 ** 9))[n:]}
+        views = [v for v in views if v.view_id not in drop]
+        print(f"balanced health questions: kept {n} Yes and {n} No, dropped {len(drop)}")
+    if args.oversample_small > 1:
+        small = [v for v in views if (lesion_fraction(v) or 1) < SMALL_LESION]
+        views = views + [replace(v, view_id=f"{v.view_id}#s{i}") for v in small for i in range(1, args.oversample_small)]
+        print(f"small lesions: {len(small)} views repeated {args.oversample_small}x")
+    if args.min_absent_share > 0:
+        absent = [v for v in views if v.kind in (ViewKind.TARGET_REMOVAL, ViewKind.NATURAL_NEGATIVE)]
+        share = len(absent) / max(1, len(views))
+        if absent and share < args.min_absent_share:
+            need = int((args.min_absent_share * len(views) - len(absent)) / (1 - args.min_absent_share)) + 1
+            reps = [replace(absent[i % len(absent)], view_id=f"{absent[i % len(absent)].view_id}#a{i // len(absent) + 1}")
+                    for i in range(need)]
+            views = views + reps
+            print(f"'absent' views: {share:.0%} -> {len(absent) + need} of {len(views)}")
+    print("view kinds:", dict(Counter(v.kind.value for v in views)))
+    return views
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True)
@@ -39,6 +75,20 @@ def main() -> None:
     ap.add_argument("--save-every", type=int, default=50)
     ap.add_argument("--seed", type=int, default=0,
                     help="training seed: LoRA initialisation, dropout, data order and trajectory jitter")
+    # ---- v4 recipe options (all off by default, so earlier runs are reproduced exactly) ----
+    ap.add_argument("--window-prob", type=float, default=0.0,
+                    help="share of grey-scale trajectories that start with a window call")
+    ap.add_argument("--small-zoom", action="store_true", help="always zoom before answering about a lesion under 2%% of the image")
+    ap.add_argument("--oversample-small", type=int, default=1,
+                    help="repeat every view of a case whose lesion is under 2%% of the image this many times")
+    ap.add_argument("--paraphrase-prob", type=float, default=0.0,
+                    help="share of cases whose templated question is reworded with a training paraphrase")
+    ap.add_argument("--min-absent-share", type=float, default=0.0,
+                    help="repeat 'absent' views (lesion erased, healthy images) until they are at least this share")
+    ap.add_argument("--balance-health", action="store_true",
+                    help="general-VQA replay: keep as many 'Is X healthy/normal?' questions answered Yes as No")
+    ap.add_argument("--hard-repeat", type=int, default=1,
+                    help="rejection sampling: repeat episodes kept from views the model mostly failed this many times")
     args = ap.parse_args()
 
     from medscope.train.hf_policy import HFPolicy
@@ -66,8 +116,17 @@ def main() -> None:
         # a separate copy of each view carries the model's own episode; the original keeps its synthetic one
         replays = {r["view_id"] + "#rft": r["turns"] for r in recs if r.get("kept")}
         print(f"{len(kept)} self-generated episodes kept by rejection sampling")
+        if args.hard_repeat > 1:      # an episode the model rarely gets right teaches the most: repeat it
+            hard = {r["view_id"] + "#rft" for r in recs if r.get("kept") and r["successes"] / r["k"] <= 0.5}
+            extra = [replace(v, view_id=f"{v.view_id}#{i}") for v in kept if v.view_id in hard
+                     for i in range(1, args.hard_repeat)]
+            for v in extra:
+                replays[v.view_id] = replays[v.view_id.rsplit("#", 1)[0]]
+            print(f"{len(hard)} of them from views it mostly failed: repeated {args.hard_repeat}x")
+            kept = kept + extra
         views = views + kept          # their own episodes, on top of the synthetic set
     views += negs
+    views = v4_mix(views, args)
     print(f"training on {len(views)} views ({len(negs)} natural negatives)")
 
     import random
@@ -84,7 +143,7 @@ def main() -> None:
     print(f"trainable LoRA parameters: {trainable / 1e6:.1f}M")
     train_sft(policy, views, args.mode, args.out, epochs=args.epochs, lr=args.lr,
               grad_accum=args.grad_accum, max_steps=args.max_steps, save_every=args.save_every,
-              replays=replays, seed=args.seed)
+              replays=replays, seed=args.seed, window_prob=args.window_prob, small_zoom=args.small_zoom)
 
 
 if __name__ == "__main__":

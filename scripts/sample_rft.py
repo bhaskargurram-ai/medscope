@@ -43,8 +43,8 @@ def success(view: View, outcome) -> bool:
     return outcome.action == "answer" and bool(outcome.correct)
 
 
-def pick_views(views: list[View], per_kind: int, seed: int = 0) -> list[View]:
-    """Up to `per_kind` views of each kind, spread across datasets (case-id prefixes)."""
+def pick_views(views: list[View], per_kind: int, seed: int = 0, override: dict | None = None) -> list[View]:
+    """Up to `per_kind` views of each kind (or the `override` count for that kind), drawn at random."""
     rng = np.random.default_rng(seed)
     by_kind: dict[ViewKind, list[View]] = defaultdict(list)
     for v in views:
@@ -52,7 +52,7 @@ def pick_views(views: list[View], per_kind: int, seed: int = 0) -> list[View]:
     picked = []
     for kind in sorted(by_kind, key=lambda k: k.value):
         vs = by_kind[kind]
-        idx = rng.permutation(len(vs))[:per_kind]
+        idx = rng.permutation(len(vs))[:(override or {}).get(kind.value, per_kind)]
         picked += [vs[i] for i in sorted(idx)]
     order = rng.permutation(len(picked))
     return [picked[i] for i in order]
@@ -90,14 +90,19 @@ def main() -> None:
     ap.add_argument("--per-kind", type=int, default=150)
     ap.add_argument("--k", type=int, default=4)
     ap.add_argument("--max-new-tokens", type=int, default=256)
+    ap.add_argument("--per-kind-override", nargs="*", default=[], metavar="KIND=N",
+                    help="v4: more views of the kinds that matter most, e.g. natural_negative=600 target_removal=400")
+    ap.add_argument("--temperature", type=float, default=1.0,
+                    help="sampling temperature (v4: 1.2, so views the model always fails still get varied tries)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
+    override = {k: int(n) for k, n in (x.split("=") for x in args.per_kind_override)}
 
     from medscope.agent.episode import run_group
     from medscope.train.hf_policy import HFPolicy
 
     views = [v for f in args.views + args.negatives for v in load_views(f)]
-    todo = pick_views(views, args.per_kind)
+    todo = pick_views(views, args.per_kind, override=override)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     old = read_jsonl(out)
@@ -107,7 +112,7 @@ def main() -> None:
     print(f"{len(done)} views already sampled, {len(todo)} to go ({args.k} samples each)", flush=True)
 
     cfg = with_vocab(load_config(), views)
-    policy = HFPolicy(args.model, adapter=args.adapter, max_new_tokens=args.max_new_tokens)
+    policy = HFPolicy(args.model, adapter=args.adapter, max_new_tokens=args.max_new_tokens, temperature=args.temperature)
     t0, kept = time.time(), Counter()
     with open(out, "a") as f:
         for i, v in enumerate(todo):

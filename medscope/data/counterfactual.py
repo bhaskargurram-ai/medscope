@@ -107,6 +107,9 @@ def make_random_removal(
 
 
 DEGRADATIONS = ("blur", "noise", "lowres", "mismatch")
+# v4 training adds severities scaled to the image's own resolution and two further kinds, so "unusable"
+# is learned as a property of the image, not of one operator at one strength
+DEGRADATIONS_V4 = DEGRADATIONS + ("lowres_rel", "jpeg", "motion")
 
 
 def make_degraded(
@@ -133,8 +136,24 @@ def make_degraded(
     if kind == "lowres":
         small = cv2.resize(rgb, (max(1, w // 8), max(1, h // 8)), interpolation=cv2.INTER_AREA)
         return cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+    if kind == "lowres_rel":           # at most 32 pixels on the long side, whatever the native size
+        f = max(max(h, w) / 32, 2.0)
+        small = cv2.resize(rgb, (max(1, round(w / f)), max(1, round(h / f))), interpolation=cv2.INTER_AREA)
+        return cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+    if kind == "jpeg":                 # extreme compression: 8x8 blocks wash out fine detail
+        ok, buf = cv2.imencode(".jpg", cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 2])
+        return cv2.cvtColor(cv2.imdecode(buf, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+    if kind == "motion":               # strong linear motion blur along a random direction
+        length = max(9, int(max(h, w) / 12)) | 1
+        kernel = np.zeros((length, length), np.float32)
+        kernel[length // 2, :] = 1.0 / length
+        angle = float(rng.uniform(0, 180))
+        rot = cv2.getRotationMatrix2D((length / 2 - 0.5, length / 2 - 0.5), angle, 1.0)
+        kernel = cv2.warpAffine(kernel, rot, (length, length))
+        kernel /= max(kernel.sum(), 1e-6)
+        return cv2.filter2D(rgb, -1, kernel)
     if kind == "mismatch":
         if other_image is None:
             raise ValueError("mismatch degradation needs other_image")
         return cv2.resize(_as_rgb(other_image), (w, h), interpolation=cv2.INTER_AREA)
-    raise ValueError(f"unknown degradation {kind!r}; choose from {DEGRADATIONS}")
+    raise ValueError(f"unknown degradation {kind!r}; choose from {DEGRADATIONS_V4}")

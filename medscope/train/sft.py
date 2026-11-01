@@ -48,14 +48,29 @@ def view_order(views: list[View], epochs: int, seed: int) -> list[View]:
     return order
 
 
+SMALL_LESION = 0.02     # lesion box under 2% of the image
+
+
+def lesion_fraction(view: View) -> Optional[float]:
+    if not view.lesion_box:
+        return None
+    x1, y1, x2, y2 = view.lesion_box
+    return max(0, x2 - x1) * max(0, y2 - y1) / 1e6
+
+
 def samples_for(view: View, mode: str, seed: int, index: int,
-                replays: Optional[dict[str, list[str]]] = None, cfg: Optional[dict] = None) -> list[SFTSample]:
+                replays: Optional[dict[str, list[str]]] = None, cfg: Optional[dict] = None,
+                window_prob: float = 0.0, small_zoom: bool = False) -> list[SFTSample]:
     """Synthetic trajectory for the view, or the model's own recorded episode for it if one
-    was kept by rejection sampling (`replays`: view_id -> assistant turns)."""
+    was kept by rejection sampling (`replays`: view_id -> assistant turns).
+    v4 options: window_prob (start grey-scale trajectories with a window call), small_zoom
+    (always zoom before answering about a small lesion)."""
     if replays and view.view_id in replays:
         return replay_samples(view, replays[view.view_id], cfg)
     rng = np.random.default_rng([seed, index])
-    return build_trajectory(view, rng, direct_only=(mode == "grounding"))
+    frac = lesion_fraction(view)
+    zoom_prob = 1.0 if small_zoom and frac is not None and frac < SMALL_LESION else 0.6
+    return build_trajectory(view, rng, zoom_prob=zoom_prob, direct_only=(mode == "grounding"), window_prob=window_prob)
 
 
 def estimate_samples(views: list[View], mode: str) -> float:
@@ -78,6 +93,8 @@ def train_sft(
     seed: int = 0,
     log: Callable[[str], None] = print,
     replays: Optional[dict[str, list[str]]] = None,
+    window_prob: float = 0.0,
+    small_zoom: bool = False,
 ) -> Path:
     import torch
 
@@ -116,7 +133,7 @@ def train_sft(
     micro, running, t0 = 0, [], time.time()
     save_due = False
     for vi in range(start_view, len(order)):
-        for s in samples_for(order[vi], mode, seed, vi, replays, cfg):
+        for s in samples_for(order[vi], mode, seed, vi, replays, cfg, window_prob, small_zoom):
             target = policy.target_ids(s.target)
             lp = policy.token_logprobs(s.messages, target)
             loss = -lp.mean()

@@ -184,6 +184,12 @@ _ABSENT_FINDING = re.compile(r"\b(?:no|without)\s+(?:\w+\s+){0,2}?(?:abnormalit\
 _THERE_IS_NO = re.compile(r"\bthere (?:is|are) (?:no|not)\b")
 _THERE_IS = re.compile(r"\bthere (?:is|are)\b")
 _ASKED = re.compile(r"\b(?:is|are) there (?:an? |any )?(.+?)(?: in | on | at | within |$)")
+# reworded presence questions (v4 paraphrases); tried only when the "is there" form does not match
+_ASKED_MORE = (
+    re.compile(r"\b(?:can|do) you see (?:an? |any )?(.+?)(?: in | on |$)"),
+    re.compile(r"\bis (?:an? |any )?(.+?) (?:visible|present) in\b"),
+    re.compile(r"\b(?:show|shows|contain) (?:an? |any )?(.+?)$"),
+)
 
 
 def asks_health(question: Optional[str]) -> bool:
@@ -195,8 +201,15 @@ def asked_finding(question: Optional[str]) -> Optional[str]:
     """The finding a presence question asks about: "Is there a pneumothorax in ...?" -> "pneumothorax"."""
     if not question:
         return None
-    m = _ASKED.search(normalise_answer(question))
-    return m.group(1).strip() if m else None
+    q = normalise_answer(question)
+    m = _ASKED.search(q)
+    if m:
+        return m.group(1).strip()
+    for pat in _ASKED_MORE:
+        m = pat.search(q)
+        if m:
+            return m.group(1).strip()
+    return None
 
 
 def _first_cue(text: str) -> Optional[str]:

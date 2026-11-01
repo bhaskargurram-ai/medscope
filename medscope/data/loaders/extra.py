@@ -183,6 +183,8 @@ DATASETS: dict[str, dict] = {
 
 # per split: cap on lesion images and on negative images, so evaluation stays affordable
 CAPS = {"train": (500, 250), "validation": (25, 25), "test": (50, 50)}
+# v4: every training image the split holds, a larger validation set for model selection; test unchanged
+CAPS_V4 = {"train": (10 ** 6, 10 ** 6), "validation": (100, 100), "test": (50, 50)}
 MAX_PER_PATIENT = {"lgg": (5, 3)}   # brain MRI: neighbouring slices are near-copies; keep a few per patient
 
 
@@ -254,17 +256,27 @@ def scan(name: str, rows: Iterable[dict], out_dir: Path, log: Callable[[str], No
     return recs, stats
 
 
-def split_and_cap(recs: list[Record], seed: int) -> dict[str, list[Record]]:
-    """Assign whole groups to splits, then cap lesion and negative images per split (and per patient)."""
+def split_and_cap(recs: list[Record], seed: int, caps: Optional[dict] = None,
+                  fresh: Optional[tuple[int, int]] = None) -> dict[str, list[Record]]:
+    """Assign whole groups to splits, then cap lesion and negative images per split (and per patient).
+
+    The selection is deterministic, so raising the train or validation caps adds images without changing which
+    images the test split holds. `fresh` = (lesion, negative) caps of a confirmatory "fresh" test set taken from
+    test-split patients that the existing test set does not use: images nobody has evaluated before.
+    """
+    caps = caps or CAPS
     ids = {g: k for k, g in enumerate(sorted({r.group for r in recs}))}
     split_of = assign_splits([ids[r.group] for r in recs], seed=seed)
     out: dict[str, list[Record]] = {s: [] for s in SPLITS}
+    if fresh:
+        out["fresh"] = []
     by_split: dict[str, list[Record]] = defaultdict(list)
     for r in recs:
         by_split[split_of[ids[r.group]]].append(r)
     for split, rs in by_split.items():
-        cap_pos, cap_neg = CAPS[split]
+        cap_pos, cap_neg = caps[split]
         per_patient = MAX_PER_PATIENT.get(rs[0].dataset) if rs else None
+        leftovers = {}
         for negative, cap in ((False, cap_pos), (True, cap_neg)):
             pool = sorted((r for r in rs if r.negative == negative), key=lambda r: stable_index(r.key, 10 ** 9))
             if per_patient:
@@ -277,6 +289,12 @@ def split_and_cap(recs: list[Record], seed: int) -> dict[str, list[Record]]:
                         seen[r.group] += 1
                 pool = kept
             out[split] += pool[:cap]
+            leftovers[negative] = pool[cap:]
+        if fresh and split == "test":
+            used = {r.group for r in out["test"]}          # patients the existing test set already shows
+            for negative in (False, True):
+                rest = [r for r in leftovers[negative] if r.group not in used]
+                out["fresh"] += rest[:fresh[1] if negative else fresh[0]]
     return out
 
 
@@ -299,14 +317,14 @@ def negative_view(rec: Record) -> View:
 
 
 NEG_FILES = {"test": "views_negatives.jsonl", "train": "views_negatives_train.jsonl",
-             "validation": "views_negatives_val.jsonl"}
+             "validation": "views_negatives_val.jsonl", "fresh": "views_negatives_fresh.jsonl"}
 
 
 def write_outputs(splits: dict[str, list[Record]], out: Path) -> dict:
     """cases_{split}.jsonl for the view builder, natural-negative views per split."""
     counts = {}
     (out / "negatives").mkdir(parents=True, exist_ok=True)
-    for split in SPLITS:
+    for split in [*SPLITS, *(["fresh"] if "fresh" in splits else [])]:
         rs = splits.get(split, [])
         cases = [c for r in rs if not r.negative for c in cases_for(r, split)]
         negs = [negative_view(r) for r in rs if r.negative]
