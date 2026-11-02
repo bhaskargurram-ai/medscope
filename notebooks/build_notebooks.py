@@ -1848,6 +1848,13 @@ V3 = json.load(open(f'{ADAPTERS}/final_choice.json'))['adapter']
     ]
 
 
+def gated(parts: tuple[str, ...], src: str) -> dict:
+    """A code cell that runs only in the listed parts (or when PART is 'all'): one notebook, opened in several
+    Colab sessions with a different PART each, splits its work over several GPUs."""
+    body = "".join("    " + l if l.strip() else l for l in src.strip("\n").splitlines(keepends=True))
+    return code(f"if PART in {('all',) + parts!r}:\n" + body)
+
+
 def nb24_v4_eval() -> list[dict]:
     flag_runs = [f"v2_{t}_test" for t, _, _ in FLAGSHIP_TAGS]
     base_runs = [b[0] for b in BASELINES]
@@ -1872,13 +1879,32 @@ everything. Every MedScope number in the paper comes from this notebook.
 
 Few-shot and cautious-prompt frontier runs (notebooks 17 and 20) are reused and compared with v4 on the same cases.
 
-**Runtime:** A100, about 12-14 hours for the GPU parts; API about $90-130 (estimates printed before spending).
-Every step resumes, so it can be split over sessions. Colab secrets: `HF_TOKEN` (write access, for the release),
-`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`.
+**Run it in parallel (recommended):** open this notebook in four Colab sessions at once, set `PART` in the first
+cell differently in each, and choose *Run all* in each. Every part writes its own result folders in Drive, so they
+never touch each other.
+
+| PART | Runtime | Runs | Time |
+| --- | --- | --- | --- |
+| `A` | A100 | sections 1-2 (the v4 model) | ~3-4 h |
+| `B1` | A100 | section 3, open models 1-3 | ~2-3 h |
+| `B2` | A100 | section 3, open models 4-6 | ~2-3 h |
+| `C` | CPU | section 4 (API) | ~3-5 h |
+| `report` | CPU | sections 5-6 and the report, **after the four parts above have finished** | ~45 min |
+
+`PART = 'all'` runs everything in one session (about 10-12 hours). API cost about $90-130 (estimate printed before
+spending). Every step resumes. Colab secrets: `HF_TOKEN` (write access, for the release), `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`.
 """ + SECRETS_NOTE),
+        code("""
+PART = 'all'  #@param ["all", "A", "B1", "B2", "C", "report"]
+"""),
         code(SETUP), code(GPU_STACK), code("!pip install -q -U openai anthropic google-genai huggingface_hub"),
         code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
         code(f"""
+import torch
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+BATCH = 24 if GPU_GB >= 38 else 8      # more episodes per batch on an A100/H100: same replies, faster
+print('PART:', PART, '| GPU memory:', round(GPU_GB), 'GB | episodes per batch:', BATCH)
 for name in ('OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'HF_TOKEN'):
     if secret(name):
         os.environ[name] = secret(name)
@@ -1895,32 +1921,33 @@ def cost(views, run, model, factor=1.0):
     vs = [v for f in views.split() for v in load_views(f)]
     return len(remaining(vs, f'{{RESULTS}}/{{run}}', 'api')) * PER_VIEW[model] * factor
 """),
-        md("## 1. The final model on every test set"),
-        code(f"""
+        md("## 1. The final model on every test set (PART A)"),
+        gated(("A",), f"""
 SETS = [('test', f'{{TEST_VIEWS}} {{TEST_NEG}}', ''), ('ext', EXT_VIEWS, ''), ('fresh', FRESH, ''), ('ext2', EXT2, ''),
         ('vqa', VQA_VIEWS, ''), ('notools_test', f'{{TEST_VIEWS}} {{TEST_NEG}}', '--tool-budget 0')]
 for split, views, extra in SETS:
-    !python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{views}} {{extra}} --out {{RESULTS}}/v4_final_{{split}} --name medscope-v4 --split {{split}}
+    !python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{views}} {{extra}} --out {{RESULTS}}/v4_final_{{split}} --name medscope-v4 --split {{split}} --batch-size {{BATCH}}
 """),
-        md("## 2. Held-out inpainting tools and held-out question wordings"),
-        code(f"""
+        md("## 2. Held-out inpainting tools and held-out question wordings (PART A)"),
+        gated(("A",), f"""
 for t in ['telea', 'transplant', 'diffusion']:
     if not os.path.exists(f'{{INP}}/{{t}}/views.jsonl'):
         raise SystemExit(f'{{t}}: held-out-tool views missing, run notebook 20 (on a GPU for diffusion) first')
-    !python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{INP}}/{{t}}/views.jsonl --vocab-from {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/v4_inp_{{t}}_final_test --name medscope-v4-{{t}} --split test
+    !python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{INP}}/{{t}}/views.jsonl --vocab-from {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/v4_inp_{{t}}_final_test --name medscope-v4-{{t}} --split test --batch-size {{BATCH}}
 !python scripts/paraphrase_views.py --views {{TEST_VIEWS}} {{TEST_NEG}} --out {{PARA}}
-!python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{PARA}} --vocab-from {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/v4_final_para_test --name medscope-v4-paraphrase --split test
+!python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{PARA}} --vocab-from {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/v4_final_para_test --name medscope-v4-paraphrase --split test --batch-size {{BATCH}}
 """),
-        md("## 3. Open models: fresh test sets, and standard VQA with their own plain prompt (GPU)"),
-        code(f"""
+        md("## 3. Open models: fresh test sets, and standard VQA with their own plain prompt (PART B1: models 1-3, B2: 4-6)"),
+        gated(("B1", "B2"), f"""
 OPEN = [
 {open_rows}
 ]
+OPEN = {{'B1': OPEN[:3], 'B2': OPEN[3:]}}.get(PART, OPEN)
 failed = []
 for tag, name, model in OPEN:
     for split, views, extra in (('fresh', FRESH, ''), ('ext2', EXT2, ''), ('vqaplain', VQA_VIEWS, '--prompt plain')):
         try:
-            !python scripts/evaluate.py --model {{model}} --views {{views}} {{extra}} --out {{RESULTS}}/v2_{{tag}}_{{split}} --name {{name}} --split {{split}}
+            !python scripts/evaluate.py --model {{model}} --views {{views}} {{extra}} --out {{RESULTS}}/v2_{{tag}}_{{split}} --name {{name}} --split {{split}} --batch-size {{min(BATCH, 16)}}
         except SystemExit:
             failed.append(f'{{name}} ({{split}})')
             import torch; torch.cuda.empty_cache()
@@ -1930,8 +1957,8 @@ print('failed:', failed or 'none')
 
 a. the fresh internal and fresh external tests; b. the held-out wordings (150 cases); c. **highest reasoning effort**
 (OpenAI `reasoning_effort=high`, Anthropic effort `max`, Gemini thinking level `high`) on the same 150 test cases as
-the cautious and few-shot runs; d. standard VQA, same agent loop as every other model."""),
-        code(r"""
+the cautious and few-shot runs; d. standard VQA, same agent loop as every other model. (PART C, CPU is fine)"""),
+        gated(("C",), r"""
 TEST = f'{TEST_VIEWS} {TEST_NEG}'
 plan = []
 for tag, p, m in FLAGSHIPS:
@@ -1950,8 +1977,16 @@ for tag, p, m, split, views, run, extra, _ in plan:
         failed.append(run)
 print('failed:', failed or 'none')
 """),
-        md("## 5. Robustness analyses from stored results (CPU)"),
-        code(f"""
+        md("## 5. Robustness analyses from stored results (PART report, after A, B1, B2 and C)"),
+        gated(("report",), f"""
+need = ['v4_final_test', 'v4_final_ext', 'v4_final_fresh', 'v4_final_ext2', 'v4_final_vqa', 'v4_final_notools_test',
+        'v4_final_para_test'] + [f'v4_inp_{{t}}_final_test' for t in ('telea', 'transplant', 'diffusion')] \\
+    + [f'v2_{{t}}_{{s}}' for t in {open_tags!r} for s in ('fresh', 'ext2', 'vqaplain')] \\
+    + [f'{{r}}' for t, _, _ in FLAGSHIPS for r in (f'v2_{{t}}_fresh', f'v2_{{t}}_ext2', f'v2_para_{{t}}_test', f'v2_high_{{t}}_test', f'v2_{{t}}_vqa')]
+missing = [r for r in need if not os.path.exists(f'{{RESULTS}}/{{r}}/summary.json')]
+print('runs not finished yet:', missing or 'none')
+if missing and PART == 'report':
+    print('WARNING: the parts above have not all finished; the report will have gaps until this cell is rerun')
 !python scripts/rescore_all.py --results {{RESULTS}} --pattern 'v4_final*'
 !python scripts/rescore_all.py --results {{RESULTS}} --pattern 'v2_*'      # every compared run judged by the same current rules
 JUDGES = {FRONTIER_RUNS!r}
@@ -1971,8 +2006,8 @@ for split, views in (('test', f'{{TEST_VIEWS}} {{TEST_NEG}}'), ('ext', EXT_VIEWS
     !python scripts/breakdowns.py --results {{RESULTS}} --views {{views}} --runs {{q(runs)}} --ref v4_final_{{split}} --out {{RESULTS}}/breakdowns_{{split}}.md > /dev/null
 !python scripts/example_figure.py --views {{TEST_VIEWS}} --negatives {{TEST_NEG}} --out {{RESULTS}}/figures
 """),
-        md("## 6. Release: the v4 model and the benchmark (private Hugging Face repositories; make public on submission)"),
-        code(r"""
+        md("## 6. Release: the v4 model and the benchmark (private Hugging Face repositories; make public on submission; PART report)"),
+        gated(("report",), r"""
 UPLOAD = True     # False: only prepare the folders in Drive
 flag = '--upload' if UPLOAD and os.environ.get('HF_TOKEN') else ''
 MORE = (f"--more fresh_internal={FRESH.replace(' ', ',')} --more fresh_external={EXT2.replace(' ', ',')} "
@@ -1982,7 +2017,7 @@ BLURB = ('MedScope v4: counterfactual SFT (LaMa and tissue-transplant erasures, 
          'VQA replay; selected on validation by a pre-registered rule.')
 !python scripts/release_hf.py --final {FINAL} --final-runs v4_final_test v4_final_ext --final-blurb '{BLURB}' --results {RESULTS} --views {TEST_VIEWS} {TEST_NEG} --external {EXT_VIEWS} {MORE} --out {DRIVE}/release_v4 {flag}
 """),
-        publish("MedScope report - 24 v4 everywhere", f"""
+        gated(("report",), "".join(publish("MedScope report - 24 v4 everywhere", f"""
     ('Final model', read_text(f'{{ADAPTERS}}/final_choice_v4.json')),
     ('Main test: v4 vs every model (paired)', {sig('v4_final_test', FRONTIER_RUNS + base_runs + ['v2_medscope3_test', 'v2_medscope_test'])}),
     ('Main test by imaging type', by_dataset(RESULTS, ['v4_final_test', 'v2_medscope3_test'] + {flag_runs!r})),
@@ -2011,7 +2046,7 @@ BLURB = ('MedScope v4: counterfactual SFT (LaMa and tissue-transplant erasures, 
     ('Extra analyses (decisions, cost matrices, tool use, lesion size)', read_text(f'{{RESULTS}}/extra_analysis_v4.md')),
     ('Highest-effort flagships: leaderboard', compare_runs(RESULTS, 'v2_high_*')),
     ('Model card (released)', read_text(f'{{DRIVE}}/release_v4/MedScope-4B/README.md')),
-"""),
+""")["source"])),
     ]
 
 
@@ -2040,9 +2075,18 @@ same learning-rate schedule (checked in the notebook).
 Each model is tested on the main test, the external centres and the fresh external test; the With CF, Without CF,
 absent-matched and erasures-only arms (seed 0) also on the erasures remade by three held-out inpainting tools.
 
-**Runtime:** A100, about 45 hours in total (nine trainings of about 4-5 hours); every step resumes, so it can be
-split over sessions. MedGemma needs `HF_TOKEN` with its terms accepted (https://huggingface.co/{MEDGEMMA}).
+**Run it in parallel (recommended):** about 50 A100-hours in total (nine trainings of about 3.5-4 hours, plus
+tests). Open this notebook in several Colab sessions at once (one A100 each), set `PARTS` to the number of sessions
+and `PART` to 1, 2, ... in each, and choose *Run all* in each. The jobs are split so every session has about the same
+amount of work; each writes only its own folders in Drive. With 3 sessions it takes about 19 hours, with 4 about 16,
+with 5 about 12 (the first cell after setup prints which jobs each part gets). When all have finished, run the notebook once more with `PART = 'report'` (CPU is fine) for the
+summaries and the report. `PART = 'all'` runs everything in one session. Every step resumes.
+MedGemma needs `HF_TOKEN` with its terms accepted (https://huggingface.co/{MEDGEMMA}).
 """ + SECRETS_NOTE),
+        code("""
+PARTS = 4     #@param {type:"integer"}
+PART = 'all'  #@param ["all", "1", "2", "3", "4", "5", "6", "report"]
+"""),
         code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
         code(r"""
 from medscope.eval.runner import load_views
@@ -2060,22 +2104,40 @@ def test_all(model, adapter, name, heldout=False):
         sets += [('test', f'{INP}/{t}/views.jsonl', f'--vocab-from {TEST_VIEWS} {TEST_NEG}', f'{head}_inp_{t}_{rest}_test')
                  for t in ('telea', 'transplant', 'diffusion')]
     for split, views, extra, run in sets:
-        !python scripts/evaluate.py --model {model} --adapter {adapter} --views {views} {extra} --out {RESULTS}/{run} --name {name} --split {split}
+        !python scripts/evaluate.py --model {model} --adapter {adapter} --views {views} {extra} --out {RESULTS}/{run} --name {name} --split {split} --batch-size {BATCH}
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+BATCH = 24 if GPU_GB >= 38 else 8      # more test episodes per batch on an A100/H100: same replies, faster
 """),
-        md("## Quick check that MedGemma trains (3 steps on 50 views)"),
+        md("## Which jobs this session runs"),
         code(f"""
-if not os.path.exists(f'{{ADAPTERS}}/v4mg_cf_s0/state.json'):
+# (model, tag, arm, seed, estimated hours); 'test' = only testing notebook 23's stage 1 (seed 0 with CF)
+JOBS = [('{BASE}', 'v4q', 'test', 0, 2.5), ('{BASE}', 'v4q', 'nocf', 0, 6.5), ('{BASE}', 'v4q', 'nocfabs', 0, 6.5),
+        ('{BASE}', 'v4q', 'tgt', 0, 6.5), ('{BASE}', 'v4q', 'cf', 1, 5), ('{BASE}', 'v4q', 'nocf', 1, 5),
+        ('{BASE}', 'v4q', 'cf', 2, 5), ('{BASE}', 'v4q', 'nocf', 2, 5),
+        ('{MEDGEMMA}', 'v4mg', 'cf', 0, 5.5), ('{MEDGEMMA}', 'v4mg', 'nocf', 0, 5.5)]
+load = [0.0] * PARTS
+owner = {{}}
+for i in sorted(range(len(JOBS)), key=lambda i: -JOBS[i][4]):     # longest first, each to the least-loaded part
+    k = min(range(PARTS), key=lambda k: load[k])
+    owner[i], load[k] = k + 1, load[k] + JOBS[i][4]
+for k in range(1, PARTS + 1):
+    print(f'part {{k}} (~{{load[k - 1]:.0f}} h):', ', '.join(f'{{j[1]}}_{{j[2]}}_s{{j[3]}}' for i, j in enumerate(JOBS) if owner[i] == k))
+MINE = [j for i, j in enumerate(JOBS) if PART == 'all' or str(owner[i]) == str(PART)]
+print('this session (PART', PART, '):', [f'{{j[1]}}_{{j[2]}}_s{{j[3]}}' for j in MINE] or 'no training or testing')
+"""),
+        md("## Quick check that MedGemma trains (3 steps on 50 views; only in the session that trains MedGemma)"),
+        code(f"""
+if any(j[1] == 'v4mg' for j in MINE) and not os.path.exists(f'{{ADAPTERS}}/v4mg_cf_s0/state.json'):
     !python scripts/train_sft.py --model {MEDGEMMA} --views {{TRAIN_V4}} --negatives {{TRAIN_NEG_V4}} --subsample 50 --max-steps 3 --grad-accum 2 --mode agentic --out {{WORK}}/mg_smoke
     print('MedGemma training works')
 """),
-        md("## Train and test (order: seed-0 ablations, seeds 1-2 of both arms, MedGemma)"),
+        md("## Train and test this session's jobs"),
         code(f"""
 ARGS = {{'cf': f'{s1}', 'nocf': f'{nocf}', 'nocfabs': f'{nocf_abs}', 'tgt': f'{tgt}'}}
-JOBS = [('{BASE}', 'v4q', 'nocf', 0), ('{BASE}', 'v4q', 'nocfabs', 0), ('{BASE}', 'v4q', 'tgt', 0),
-        ('{BASE}', 'v4q', 'cf', 1), ('{BASE}', 'v4q', 'nocf', 1), ('{BASE}', 'v4q', 'cf', 2), ('{BASE}', 'v4q', 'nocf', 2),
-        ('{MEDGEMMA}', 'v4mg', 'cf', 0), ('{MEDGEMMA}', 'v4mg', 'nocf', 0)]
-test_all('{BASE}', f'{{ADAPTERS}}/v4_s1/final', 'v4q_cf_s0', heldout=True)        # seed 0 with CF = notebook 23's stage 1
-for model, tag, arm, seed in JOBS:
+for model, tag, arm, seed, _ in MINE:
+    if arm == 'test':
+        test_all(model, f'{{ADAPTERS}}/v4_s1/final', 'v4q_cf_s0', heldout=True)     # seed 0 with CF = notebook 23's stage 1
+        continue
     name = f'{{tag}}_{{arm}}_s{{seed}}'
     out = f'{{ADAPTERS}}/{{name}}'
     if not os.path.exists(f'{{out}}/final/adapter_config.json'):
@@ -2086,13 +2148,16 @@ for model, tag, arm, seed in JOBS:
         raise SystemExit(f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like, stop and report this')
     test_all(model, f'{{out}}/final', name, heldout=(tag == 'v4q' and seed == 0))
 """),
-        md("## Summaries"),
-        code(r"""
+        md("## Summaries and report (PART report, after every part has finished)"),
+        gated(("report",), r"""
+missing = [f'{j[1]}_{"cf" if j[2] == "test" else j[2]}_s{j[3]}_{s}' for j in JOBS for s in ('test', 'ext', 'ext2')
+           if not os.path.exists(f'{RESULTS}/{j[1]}_{"cf" if j[2] == "test" else j[2]}_s{j[3]}_{s}/summary.json')]
+print('runs not finished yet:', missing or 'none')
 for split in ('test', 'ext', 'ext2'):
     !python scripts/seed_summary.py --results {RESULTS} --arm 'With CF=v4q_cf_s0_{split},v4q_cf_s1_{split},v4q_cf_s2_{split}' --arm 'Without CF=v4q_nocf_s0_{split},v4q_nocf_s1_{split},v4q_nocf_s2_{split}' --out {RESULTS}/v4_seeds_{split}.md
 !python scripts/inpainter_summary.py --results {RESULTS} --inpainters telea transplant diffusion --model 'With CF=v4q_cf_s0_test' --model 'Without CF=v4q_nocf_s0_test' --model 'Without CF, absent-matched=v4q_nocfabs_s0_test' --model 'Erasures only=v4q_tgt_s0_test' --ref 'With CF' --training-tools lama transplant --out {RESULTS}/inpainters_v4_ablation.md
 """),
-        publish("MedScope report - 25 v4 recipe", f"""
+        gated(("report",), "".join(publish("MedScope report - 25 v4 recipe", f"""
     ('Main test: three seeds per arm', read_text(f'{{RESULTS}}/v4_seeds_test.md')),
     ('External centres: three seeds per arm', read_text(f'{{RESULTS}}/v4_seeds_ext.md')),
     ('Fresh external: three seeds per arm', read_text(f'{{RESULTS}}/v4_seeds_ext2.md')),
@@ -2105,7 +2170,7 @@ for split in ('test', 'ext', 'ext2'):
     ('MedGemma with vs without counterfactual views (fresh external)', significance_table(RESULTS, 'v4mg_cf_s0_ext2', ['v4mg_nocf_s0_ext2', 'v2_base_medgemma15_ext2'])),
     ('Qwen vs MedGemma base, same v4 stage-1 recipe', significance_table(RESULTS, 'v4q_cf_s0_test', ['v4mg_cf_s0_test'])),
     ('Stage 1 vs the final model (what stages 2-3 add)', significance_table(RESULTS, 'v4_final_test', ['v4q_cf_s0_test'])),
-"""),
+""")["source"])),
     ]
 
 

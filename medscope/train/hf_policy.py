@@ -247,6 +247,15 @@ class HFPolicy:
         try:
             with torch.no_grad():
                 out, recorder = self._generate(inputs, sample)
+        except torch.cuda.OutOfMemoryError:
+            # too large a batch for this GPU: split it in two (same replies, only slower) instead of giving up
+            del inputs
+            torch.cuda.empty_cache()
+            half = len(conversations) // 2
+            if not getattr(self, "_oom_noted", False):
+                print(f"batch of {len(conversations)} does not fit in GPU memory: running it in halves")
+                self._oom_noted = True
+            return self.generate_batch(conversations[:half], sample) + self.generate_batch(conversations[half:], sample)
         except Exception as e:  # noqa: BLE001 - e.g. a model whose vision tower can't batch mixed sizes
             print(f"batched generation failed for this model ({type(e).__name__}: {str(e)[:120]}); "
                   "running one at a time")
