@@ -724,3 +724,14 @@ net 0.788 -> 0.796. By type (different images old vs new): brain MRI CCR 0.94 ->
 denials after edit elsewhere 6% -> 25%; chest X-ray ESG 0.65 -> 0.46; breast ultrasound healthy claims 24% -> 0%.
 Amendment 1 to the pre-registration (before any stage-2/3 validation or test result): v3 is evaluated on the same
 v4 validation set and stays the final model unless v4 is within 0.02 of it in net utility.
+
+## 2026-11-02 — v4 selection (notebook 23)
+
+Validation (540 cases, 1,473 views), net utility / healthy-image claims: stage 1 0.585 / 13.6%, stage 2 0.610 /
+12.7%, stage 3 0.613 / 7.7% -> pre-registered rule selects stage 3. v3 on the same validation set: 0.593 / 8.2%
+-> amendment 1 keeps v4 stage 3 (within 0.02 of v3 or better). Final model: adapters/v4_s3/final.
+v4 stage 3 minus v3, paired over the same validation cases: net +0.020 (p 0.59), ESG +0.016 (p 0.58), erased-lesion
+claims 16.6% -> 8.7% (p<0.001), healthy-image claims 8.2% -> 7.7% (p 0.89), CCR 0.852 -> 0.792 (p 0.004), denials
+after an edit elsewhere 14.1% -> 20.3% (p 0.004), grounded accuracy 0.772 -> 0.706 (p 0.001). By type: chest X-ray
+erased claims 28% -> 12%, CCR 0.79 -> 0.67; breast ultrasound erased 20% -> 8%, healthy 10% -> 0%, CCR 0.92 -> 0.81;
+colonoscopy net 0.95 -> 1.00; SLAKE (21 cases) net 0.14 -> 0.03.
