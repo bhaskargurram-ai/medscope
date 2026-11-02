@@ -1980,6 +1980,10 @@ S1_STEPS, S1_TOTAL = _s1['opt_step'], _s1['total_steps']    # the no-CF arms tak
 print('stage-1 steps:', S1_STEPS, '| schedule length:', S1_TOTAL)
 def test_all(model, adapter, name):
     for split, views in (('test', f'{TEST_VIEWS} {TEST_NEG}'), ('ext', EXT_VIEWS), ('ext2', EXT2)):
+        if split == 'ext2' and not os.path.exists(f'{ADAPTERS}/final_choice_v4.json'):
+            # pre-registration: no model touches the fresh test set before notebook 23 has chosen v4
+            print(f'{name}: fresh external test postponed until notebook 23 has chosen the v4 model')
+            continue
         !python scripts/evaluate.py --model {model} --adapter {adapter} --views {views} --out {RESULTS}/{name}_{split} --name {name} --split {split}
 """),
         md("## Quick check that MedGemma trains (3 steps on 50 views)"),
@@ -2005,6 +2009,17 @@ for model, tag, arm, seed in JOBS:
     if abs(done - S1_STEPS) > 0.02 * S1_STEPS:
         print(f'WARNING: {{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like')
     test_all(model, f'{{out}}/final', name)
+"""),
+        md("## Fresh external test for every model (runs only once notebook 23 has chosen v4; rerun this cell then)"),
+        code(f"""
+if os.path.exists(f'{{ADAPTERS}}/final_choice_v4.json'):
+    test_all('{BASE}', f'{{ADAPTERS}}/v4_s1/final', 'v4q_cf_s0')
+    for model, tag, arm, seed in JOBS:
+        name = f'{{tag}}_{{arm}}_s{{seed}}'
+        if os.path.exists(f'{{ADAPTERS}}/{{name}}/final/adapter_config.json'):
+            test_all(model, f'{{ADAPTERS}}/{{name}}/final', name)
+else:
+    print('notebook 23 has not chosen v4 yet: rerun this cell (and the ones below) after it has')
 """),
         code(r"""
 for split in ('test', 'ext', 'ext2'):
