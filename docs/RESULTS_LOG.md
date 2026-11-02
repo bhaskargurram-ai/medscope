@@ -713,3 +713,14 @@ claims (6.1% -> 15.9%, p=0.001). MedScope-4B vs few-shot flagships: ESG +0.24 to
 points (all p<=0.001).
 Note for v4: Telea is the weakest tool for the v3-era models; v4 trains on LaMa + transplant and is tested on Telea
 and Stable Diffusion as unseen tools.
+
+## 2026-11-02 — v4 stage 1 on validation
+
+v4 stage 1 (3,706 steps): v4 validation (540 cases, 1,473 views) CCR 0.805, ESG 0.672, erased claims 13.1%,
+denials after an edit elsewhere 19.7%, healthy-image claims 13.6%, net 0.585. Not comparable with v3's stage-1
+validation numbers as a whole (the v4 validation set is larger and weighted towards chest X-ray and brain MRI). On
+the 525 identical views (colonoscopy, SLAKE): v3 stage 1 -> v4 stage 1: ESG 0.768 -> 0.795, erased 8.0% -> 7.1%,
+net 0.788 -> 0.796. By type (different images old vs new): brain MRI CCR 0.94 -> 0.75, healthy claims 0% -> 24%,
+denials after edit elsewhere 6% -> 25%; chest X-ray ESG 0.65 -> 0.46; breast ultrasound healthy claims 24% -> 0%.
+Amendment 1 to the pre-registration (before any stage-2/3 validation or test result): v3 is evaluated on the same
+v4 validation set and stays the final model unless v4 is within 0.02 of it in net utility.

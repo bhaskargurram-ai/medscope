@@ -1831,7 +1831,10 @@ if not os.path.exists(REPLAY):
 """),
         md("## Pre-registered selection"),
         code(r"""
-!python scripts/select_v4.py --results {RESULTS} --adapters {ADAPTERS} --out {ADAPTERS}/final_choice_v4.json
+# amendment 1 (docs/PREREGISTRATION_v4.md): the earlier final model on the same v4 validation set
+V3 = json.load(open(f'{ADAPTERS}/final_choice.json'))['adapter']
+!python scripts/evaluate.py --model Qwen/Qwen3.5-4B --adapter {V3} --views {VAL_V4} {VAL_NEG_V4} --out {RESULTS}/v3_on_v4_val --name medscope-4b-v3 --split validation
+!python scripts/select_v4.py --results {RESULTS} --adapters {ADAPTERS} --incumbent v3_on_v4_val --incumbent-adapter {V3} --out {ADAPTERS}/final_choice_v4.json
 """),
         publish("MedScope report - 23 v4 training", """
     ('Selection (pre-registered rule)', read_text(f'{ADAPTERS}/final_choice_v4.json')),
@@ -1839,6 +1842,8 @@ if not os.path.exists(REPLAY):
     ('Rejection sampling', read_text(f'{ADAPTERS}/v4_rft/rft_summary.md')),
     ('Validation by imaging type', by_dataset(RESULTS, ['v4_s1_val', 'v4_s2_val', 'v4_s3_val'])),
     ('Validation: stage 3 vs stage 2 (paired)', significance_table(RESULTS, 'v4_s3_val', ['v4_s2_val', 'v4_s1_val'])),
+    ('Validation: v4 stages vs v3 on the same set (paired)', significance_table(RESULTS, 'v3_on_v4_val', ['v4_s1_val', 'v4_s2_val', 'v4_s3_val'])),
+    ('Validation by imaging type, v3 and v4 stages', by_dataset(RESULTS, ['v3_on_v4_val', 'v4_s1_val', 'v4_s2_val', 'v4_s3_val'])),
 """),
     ]
 

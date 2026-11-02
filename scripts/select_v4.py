@@ -30,6 +30,10 @@ def main() -> None:
     ap.add_argument("--results", required=True)
     ap.add_argument("--adapters", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--incumbent", default=None,
+                    help="amendment 1: validation run of the earlier final model (v3) on the same v4 validation set; "
+                         "it stays the final model if the chosen v4 stage is more than 0.02 below it in net utility")
+    ap.add_argument("--incumbent-adapter", default=None)
     args = ap.parse_args()
     scores, folders = {}, {}
     for stage, run, folder in STAGES:
@@ -39,10 +43,19 @@ def main() -> None:
     chosen = choose(scores)
     rec = {"rule": "docs/PREREGISTRATION_v4.md", "chosen": chosen, "adapter": folders[chosen],
            "validation": {s: {"net_utility": u, "healthy_image_claims": h} for s, (u, h) in scores.items()}}
+    if args.incumbent:
+        m = json.loads((Path(args.results) / args.incumbent / "summary.json").read_text())["metrics"]
+        u_old = m["net_utility"]["value"]
+        rec["validation"]["v3 (incumbent)"] = {"net_utility": u_old,
+                                               "healthy_image_claims": m["natural_hallucination_rate"]["value"]}
+        if scores[chosen][0] < u_old - MARGIN:
+            print(f"amendment 1: v4 {chosen} ({scores[chosen][0]:.3f}) is more than {MARGIN} below v3 ({u_old:.3f}) "
+                  "on the same validation set -> v3 stays the final model")
+            rec.update({"chosen": "v3 (incumbent)", "adapter": args.incumbent_adapter, "v4_candidate": folders[chosen]})
     Path(args.out).write_text(json.dumps(rec, indent=2))
     for s, (u, h) in scores.items():
         print(f"{s}: validation net utility {u:.3f}, healthy-image claims {h:.1%}")
-    print(f"pre-registered rule -> final v4 model: {chosen} ({folders[chosen]})")
+    print(f"pre-registered rule -> final model: {rec['chosen']} ({rec['adapter']})")
 
 
 if __name__ == "__main__":

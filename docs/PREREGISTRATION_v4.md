@@ -55,6 +55,14 @@ Let U be validation net utility and H the validation rate of claimed findings on
 - Otherwise **stage 2** if U(stage 2) >= U(stage 1) - 0.02 and H(stage 2) <= H(stage 1) + 0.02.
 - Otherwise **stage 1**.
 
+**Amendment 1 (2 November 2026, 01:40 UTC; after the stage-1 validation result, before any stage-2/3
+validation result and before any test result).** The validation set was enlarged for v4, so v4 cannot be compared
+with the earlier final model (v3) through earlier numbers. v3 is therefore evaluated on the same v4 validation set,
+and it remains the final model if the v4 stage chosen above is more than 0.02 below it in validation net utility.
+Reason: on the 525 validation views shared with the earlier validation set, v4 stage 1 equals or beats v3's stage 1
+(net utility 0.796 vs 0.788), but on the newly added chest X-ray and brain MRI validation images its numbers are
+lower than v3-era numbers on the old, smaller images of those sources, which cannot be compared directly.
+
 No decision threshold, prompt or setting is tuned after this choice. The selected model is then evaluated once
 on every test set (notebook 24); no further v4 variant is trained after any v4 test result is seen.
 
