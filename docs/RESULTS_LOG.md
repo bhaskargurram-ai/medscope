@@ -735,3 +735,12 @@ claims 16.6% -> 8.7% (p<0.001), healthy-image claims 8.2% -> 7.7% (p 0.89), CCR 
 after an edit elsewhere 14.1% -> 20.3% (p 0.004), grounded accuracy 0.772 -> 0.706 (p 0.001). By type: chest X-ray
 erased claims 28% -> 12%, CCR 0.79 -> 0.67; breast ultrasound erased 20% -> 8%, healthy 10% -> 0%, CCR 0.92 -> 0.81;
 colonoscopy net 0.95 -> 1.00; SLAKE (21 cases) net 0.14 -> 0.03.
+
+## 2026-11-02 — final notebooks 24 and 25 (no new results)
+
+Notebook 24 (final evaluation, selected model v4 stage 3 only) and notebook 25 (like-for-like stage-1 recipe) are
+the last notebooks. Added before any v4 test result (pre-registration amendment 2): highest-reasoning-effort
+flagships (OpenAI reasoning_effort high, Anthropic effort max, Gemini thinking level high), flagships and open models
+(own plain prompt) on standard VQA, net utility without degraded views and clarify rate by degradation type on all four
+test sets, release of v4 (private), and two extra ablation arms (absent-matched without CF; erasures only) with
+held-out inpainting tools for every seed-0 arm.

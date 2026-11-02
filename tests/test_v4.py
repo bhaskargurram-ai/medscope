@@ -145,6 +145,26 @@ class TestV4(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 protect("lgg", recs, bad, {})
 
+    def test_breakdowns(self):
+        from medscope.rewards import Outcome
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            views = build_views(make_case(d, "chestxdet1", 1), d / "v", np.random.default_rng(0))
+            (d / "views.jsonl").write_text("".join(json.dumps(v.to_dict()) + "\n" for v in views))
+            for run, act in (("a", "clarify"), ("b", "answer")):
+                (d / run).mkdir()
+                rows = [Outcome(view_id=v.view_id, case_id=v.case_id, kind=v.kind.value, action=act, correct=True, iou=0.0,
+                                confidence=None, tool_calls=0, malformed=False, reward=1.0 if act == "clarify" else 0.5,
+                                breakdown={}).to_dict() for v in views]
+                (d / run / "outcomes.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+            r = subprocess.run([sys.executable, str(ROOT / "scripts" / "breakdowns.py"), "--results", str(d), "--views",
+                                str(d / "views.jsonl"), "--runs", "a=A", "b=B", "--ref", "a", "--out", str(d / "o.md")],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            md = (d / "o.md").read_text()
+            self.assertIn("| A | 1.000 | 1.000 |", md)
+            self.assertIn("100% (1)", md)
+
     def test_paraphrase_view_keeps_ids(self):
         with tempfile.TemporaryDirectory() as d:
             v = build_views(make_case(Path(d), "chestxdet1", 1), Path(d) / "v", np.random.default_rng(0))[1]

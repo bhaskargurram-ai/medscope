@@ -63,6 +63,13 @@ Reason: on the 525 validation views shared with the earlier validation set, v4 s
 (net utility 0.796 vs 0.788), but on the newly added chest X-ray and brain MRI validation images its numbers are
 lower than v3-era numbers on the old, smaller images of those sources, which cannot be compared directly.
 
+**Amendment 2 (2 November 2026; after the selection, before any v4 test result).** Further comparisons, all fixed
+before any v4 model is tested: two extra stage-1 ablation arms (without counterfactual views but with healthy images
+repeated to the same share of "absent" answers as the full recipe; erasures only, without edits elsewhere or
+insertions), the held-out inpainting tools for every seed-0 stage-1 arm, the three frontier flagships at their
+highest reasoning setting on the same 150 test cases as the cautious and few-shot runs and on standard VQA, and the
+open models on standard VQA with their own plain prompt. None of these can change the selected model.
+
 No decision threshold, prompt or setting is tuned after this choice. The selected model is then evaluated once
 on every test set (notebook 24); no further v4 variant is trained after any v4 test result is seen.
 

@@ -93,8 +93,13 @@ class _ApiPolicy:
     load_in_4bit = False
     dtype = "api"
 
-    def __init__(self, model: str, max_tokens: int = 16000, workers: int = 8):
-        self.model, self.max_tokens, self.workers = model, max_tokens, workers
+    def __init__(self, model: str, max_tokens: int = 16000, workers: int = 8, effort: Optional[str] = None):
+        # effort="high": the provider's highest reasoning setting (OpenAI reasoning_effort="high", Anthropic
+        # output_config effort "max" with adaptive thinking, Gemini thinking level "high"); None keeps the provider
+        # default used in the main comparison. Thinking counts toward the output limit, so it is raised.
+        self.model, self.max_tokens, self.workers, self.effort = model, max_tokens, workers, effort
+        if effort == "high":
+            self.max_tokens = max(max_tokens, 64000)
         self.usage = {"requests": 0, "input_tokens": 0, "output_tokens": 0, "errors": 0}
         self._lock = threading.Lock()
 
@@ -148,8 +153,9 @@ class OpenAIPolicy(_ApiPolicy):
         return out
 
     def _call(self, messages: list[dict]) -> str:
+        extra = {"reasoning_effort": "high"} if self.effort == "high" else {}
         r = self.client.chat.completions.create(model=self.model, messages=self.to_openai(messages),
-                                                max_completion_tokens=self.max_tokens)
+                                                max_completion_tokens=self.max_tokens, **extra)
         if getattr(r, "usage", None):
             self._record(r.usage.prompt_tokens, r.usage.completion_tokens)
         return r.choices[0].message.content or ""
@@ -180,7 +186,14 @@ class AnthropicPolicy(_ApiPolicy):
 
     def _call(self, messages: list[dict]) -> str:
         system, msgs = self.to_anthropic(messages)
-        r = self.client.messages.create(model=self.model, system=system, messages=msgs, max_tokens=self.max_tokens)
+        if self.effort == "high":
+            # highest effort; a long output limit needs streaming in the SDK
+            with self.client.messages.stream(model=self.model, system=system, messages=msgs, max_tokens=self.max_tokens,
+                                             thinking={"type": "adaptive"},
+                                             extra_body={"output_config": {"effort": "max"}}) as s:
+                r = s.get_final_message()
+        else:
+            r = self.client.messages.create(model=self.model, system=system, messages=msgs, max_tokens=self.max_tokens)
         if getattr(r, "usage", None):
             self._record(r.usage.input_tokens, r.usage.output_tokens)
         return "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
@@ -204,17 +217,24 @@ class GeminiPolicy(_ApiPolicy):
             parts = [types.Part.from_bytes(data=png_bytes(c["image"]), mime_type="image/png") if c["type"] == "image"
                      else types.Part.from_text(text=c["text"]) for c in m["content"]]
             contents.append(types.Content(role="model" if m["role"] == "assistant" else "user", parts=parts))
+        extra = {}
+        if self.effort == "high":
+            try:
+                extra = {"thinking_config": types.ThinkingConfig(thinking_level="high")}
+            except Exception:          # older SDKs: a large thinking budget instead
+                extra = {"thinking_config": types.ThinkingConfig(thinking_budget=32768)}
         r = self.client.models.generate_content(
             model=self.model, contents=contents,
-            config=types.GenerateContentConfig(system_instruction=system, max_output_tokens=self.max_tokens))
+            config=types.GenerateContentConfig(system_instruction=system, max_output_tokens=self.max_tokens, **extra))
         u = getattr(r, "usage_metadata", None)
         if u:
             self._record(u.prompt_token_count or 0, (u.candidates_token_count or 0) + (getattr(u, "thoughts_token_count", 0) or 0))
         return r.text or ""
 
 
-def api_policy(provider: str, model: str, workers: int = 8) -> _ApiPolicy:
-    return {"openai": OpenAIPolicy, "anthropic": AnthropicPolicy, "gemini": GeminiPolicy}[provider](model, workers=workers)
+def api_policy(provider: str, model: str, workers: int = 8, effort: Optional[str] = None) -> _ApiPolicy:
+    return {"openai": OpenAIPolicy, "anthropic": AnthropicPolicy, "gemini": GeminiPolicy}[provider](
+        model, workers=workers, effort=effort)
 
 
 def available_models(provider: str) -> Optional[list[str]]:

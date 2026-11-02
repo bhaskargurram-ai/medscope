@@ -98,7 +98,8 @@ abstains or reacts to edits.
 
 ## Contents
 
-- `manifests/`: the internal test and external test views (question, expected answer, lesion box, view kind, source
+- `manifests/`: the internal test, external test, fresh internal and fresh external test views, and the main-test
+  edits remade with held-out inpainting tools (Telea, tissue transplant, Stable Diffusion) (question, expected answer, lesion box, view kind, source
   case id). **Images are not redistributed**: the source datasets have different licences. Rebuild them with
   `scripts/prepare_data.py`, `scripts/prepare_extra.py`, `scripts/prepare_external.py` and `scripts/build_views.py` from {github}.
 - `runs/<run>/`: for every model evaluated (MedScope checkpoints, ablations, 6 open and 9 frontier models, robustness
@@ -107,7 +108,8 @@ abstains or reacts to edits.
 - `reports/`: the published report tables.
 
 Sources: SLAKE, Kvasir-SEG, HyperKvasir, ChestX-Det, BUSI, TCGA-LGG (internal); CVC-ClinicDB, QaTa-COV19, BUS-BRA,
-BraTS-Africa 2023 (external). Cite the original datasets when using these views.
+BraTS-Africa 2023 (external); ETIS-LaribPolypDB, BUS-UCLM, BraTS 2023 meningioma, SIIM-ACR pneumothorax (fresh
+external). Cite the original datasets when using these views.
 """
 
 
@@ -135,9 +137,9 @@ def build_model(out: Path, adapter: Path, repo: str, name: str, blurb: str, resu
                                                      rows=card_rows(results, test_run, ext_run)))
 
 
-def build_bench(out: Path, results: Path, views: list[str], external: list[str]):
+def build_bench(out: Path, results: Path, views: list[str], external: list[str], more: dict | None = None):
     (out / "manifests").mkdir(parents=True, exist_ok=True)
-    for split, files in (("test", views), ("external", external)):
+    for split, files in (("test", views), ("external", external), *(more or {}).items()):
         rows = []
         for f in files:
             for line in Path(f).read_text().splitlines():
@@ -148,7 +150,7 @@ def build_bench(out: Path, results: Path, views: list[str], external: list[str])
                     rows.append(r)
         (out / "manifests" / f"{split}_views.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     n_runs = 0
-    for run in sorted(results.glob("v2_*")):
+    for run in sorted([*results.glob("v2_*"), *results.glob("v4*")]):
         if not (run / "summary.json").exists():
             continue
         dst = out / "runs" / run.name
@@ -158,7 +160,7 @@ def build_bench(out: Path, results: Path, views: list[str], external: list[str])
                 shutil.copy2(run / f, dst / f)
         n_runs += 1
     (out / "reports").mkdir(exist_ok=True)
-    for f in list(results.glob("*_report.md")) + [results / "frontier_costs.md", results / "extra_analysis.md"]:
+    for f in results.glob("*.md"):
         if f.exists():
             shutil.copy2(f, out / "reports" / f.name)
     (out / "README.md").write_text(BENCH_CARD.format(github=GITHUB))
@@ -168,10 +170,16 @@ def build_bench(out: Path, results: Path, views: list[str], external: list[str])
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--final", required=True, help="adapter folder of the final model (stage 3)")
-    ap.add_argument("--verify", required=True, help="adapter folder of the verification checkpoint (stage 2)")
+    ap.add_argument("--verify", default=None, help="adapter folder of the verification checkpoint (stage 2); optional")
+    ap.add_argument("--final-runs", nargs=2, default=["v2_medscope3_test", "v2_medscope3_ext"], metavar=("TEST", "EXT"),
+                    help="result runs whose numbers go into the final model's card")
+    ap.add_argument("--final-blurb", default="Final model: counterfactual SFT, rejection-sampling fine-tuning and "
+                                             "general medical VQA replay.")
     ap.add_argument("--results", required=True)
     ap.add_argument("--views", nargs="+", required=True)
     ap.add_argument("--external", nargs="+", required=True)
+    ap.add_argument("--more", action="append", default=[], metavar="NAME=FILE[,FILE]",
+                    help="further test manifests, e.g. fresh_internal=a.jsonl,b.jsonl")
     ap.add_argument("--out", required=True)
     ap.add_argument("--user", default=None, help="Hugging Face user or organisation (default: the token's owner)")
     ap.add_argument("--upload", action="store_true", help="create the private repositories and upload")
@@ -185,21 +193,23 @@ def main() -> None:
     user = user or "your-username"
     repos = {"final": f"{user}/MedScope-4B", "verify": f"{user}/MedScope-4B-R", "bench": f"{user}/MedScope-Bench"}
 
-    build_model(out / "MedScope-4B", Path(args.final), repos["final"], "MedScope-4B",
-                "Final model: counterfactual SFT, rejection-sampling fine-tuning and general medical VQA replay.",
-                results, "v2_medscope3_test", "v2_medscope3_ext")
-    build_model(out / "MedScope-4B-R", Path(args.verify), repos["verify"], "MedScope-4B-R",
-                "Verification checkpoint (before VQA replay): fewer false findings on healthy images, weaker on open "
-                "general questions. Use MedScope-4B for general medical VQA.",
-                results, "v2_medscope_test", "v2_medscope_ext")
-    n = build_bench(out / "MedScope-Bench", results, args.views, args.external)
-    print(f"prepared {out}: two adapters, benchmark manifests and {n} evaluation runs")
+    build_model(out / "MedScope-4B", Path(args.final), repos["final"], "MedScope-4B", args.final_blurb,
+                results, *args.final_runs)
+    if args.verify:
+        build_model(out / "MedScope-4B-R", Path(args.verify), repos["verify"], "MedScope-4B-R",
+                    "Verification checkpoint (before VQA replay): fewer false findings on healthy images, weaker on "
+                    "open general questions. Use MedScope-4B for general medical VQA.",
+                    results, "v2_medscope_test", "v2_medscope_ext")
+    more = {k: v.split(",") for k, _, v in (m.partition("=") for m in args.more)}
+    n = build_bench(out / "MedScope-Bench", results, args.views, args.external, more)
+    print(f"prepared {out}: adapters, benchmark manifests and {n} evaluation runs")
 
     if args.upload:
         from huggingface_hub import HfApi
         api = HfApi()
-        for key, folder, kind in (("final", "MedScope-4B", "model"), ("verify", "MedScope-4B-R", "model"),
-                                  ("bench", "MedScope-Bench", "dataset")):
+        parts = [("final", "MedScope-4B", "model")] + ([("verify", "MedScope-4B-R", "model")] if args.verify else []) \
+            + [("bench", "MedScope-Bench", "dataset")]
+        for key, folder, kind in parts:
             api.create_repo(repos[key], repo_type=kind, private=True, exist_ok=True)
             api.upload_folder(folder_path=str(out / folder), repo_id=repos[key], repo_type=kind)
             print(f"uploaded (private): https://huggingface.co/{'datasets/' if kind == 'dataset' else ''}{repos[key]}")

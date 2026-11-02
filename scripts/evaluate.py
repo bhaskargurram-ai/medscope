@@ -55,6 +55,8 @@ def main() -> None:
     ap.add_argument("--api", choices=["openai", "anthropic", "gemini"], default=None,
                     help="evaluate a model behind an API (key from OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY); "
                          "--model is its id")
+    ap.add_argument("--effort", choices=["default", "high"], default="default",
+                    help="API models: the provider's maximum reasoning setting (high) instead of its default")
     ap.add_argument("--batch-size", type=int, default=8,
                     help="episodes advanced together; each sees exactly what it would see alone")
     ap.add_argument("--prompt", choices=["agent", "plain", "cautious", "fewshot"], default="agent",
@@ -88,7 +90,7 @@ def main() -> None:
     views = select_cases([v for f in args.views for v in load_views(f)], args.limit_cases)
     if args.api:
         from medscope.api_policy import api_policy
-        policy = api_policy(args.api, args.model)
+        policy = api_policy(args.api, args.model, effort=None if args.effort == "default" else args.effort)
         precision = "api"
     else:
         from medscope.train.hf_policy import HFPolicy
@@ -109,6 +111,8 @@ def main() -> None:
     if args.prompt == "plain":
         cfg = {**cfg, "tools": {**cfg["tools"], "max_turns": 1}}   # one reply, no tools offered
     meta["prompt"] = args.prompt
+    if args.api and args.effort != "default":
+        meta["effort"] = args.effort
     if fewshot:
         meta["fewshot"] = fewshot
     summary = evaluate(policy, views, cfg, args.out, meta, batch_size=args.batch_size)

@@ -53,8 +53,8 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `21_medgemma` | *(superseded by 25)* The same stage-1 recipe on MedGemma 1.5 4B, with and without counterfactual views | A100 | 9–10 h (resumes) |
 | `22_v4_data` | v4 data: all training images, larger validation, fresh internal test, transplant erasures for training, lesion insertions, fresh external test (ETIS-Larib, BUS-UCLM, BraTS meningioma, SIIM) | A100/L4 | 3–4 h |
 | `23_v4_train` | v4 stages 1–3 and the pre-registered selection on validation (docs/PREREGISTRATION_v4.md) | A100 | 12–14 h (resumes) |
-| `24_v4_everywhere` | The selected v4 model on every test: main, external, fresh internal and external, VQA, held-out inpainting tools and wordings, tools off, robustness analyses; frontier and open models on the fresh sets | A100 + API | 10–12 h, ~$40–60 |
-| `25_v4_recipe` | v4 stage-1 recipe like-for-like: ablation without counterfactual views, seeds 1–2, MedGemma 1.5 4B | A100 | ~35 h (resumes) |
+| `24_v4_everywhere` | Final evaluation of the selected v4 model on every test (main, external, fresh internal and external, VQA, held-out inpainting tools and wordings, tools off); open models on the fresh sets and on VQA with their own prompt; frontier flagships on the fresh sets, held-out wordings, highest reasoning effort and VQA; robustness analyses; private Hugging Face release | A100 + API | 12–14 h, ~$90–130 |
+| `25_v4_recipe` | v4 stage-1 recipe like-for-like: without counterfactual views (3 seeds), absent-matched, erasures only, held-out tools for every arm, MedGemma 1.5 4B | A100 | ~45 h (resumes) |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.
