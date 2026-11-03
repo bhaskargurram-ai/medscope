@@ -2177,6 +2177,21 @@ for split in ('test', 'ext', 'ext2'):
     ]
 
 
+def nb24c_frontier() -> list[dict]:
+    """Notebook 24, section 4 only (frontier API runs), as its own notebook for a CPU session."""
+    c = nb24_v4_eval()
+    pick = lambda i: c[i]
+    assert "PART = 'all'" in "".join(c[1]["source"]) and "if PART in ('all', 'C')" in "".join(c[16]["source"])
+    return [md("""
+# MedScope 24c: frontier flagships only (API, CPU runtime)
+
+Section 4 of notebook 24 on its own: gpt-6-astra, claude-opus-5-5 and gemini-4-argon on the fresh internal and fresh
+external tests, the held-out question wordings (150 cases), their highest reasoning setting (150 cases) and standard
+VQA. Runs on a **CPU** runtime; every run resumes and finished runs are skipped. Colab secrets `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`. When it has finished, run notebook 24 with `PART = 'report'`.
+"""), code("PART = 'C'"), pick(2), pick(4), pick(5), pick(6), pick(7), pick(8), pick(15), pick(16)]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -2203,6 +2218,7 @@ NOTEBOOKS = {
     "22_v4_data.ipynb": nb22_v4_data,
     "23_v4_train.ipynb": nb23_v4_train,
     "24_v4_everywhere.ipynb": nb24_v4_eval,
+    "24c_frontier_only.ipynb": nb24c_frontier,
     "25_v4_recipe.ipynb": nb25_v4_recipe,
 }
 
