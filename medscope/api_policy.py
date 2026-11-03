@@ -43,7 +43,8 @@ def with_retries(fn, tries: int = 6):
             if attempt == tries - 1:
                 raise
             wait = min(60, 2 ** attempt + random.random())
-            print(f"  API error ({type(e).__name__}: {str(e)[:100]}); retrying in {wait:.0f}s", flush=True)
+            cause = f" <- {type(e.__cause__).__name__}: {str(e.__cause__)[:120]}" if e.__cause__ else ""
+            print(f"  API error ({type(e).__name__}: {str(e)[:100]}{cause}); retrying in {wait:.0f}s", flush=True)
             time.sleep(wait)
 
 
