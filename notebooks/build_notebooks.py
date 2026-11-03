@@ -2089,7 +2089,7 @@ MedGemma needs `HF_TOKEN` with its terms accepted (https://huggingface.co/{MEDGE
 """ + SECRETS_NOTE),
         code("""
 PARTS = 4     #@param {type:"integer"}
-PART = 'all'  #@param ["all", "1", "2", "3", "4", "5", "6", "report"]
+PART = 'all'  #@param ["all", "1", "2", "3", "4", "5", "6", "7", "8", "9", "report"]
 """),
         code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
         code(r"""
