@@ -59,6 +59,8 @@ def select_cases(views: list[View], limit_cases: Optional[int], seed: int = 0) -
 _read_jsonl = read_jsonl
 
 
+API_ERROR = "[API error:"     # what api_policy returns in place of a reply when a request fails
+
 def evaluate(
     policy: Policy,
     views: list[View],
@@ -92,6 +94,13 @@ def evaluate(
         _write_jsonl(outcomes_path, rows)
         _write_jsonl(transcripts_path, trows)
         log(f"{len(stale)} earlier results used a different view or precision; set aside and redone")
+    # A request the provider refused or that failed (no credit, outage) is not the model's answer: episodes
+    # with an API error are redone (once per run; a request that fails again stays scored as malformed)
+    failed = {t["view_id"] for t in trows if API_ERROR in json.dumps(t.get("turns", ""))}
+    if failed:
+        rows = [r for r in rows if r["view_id"] not in failed]
+        trows = [t for t in trows if t["view_id"] not in failed]
+        log(f"{len(failed)} earlier episodes ended in an API error (refused or failed request); redone")
     _write_jsonl(outcomes_path, rows)       # rewrite first: a cut-off last line must not end up mid-file
     _write_jsonl(transcripts_path, trows)
     done = {r["view_id"] for r in rows if r["view_id"] in keys}
@@ -195,7 +204,9 @@ def remaining(views: list[View], out_dir: str | Path, precision=None) -> list[Vi
     """Views that `evaluate` would still have to run in out_dir (same keys as evaluate uses)."""
     keys = {v.view_id: view_key(v, precision) for v in views}
     rows = _read_jsonl(Path(out_dir) / "outcomes.jsonl")
-    done = {r["view_id"] for r in rows if r.get("vkey") == keys.get(r["view_id"])}
+    failed = {t["view_id"] for t in _read_jsonl(Path(out_dir) / "transcripts.jsonl")
+              if API_ERROR in json.dumps(t.get("turns", ""))}
+    done = {r["view_id"] for r in rows if r.get("vkey") == keys.get(r["view_id"]) and r["view_id"] not in failed}
     return [v for v in views if v.view_id not in done]
 
 

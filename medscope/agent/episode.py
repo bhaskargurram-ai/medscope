@@ -74,6 +74,9 @@ class _State:
         """Apply one model turn: a final action ends the episode, a tool call runs."""
         self.turns.append(Turn(len(self.messages), gen.text, gen.extra))
         self.messages.append(assistant_message(gen.text))
+        if gen.text.startswith("[API error:"):      # a failed request is never read as the model's answer
+            self.malformed, self.error, self.done = True, "API error", True
+            return
         parsed = parse(gen.text)
         if parsed.malformed:
             self.malformed, self.error, self.done = True, parsed.error, True

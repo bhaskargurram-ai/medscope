@@ -73,6 +73,28 @@ class TestRunner(unittest.TestCase):
             table = compare_runs(d)
             self.assertIn("| oracle | test | 6 |", table)
 
+    def test_api_errors_are_redone(self):
+        class Flaky(Oracle):                      # the first 5 requests fail (e.g. no API credit)
+            def generate(self, messages, sample=False):
+                self.calls += 1
+                if self.calls <= 5:
+                    return Generation("[API error: PermissionDeniedError: credit balance too low]")
+                return super().generate(messages, sample)
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            views = load_views(build_dataset(d))
+            quiet = dict(n_bootstrap=20, log=lambda m: None)
+            pol = Flaky()
+            s = evaluate(pol, views, CFG, d / "run", {"name": "a", "precision": "api"}, **quiet)
+            self.assertGreater(s["metrics"]["malformed_rate"]["value"], 0)
+            self.assertEqual(len(remaining(views, d / "run", "api")), 5)
+            msgs = []
+            s = evaluate(pol, views, CFG, d / "run", {"name": "a", "precision": "api"}, n_bootstrap=20, log=msgs.append)
+            self.assertIn("19 views already done, 5 to run", msgs)   # only the failed episodes were redone
+            self.assertEqual(remaining(views, d / "run", "api"), [])
+            self.assertEqual(s["metrics"]["malformed_rate"]["value"], 0)
+            self.assertEqual(len((d / "run" / "outcomes.jsonl").read_text().splitlines()), 24)
+
     def test_pilot_subset_carries_over_into_full_run(self):
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)

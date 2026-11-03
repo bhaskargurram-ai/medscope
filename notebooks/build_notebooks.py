@@ -1978,6 +1978,7 @@ for tag, p, m, split, views, run, extra, _ in plan:
     except SystemExit:
         failed.append(run)
 print('failed:', failed or 'none')
+!python scripts/api_errors.py --results {RESULTS}
 """),
         md("## 5. Robustness analyses from stored results (PART report, after A, B1, B2 and C)"),
         gated(("report",), f"""
