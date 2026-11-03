@@ -2089,7 +2089,7 @@ MedGemma needs `HF_TOKEN` with its terms accepted (https://huggingface.co/{MEDGE
 """ + SECRETS_NOTE),
         code("""
 PARTS = 4     #@param {type:"integer"}
-PART = 'all'  #@param ["all", "1", "2", "3", "4", "5", "6", "7", "8", "9", "report"]
+PART = 'all'  #@param ["all", "1", "2", "3", "4", "5", "6", "7", "8", "9", "report"] {allow-input: true}
 """),
         code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
         code(r"""
@@ -2126,7 +2126,10 @@ for i in sorted(range(len(JOBS)), key=lambda i: -JOBS[i][4]):     # longest firs
     owner[i], load[k] = k + 1, load[k] + JOBS[i][4]
 for k in range(1, PARTS + 1):
     print(f'part {{k}} (~{{load[k - 1]:.0f}} h):', ', '.join(f'{{j[1]}}_{{j[2]}}_s{{j[3]}}' for i, j in enumerate(JOBS) if owner[i] == k))
-MINE = [j for i, j in enumerate(JOBS) if PART == 'all' or str(owner[i]) == str(PART)]
+MY_PARTS = [p.strip() for p in str(PART).split('+')]      # e.g. '3+4': two parts at once on one large GPU
+MINE = [j for i, j in enumerate(JOBS) if PART == 'all' or str(owner[i]) in MY_PARTS]
+GROUPS = [MINE] if PART == 'all' or len(MY_PARTS) == 1 else \
+    [[j for i, j in enumerate(JOBS) if str(owner[i]) == p] for p in MY_PARTS]
 print('this session (PART', PART, '):', [f'{{j[1]}}_{{j[2]}}_s{{j[3]}}' for j in MINE] or 'no training or testing')
 """),
         md("## Quick check that MedGemma trains (3 steps on 50 views; only in the session that trains MedGemma)"),
@@ -2138,19 +2141,45 @@ if any(j[1] == 'v4mg' for j in MINE) and not os.path.exists(f'{{ADAPTERS}}/v4mg_
         md("## Train and test this session's jobs"),
         code(f"""
 ARGS = {{'cf': f'{s1}', 'nocf': f'{nocf}', 'nocfabs': f'{nocf_abs}', 'tgt': f'{tgt}'}}
-for model, tag, arm, seed, _ in MINE:
-    if arm == 'test':
-        test_all(model, f'{{ADAPTERS}}/v4_s1/final', 'v4q_cf_s0', heldout=True)     # seed 0 with CF = notebook 23's stage 1
-        continue
-    name = f'{{tag}}_{{arm}}_s{{seed}}'
-    out = f'{{ADAPTERS}}/{{name}}'
-    if not os.path.exists(f'{{out}}/final/adapter_config.json'):
-        a = ARGS[arm]
-        !python scripts/train_sft.py --model {{model}} {{a}} --seed {{seed}} --out {{out}}
-    done = json.load(open(f'{{out}}/state.json'))['opt_step']
-    if abs(done - S1_STEPS) > 0.02 * S1_STEPS:
-        raise SystemExit(f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like, stop and report this')
-    test_all(model, f'{{out}}/final', name, heldout=(tag == 'v4q' and seed == 0))
+import threading, subprocess, time
+def gpu_monitor(stop):        # GPU use every 5 minutes, printed and saved to Drive (results/gpu_log_part<PART>.txt)
+    while not stop.wait(300):
+        q = subprocess.run(['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total,power.draw',
+                            '--format=csv,noheader'], capture_output=True, text=True).stdout.strip()
+        line = time.strftime('%H:%M') + ' GPU util, memory used, memory total, power: ' + q
+        print(line, flush=True)
+        with open(f"{{RESULTS}}/gpu_log_part{{str(PART).replace('+', '_')}}.txt", 'a') as f:
+            f.write(line + '\\n')
+def run_jobs(jobs):
+    for model, tag, arm, seed, _ in jobs:
+        if arm == 'test':
+            test_all(model, f'{{ADAPTERS}}/v4_s1/final', 'v4q_cf_s0', heldout=True)     # seed 0 with CF = notebook 23's stage 1
+            continue
+        name = f'{{tag}}_{{arm}}_s{{seed}}'
+        out = f'{{ADAPTERS}}/{{name}}'
+        if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+            a = ARGS[arm]
+            !python scripts/train_sft.py --model {{model}} {{a}} --seed {{seed}} --out {{out}}
+        done = json.load(open(f'{{out}}/state.json'))['opt_step']
+        if abs(done - S1_STEPS) > 0.02 * S1_STEPS:
+            raise SystemExit(f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like, stop and report this')
+        test_all(model, f'{{out}}/final', name, heldout=(tag == 'v4q' and seed == 0))
+stop = threading.Event()
+threading.Thread(target=gpu_monitor, args=(stop,), daemon=True).start()
+errors = []
+def guarded(jobs):
+    try:
+        run_jobs(jobs)
+    except BaseException as e:      # noqa: BLE001 - reported after every part has finished
+        errors.append(e)
+threads = [threading.Thread(target=guarded, args=(g,)) for g in GROUPS if g]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+stop.set()
+if errors:
+    raise SystemExit(f'{{len(errors)}} part(s) failed: ' + ' | '.join(str(e)[:300] for e in errors))
 """),
         md("## Summaries and report (PART report, after every part has finished)"),
         gated(("report",), r"""
