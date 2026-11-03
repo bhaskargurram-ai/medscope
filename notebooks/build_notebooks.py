@@ -2296,6 +2296,7 @@ NOTEBOOKS = {
     "25e_parts_2_to_5.ipynb": nb25_part("2+3+4+5", "four jobs on one GPU: no CF with matched 'absent' answers, "
                                                    "erasures only, MedGemma with and without CF"),
     "25f_parts_6_to_9.ipynb": nb25_part("6+7+8+9", "four jobs on one GPU: seeds 1 and 2, with and without CF"),
+    "25g_part_2.ipynb": nb25_part("2", "the no-CF arm with matched 'absent' answers (seed 0), resumed from its checkpoint"),
 }
 
 
