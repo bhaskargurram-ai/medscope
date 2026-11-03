@@ -2261,6 +2261,22 @@ interrupted training resumes from its last checkpoint. Use 25a-25d with four GPU
     return build
 
 
+def nb24r_report() -> list[dict]:
+    """Notebook 24 fixed to PART = 'report' (CPU): analyses, the final report and the release."""
+    cells = nb24_v4_eval()
+    assert "PART = 'all'" in "".join(cells[1]["source"])
+    cells[1] = code("PART = 'report'")
+    cells[0] = md("""
+# MedScope 24r: final report of notebook 24 (CPU)
+
+Run after notebooks 24 and 24c have finished. **CPU runtime, Run all, nothing to set.** Builds every paired
+comparison, the breakdowns, the label check and the figures from the stored results, publishes the report, and
+uploads the v4 model and the benchmark to private Hugging Face repositories (Colab secret `HF_TOKEN` with write
+access and Notebook access switched on). About 45 minutes.
+""")
+    return cells
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -2288,6 +2304,7 @@ NOTEBOOKS = {
     "23_v4_train.ipynb": nb23_v4_train,
     "24_v4_everywhere.ipynb": nb24_v4_eval,
     "24c_frontier_only.ipynb": nb24c_frontier,
+    "24r_report.ipynb": nb24r_report,
     "25_v4_recipe.ipynb": nb25_v4_recipe,
     "25a_parts_2_3.ipynb": nb25_part("2+3", "no CF with matched 'absent' answers, and erasures only (seed 0)"),
     "25b_parts_4_5.ipynb": nb25_part("4+5", "MedGemma 1.5 4B with and without counterfactual views"),
