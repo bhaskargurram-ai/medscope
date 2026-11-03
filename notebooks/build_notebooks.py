@@ -2164,6 +2164,28 @@ def run_jobs(jobs):
         if abs(done - S1_STEPS) > 0.02 * S1_STEPS:
             raise SystemExit(f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like, stop and report this')
         test_all(model, f'{{out}}/final', name, heldout=(tag == 'v4q' and seed == 0))
+def start_mps():
+    # NVIDIA MPS lets the training processes of this tab run their GPU kernels at the same time instead of taking
+    # turns; it changes no result. Used only if this runtime has it and a test process works through it.
+    if len([g for g in GROUPS if g]) < 2 or not shutil.which('nvidia-cuda-mps-control'):
+        return False
+    env = {{'CUDA_MPS_PIPE_DIRECTORY': '/tmp/mps_pipe', 'CUDA_MPS_LOG_DIRECTORY': '/tmp/mps_log'}}
+    for d in env.values():
+        os.makedirs(d, exist_ok=True)
+    os.environ.update(env)
+    subprocess.run(['nvidia-cuda-mps-control', '-d'], capture_output=True)
+    ok = subprocess.run([sys.executable, '-c', 'import torch; x = torch.ones(1024, device="cuda"); print(float(x.sum()))'],
+                        capture_output=True, text=True, timeout=300).returncode == 0
+    if not ok:
+        subprocess.run('echo quit | nvidia-cuda-mps-control', shell=True, capture_output=True)
+        for k in env:
+            os.environ.pop(k, None)
+    return ok
+import shutil, sys
+n_jobs = max(1, len([g for g in GROUPS if g]))
+os.environ['OMP_NUM_THREADS'] = str(max(2, (os.cpu_count() or 8) // n_jobs))   # share the CPU cores between the jobs
+print(f'{{n_jobs}} job(s) at once on this GPU | CPU cores: {{os.cpu_count()}} ({{os.environ["OMP_NUM_THREADS"]}} threads per job)')
+print('NVIDIA MPS (GPU kernels of the parts run at the same time):', 'on' if start_mps() else 'off')
 stop = threading.Event()
 threading.Thread(target=gpu_monitor, args=(stop,), daemon=True).start()
 errors = []
@@ -2231,9 +2253,9 @@ def nb25_part(parts: str, jobs: str):
         cells.insert(0, md(f"""
 # MedScope 25 ({parts.replace('+', ' and ')}): {jobs}
 
-One of four notebooks that together run all of notebook 25 at once: open each in its own tab on an **A100 or G4**
-runtime and choose **Run all**. Nothing to set. The two jobs run at the same time on the one GPU (each needs about
-10 GB). Finished work is skipped and interrupted training resumes from its last checkpoint. About 8-9 hours.
+Part of notebook 25 fixed to these jobs: open it in its own tab on an **A100 or G4** runtime and choose **Run all**.
+Nothing to set. The jobs run at the same time on the one GPU (each needs about 10 GB). Finished work is skipped and
+interrupted training resumes from its last checkpoint. Use 25a-25d with four GPUs, or 25e and 25f with two.
 """))
         return cells
     return build
@@ -2271,6 +2293,9 @@ NOTEBOOKS = {
     "25b_parts_4_5.ipynb": nb25_part("4+5", "MedGemma 1.5 4B with and without counterfactual views"),
     "25c_parts_6_7.ipynb": nb25_part("6+7", "seed 1 with and without counterfactual views"),
     "25d_parts_8_9.ipynb": nb25_part("8+9", "seed 2 with and without counterfactual views"),
+    "25e_parts_2_to_5.ipynb": nb25_part("2+3+4+5", "four jobs on one GPU: no CF with matched 'absent' answers, "
+                                                   "erasures only, MedGemma with and without CF"),
+    "25f_parts_6_to_9.ipynb": nb25_part("6+7+8+9", "four jobs on one GPU: seeds 1 and 2, with and without CF"),
 }
 
 

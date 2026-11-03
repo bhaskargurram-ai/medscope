@@ -11,6 +11,9 @@ model sees at inference, so training and inference prompts match.
 
 from __future__ import annotations
 
+import os
+import queue
+import threading
 import time
 from pathlib import Path
 from typing import Callable, Iterator, Optional
@@ -80,6 +83,48 @@ def estimate_samples(views: list[View], mode: str) -> float:
     return sum(1.0 if v.kind.value == "degraded" else 1.6 for v in views)
 
 
+def prepared_views(policy, order, start_view, mode, seed, replays, cfg, window_prob, small_zoom, stop, ahead=4):
+    """(view index, [(sample, target ids, tokenised inputs)]) in training order. A background thread builds and
+    tokenises the next views (images included) while the GPU trains on the current one, so the GPU no longer waits
+    for the CPU; the samples and their order are exactly those of the plain loop. MEDSCOPE_PREFETCH=0 turns it off."""
+    def build(vi):
+        out = []
+        for s in samples_for(order[vi], mode, seed, vi, replays, cfg, window_prob, small_zoom):
+            target = policy.target_ids(s.target)
+            inputs = policy.encode_cpu(s.messages) if hasattr(policy, "encode_cpu") else None
+            out.append((s, target, inputs))
+        return out
+    if os.environ.get("MEDSCOPE_PREFETCH", "1") == "0" or not hasattr(policy, "encode_cpu"):
+        for vi in range(start_view, len(order)):
+            yield vi, build(vi)
+        return
+    q: queue.Queue = queue.Queue(maxsize=ahead)
+
+    def producer():
+        try:
+            for vi in range(start_view, len(order)):
+                item = (vi, build(vi))
+                while not stop.is_set():
+                    try:
+                        q.put(item, timeout=1)
+                        break
+                    except queue.Full:
+                        continue
+                if stop.is_set():
+                    return
+            q.put(None)
+        except BaseException as e:  # noqa: BLE001 - handed to the training loop, which raises it
+            q.put(e)
+    threading.Thread(target=producer, daemon=True).start()
+    while True:
+        item = q.get()
+        if item is None:
+            return
+        if isinstance(item, BaseException):
+            raise item
+        yield item
+
+
 def train_sft(
     policy,
     views: list[View],
@@ -133,10 +178,12 @@ def train_sft(
 
     micro, running, t0 = 0, [], time.time()
     save_due = False
-    for vi in range(start_view, len(order)):
-        for s in samples_for(order[vi], mode, seed, vi, replays, cfg, window_prob, small_zoom):
-            target = policy.target_ids(s.target)
-            lp = policy.token_logprobs(s.messages, target)
+    stop = threading.Event()
+    for vi, prepared in prepared_views(policy, order, start_view, mode, seed, replays, cfg, window_prob, small_zoom,
+                                       stop):
+        for s, target, inputs in prepared:
+            lp = policy.token_logprobs(s.messages, target, inputs=inputs) if inputs is not None \
+                else policy.token_logprobs(s.messages, target)
             loss = -lp.mean()
             (loss / grad_accum).backward()
             running.append(loss.item())
@@ -158,6 +205,7 @@ def train_sft(
             save_due = False
         if max_steps and step >= max_steps:
             break
+    stop.set()
     if micro % grad_accum:
         optimizer_step()  # leftover gradients from the last partial batch
 

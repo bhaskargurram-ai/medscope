@@ -136,11 +136,14 @@ class HFPolicy:
 
     def encode(self, messages: list[dict]):
         """Tokenise a conversation ending where the assistant should start writing."""
+        return self.encode_cpu(messages).to(self.model.device)
+
+    def encode_cpu(self, messages: list[dict]):
+        """Same as encode, left on the CPU: training prepares the next samples this way while the GPU works."""
         hf = self.to_hf(messages)
-        inputs = self.processor.apply_chat_template(
+        return self.processor.apply_chat_template(
             hf, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt",
             **self.template_kwargs)
-        return inputs.to(self.model.device)
 
     def _find_end_of_turn_id(self) -> int:
         """Token that closes an assistant turn (<|im_end|>, <end_of_turn>, ...)."""
@@ -282,10 +285,11 @@ class HFPolicy:
 
     # ---- training signals ------------------------------------------------------
 
-    def token_logprobs(self, messages: list[dict], target_ids):
-        """Log-prob of each target token given the conversation (with gradients)."""
+    def token_logprobs(self, messages: list[dict], target_ids, inputs=None):
+        """Log-prob of each target token given the conversation (with gradients).
+        `inputs`: the conversation already tokenised by encode_cpu (identical result, prepared ahead)."""
         torch = self.torch
-        inputs = self.encode(messages)
+        inputs = self.encode(messages) if inputs is None else inputs.to(self.model.device)
         prompt = inputs["input_ids"]
         target = target_ids.to(prompt.device).unsqueeze(0)
         n_prompt, n_target = prompt.shape[1], target.shape[1]

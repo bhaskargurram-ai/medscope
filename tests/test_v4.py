@@ -165,6 +165,30 @@ class TestV4(unittest.TestCase):
             self.assertIn("| A | 1.000 | 1.000 |", md)
             self.assertIn("100% (1)", md)
 
+    def test_prefetched_training_samples_match_the_plain_loop(self):
+        import os
+        import threading
+        from medscope.train.sft import prepared_views, view_order
+        class Fake:
+            def target_ids(self, text):
+                return [len(text)]
+            def encode_cpu(self, messages):
+                return {"n": len(messages), "q": messages[-1]["content"][-1].get("text", "")[:20]}
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            views = build_views(make_case(d, "chestxdet1", 1), d / "v", np.random.default_rng(0)) + \
+                build_views(make_case(d, "chestxdet2", 2, radius=40), d / "v", np.random.default_rng(1))
+            order = view_order(views, 2, 0)
+            def run(flag):
+                os.environ["MEDSCOPE_PREFETCH"] = flag
+                out = [(vi, [(s.target, t, inp) for s, t, inp in p]) for vi, p in
+                       prepared_views(Fake(), order, 3, "agentic", 0, None, None, 0.3, True, threading.Event())]
+                os.environ.pop("MEDSCOPE_PREFETCH")
+                return out
+            plain, fast = run("0"), run("1")
+            self.assertEqual(plain, fast)
+            self.assertEqual([vi for vi, _ in fast], list(range(3, len(order))))
+
     def test_paraphrase_view_keeps_ids(self):
         with tempfile.TemporaryDirectory() as d:
             v = build_views(make_case(Path(d), "chestxdet1", 1), Path(d) / "v", np.random.default_rng(0))[1]
