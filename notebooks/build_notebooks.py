@@ -2222,6 +2222,23 @@ VQA. Runs on a **CPU** runtime; every run resumes and finished runs are skipped.
 """), code("PART = 'C'"), pick(2), pick(4), pick(5), pick(6), pick(7), pick(8), pick(15), pick(16)]
 
 
+def nb25_part(parts: str, jobs: str):
+    """Notebook 25 fixed to one set of parts (PARTS = 9), so each tab needs no settings."""
+    def build() -> list[dict]:
+        cells = nb25_v4_recipe()
+        i = next(k for k, c in enumerate(cells) if "PARTS = " in "".join(c["source"]) and "#@param" in "".join(c["source"]))
+        cells[i] = code(f"PARTS = 9\nPART = {parts!r}      # this notebook's jobs: {jobs}")
+        cells.insert(0, md(f"""
+# MedScope 25 ({parts.replace('+', ' and ')}): {jobs}
+
+One of four notebooks that together run all of notebook 25 at once: open each in its own tab on an **A100 or G4**
+runtime and choose **Run all**. Nothing to set. The two jobs run at the same time on the one GPU (each needs about
+10 GB). Finished work is skipped and interrupted training resumes from its last checkpoint. About 8-9 hours.
+"""))
+        return cells
+    return build
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -2250,6 +2267,10 @@ NOTEBOOKS = {
     "24_v4_everywhere.ipynb": nb24_v4_eval,
     "24c_frontier_only.ipynb": nb24c_frontier,
     "25_v4_recipe.ipynb": nb25_v4_recipe,
+    "25a_parts_2_3.ipynb": nb25_part("2+3", "no CF with matched 'absent' answers, and erasures only (seed 0)"),
+    "25b_parts_4_5.ipynb": nb25_part("4+5", "MedGemma 1.5 4B with and without counterfactual views"),
+    "25c_parts_6_7.ipynb": nb25_part("6+7", "seed 1 with and without counterfactual views"),
+    "25d_parts_8_9.ipynb": nb25_part("8+9", "seed 2 with and without counterfactual views"),
 }
 
 
