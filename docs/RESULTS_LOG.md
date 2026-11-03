@@ -744,3 +744,30 @@ flagships (OpenAI reasoning_effort high, Anthropic effort max, Gemini thinking l
 (own plain prompt) on standard VQA, net utility without degraded views and clarify rate by degradation type on all four
 test sets, release of v4 (private), and two extra ablation arms (absent-matched without CF; erasures only) with
 held-out inpainting tools for every seed-0 arm.
+
+## 2026-11-03 — v4 final evaluation (notebooks 24, 24c, 24r)
+
+Single selected model (v4 stage 3) on every test; all frontier runs re-checked for API errors (none left).
+- Main test (507 cases): CCR 0.849, ESG 0.758, erased-lesion claims 9.6%, healthy-image claims 7.6%, net 0.732.
+  Better than all 9 frontier and 6 open models on ESG, erased claims and net utility (all p<0.001); CCR not
+  different from any frontier model. Healthy-image claims lower than 8/9 frontier models; vs gemini-4-argon 7.6% vs
+  9.0% (p 0.59; v3 was worse than argon, p 0.033). vs v3: healthy 14.6% -> 7.6% (p 0.001), erased 13.7% -> 9.6%
+  (p 0.059), net +0.018 (n.s.), CCR -0.032 (p 0.066). Label check (26 disputed healthy images removed): same picture.
+- Held-out wordings (373 cases): no change vs original wording (net +0.006, p 0.74). vs flagships on 150 cases: net
+  +0.35 to +0.57 (p<0.001).
+- Highest reasoning effort (150 cases): no flagship improves over its default (all n.s.); v4 better than each on ESG
+  (+0.29 to +0.43), erased claims (-32 to -52 points) and net (+0.18 to +0.41).
+- Few-shot and cautious prompts: v4 better than every flagship on ESG and net (p<=0.006).
+- Held-out inpainters (125 cases, ESG lama/telea/transplant/diffusion): v4 0.752/0.664/0.720/0.640 (v3 0.704/0.536/
+  0.640/0.640). Telea erased claims unchanged (7.2%; v3 14% -> 33%); diffusion +10.4 points (p 0.006). v4 beats all
+  three flagships on every tool (ESG p<=0.049).
+- Tools off: ESG unchanged (0.753), CCR -0.053, net -0.092 (p 0.003). Windowing now used (35% of tool calls).
+- Lesion-size quartiles: ESG 0.55 / 0.74 / 0.84 / 0.91 (smallest lesions still weakest; flagships 0.2-0.45 in all).
+- Clean-looking erasures (rated unedited by gemini): v4 claims the lesion in 15% (flagships 41-64%).
+- External centres (169): ESG 0.597 vs flagships 0.28-0.41 (p<=0.002), erased 11.8% vs 54-66%, healthy 4% vs 18-30%;
+  CCR 0.73 vs 0.95-0.97; net 0.530 vs 0.424/0.544/0.544 (n.s.). vs v3: ESG -0.076 (p 0.062).
+- Fresh internal (ChestX-Det, 76 cases): net 0.402 vs flagships 0.22/-0.02/0.05; ESG 0.47 vs 0.00-0.08 (p<=0.001).
+- Fresh external (316 cases): net -0.053 vs astra -0.106, opus 0.056, argon 0.310 (argon better, p<0.001); ESG 0.393
+  vs 0.27/0.29/0.43. By source: BUS-UCLM net 0.67 (argon 0.55), ETIS 0.38 (argon 0.75), BraTS-MEN -0.03 (argon 0.09),
+  **SIIM pneumothorax CCR 0.00, net -1.10** (argon CCR 0.66, net -0.06; astra/opus CCR 0.28-0.29). Under investigation.
+- Standard VQA (all): PathVQA 0.477, SLAKE 0.730, VQA-RAD 0.514 (v3 0.520/0.767/0.554; argon 0.417/0.780/0.674).
