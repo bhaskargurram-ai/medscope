@@ -1960,6 +1960,8 @@ a. the fresh internal and fresh external tests; b. the held-out wordings (150 ca
 the cautious and few-shot runs; d. standard VQA, same agent loop as every other model. (PART C, CPU is fine)"""),
         gated(("C",), r"""
 TEST = f'{TEST_VIEWS} {TEST_NEG}'
+if not os.path.exists(PARA):      # built in section 2; a separate API session builds its own (same, deterministic)
+    !python scripts/paraphrase_views.py --views {TEST_VIEWS} {TEST_NEG} --out {PARA}
 plan = []
 for tag, p, m in FLAGSHIPS:
     plan += [(tag, p, m, 'fresh', FRESH, f'v2_{tag}_fresh', '', 1.0), (tag, p, m, 'ext2', EXT2, f'v2_{tag}_ext2', '', 1.0),
@@ -1983,7 +1985,8 @@ need = ['v4_final_test', 'v4_final_ext', 'v4_final_fresh', 'v4_final_ext2', 'v4_
         'v4_final_para_test'] + [f'v4_inp_{{t}}_final_test' for t in ('telea', 'transplant', 'diffusion')] \\
     + [f'v2_{{t}}_{{s}}' for t in {open_tags!r} for s in ('fresh', 'ext2', 'vqaplain')] \\
     + [f'{{r}}' for t, _, _ in FLAGSHIPS for r in (f'v2_{{t}}_fresh', f'v2_{{t}}_ext2', f'v2_para_{{t}}_test', f'v2_high_{{t}}_test', f'v2_{{t}}_vqa')]
-missing = [r for r in need if not os.path.exists(f'{{RESULTS}}/{{r}}/summary.json')]
+done = lambda r: os.path.exists(f'{{RESULTS}}/{{r}}/summary.json') and json.load(open(f'{{RESULTS}}/{{r}}/summary.json'))['n_views'] > 0
+missing = [r for r in need if not done(r)]
 print('runs not finished yet:', missing or 'none')
 if missing and PART == 'report':
     print('WARNING: the parts above have not all finished; the report will have gaps until this cell is rerun')

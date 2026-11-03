@@ -87,7 +87,12 @@ def main() -> None:
         set_fewshot(example_messages(examples), fewshot)
         print("few-shot examples:", ", ".join(f"{v.view_id} ({v.question} -> {v.kind.value})" for v in examples))
 
+    missing = [f for f in args.views + (args.vocab_from or []) if not Path(f).exists()]
+    if missing:
+        raise SystemExit(f"views file(s) not found: {missing}")
     views = select_cases([v for f in args.views for v in load_views(f)], args.limit_cases)
+    if not views:
+        raise SystemExit(f"no usable views in {args.views}")
     if args.api:
         from medscope.api_policy import api_policy
         policy = api_policy(args.api, args.model, effort=None if args.effort == "default" else args.effort)
