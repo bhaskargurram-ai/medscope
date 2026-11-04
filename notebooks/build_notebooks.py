@@ -2277,6 +2277,85 @@ access and Notebook access switched on). About 45 minutes.
     return cells
 
 
+def nb26_siim_fullres() -> list[dict]:
+    full_runs = ["v4_final_siimfull", "v4q_cf_s0_siimfull", "v4q_nocf_s0_siimfull", "v2_base_qwen35_siimfull",
+                 "v2_gemini_siimfull"]
+    low_runs = ["v4_final_ext2", "v4q_cf_s0_ext2", "v4q_nocf_s0_ext2", "v2_base_qwen35_ext2", "v2_gemini_ext2"]
+    return [
+        md("""
+# MedScope 26: SIIM pneumothorax at original resolution (post-hoc analysis)
+
+**Not part of the pre-registered evaluation; no model is changed.** On the fresh external test every Qwen-based model
+(the base model, both stage-1 arms and MedScope v4) missed nearly all SIIM pneumothoraxes. That test used a 256-pixel
+copy of SIIM. This notebook rebuilds exactly the same images from the original SIIM-ACR files (1024 pixels, saved at
+768 like every other image in this project), builds the same views, and tests the same models, to see whether
+resolution is the cause.
+
+**Needs:** an A100 or L4 runtime, about 1 hour; the Colab secrets `KAGGLE_USERNAME` and `KAGGLE_KEY` (kaggle.com ->
+your profile -> Settings -> API -> *Create New Token*; the downloaded kaggle.json holds both values) with Notebook
+access switched on, plus `HF_TOKEN` (and `GEMINI_API_KEY` for the optional gemini-4-argon run, about $2). Downloads
+the SIIM-ACR training DICOMs (Kaggle dataset seesee/siim-train-test, about 2 GB).
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code("!pip install -q kaggle pydicom"), code(LAMA_CELL), code(RESTORE_ALL),
+        code(RESTORE_V4),
+        md("## 1. Original SIIM-ACR images"),
+        code(r"""
+import glob
+for k in ('KAGGLE_USERNAME', 'KAGGLE_KEY', 'GEMINI_API_KEY'):
+    if secret(k):
+        os.environ[k] = secret(k)
+SIIM = f'{WORK}/raw/siim_full'
+if not glob.glob(f'{SIIM}/**/*.dcm', recursive=True):
+    if not os.environ.get('KAGGLE_KEY'):
+        raise SystemExit('Add the Colab secrets KAGGLE_USERNAME and KAGGLE_KEY (kaggle.com -> Settings -> API -> '
+                         'Create New Token) with Notebook access switched on, then rerun this cell.')
+    os.makedirs(SIIM, exist_ok=True)
+    !kaggle datasets download -d seesee/siim-train-test -p {SIIM} --unzip -q
+print(len(glob.glob(f'{SIIM}/**/*.dcm', recursive=True)), 'DICOM files;', glob.glob(f'{SIIM}/**/*rle*.csv', recursive=True))
+"""),
+        md("## 2. The same SIIM cases at original resolution, and their views"),
+        code(r"""
+FULL = f'{V4}/siim_full'
+!python scripts/siim_fullres.py --views {EXT2} --siim {SIIM} --out {FULL}
+!python scripts/build_views.py --manifest {FULL}/cases_test.jsonl --out {FULL}/views --inpainter lama
+!python scripts/check_views.py --views {FULL}/views/views.jsonl
+SIIMFULL = f'{FULL}/views/views_clean.jsonl {FULL}/negatives/views_negatives_external.jsonl'
+"""),
+        md("## 3. The same models (GPU), and gemini-4-argon (API, optional)"),
+        code(f"""
+import torch
+BATCH = 24 if torch.cuda.get_device_properties(0).total_memory / 2 ** 30 >= 38 else 8
+FINAL = json.load(open(f'{{ADAPTERS}}/final_choice_v4.json'))['adapter']
+MODELS = [('v4_final', FINAL), ('v4q_cf_s0', f'{{ADAPTERS}}/v4_s1/final'), ('v4q_nocf_s0', f'{{ADAPTERS}}/v4q_nocf_s0/final'),
+          ('v2_base_qwen35', None)]
+for run, adapter in MODELS:
+    a = f'--adapter {{adapter}}' if adapter else ''
+    !python scripts/evaluate.py --model {BASE} {{a}} --views {{SIIMFULL}} --out {{RESULTS}}/{{run}}_siimfull --name {{run}}-siimfull --split siimfull --batch-size {{BATCH}}
+if os.environ.get('GEMINI_API_KEY'):
+    !python scripts/evaluate.py --api gemini --model gemini-4-argon --views {{SIIMFULL}} --out {{RESULTS}}/v2_gemini_siimfull --name gemini-4-argon-siimfull --split siimfull --batch-size 8
+"""),
+        md("## 4. 256 pixels vs original resolution"),
+        code(f"""
+from medscope.eval.runner import scored_rows
+def present(run, prefix):
+    rows = [r for r in scored_rows(f'{{RESULTS}}/{{run}}') if r['case_id'].startswith(prefix) and r['kind'] == 'original']
+    return (sum(r['action'] == 'answer' and not r.get('claims_absent') for r in rows), len(rows)) if rows else (0, 0)
+lines = ['| Model | Pneumothorax called present, 256 px | at original resolution |', '| --- | --- | --- |']
+for low, full in zip({low_runs!r}, {full_runs!r}):
+    (a, n), (b, m) = present(low, 'siimext'), present(full, 'siimfull')
+    lines.append(f'| {{full.replace("_siimfull", "")}} | {{a}}/{{n}} ({{a / max(n, 1):.0%}}) | {{b}}/{{m}} ({{b / max(m, 1):.0%}}) |')
+SIIM_TABLE = '\\n'.join(lines)
+open(f'{{RESULTS}}/siim_fullres.md', 'w').write(SIIM_TABLE + '\\n')
+print(SIIM_TABLE)
+"""),
+        publish("MedScope report - 26 SIIM full resolution", f"""
+    ('Matched cases', read_text(f'{{FULL}}/report.txt')),
+    ('Pneumothorax called present: 256 px vs original resolution', read_text(f'{{RESULTS}}/siim_fullres.md')),
+    ('All metrics by source (SIIM rows: siimext = 256 px, siimfull = original resolution)', by_dataset(RESULTS, {low_runs + full_runs!r})),
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -2314,6 +2393,7 @@ NOTEBOOKS = {
                                                    "erasures only, MedGemma with and without CF"),
     "25f_parts_6_to_9.ipynb": nb25_part("6+7+8+9", "four jobs on one GPU: seeds 1 and 2, with and without CF"),
     "25g_part_2.ipynb": nb25_part("2", "the no-CF arm with matched 'absent' answers (seed 0), resumed from its checkpoint"),
+    "26_siim_fullres.ipynb": nb26_siim_fullres,
 }
 
 

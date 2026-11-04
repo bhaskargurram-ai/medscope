@@ -189,6 +189,37 @@ class TestV4(unittest.TestCase):
             self.assertEqual(plain, fast)
             self.assertEqual([vi for vi, _ in fast], list(range(3, len(order))))
 
+    def test_siim_fullres_rebuilds_the_same_cases(self):
+        import siim_fullres
+        from dataclasses import replace
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            v = build_views(make_case(d, "siimext00003", 1, question="Is there a pneumothorax in this chest X-ray?"),
+                            d / "v", np.random.default_rng(0))
+            orig = replace(v[0], view_id="siimext00003_ptx__original", case_id="siimext00003_ptx", patient_id="siim_1.2.3")
+            neg = replace(v[0], view_id="siimext00004neg_ptx__natural_negative", case_id="siimext00004neg_ptx",
+                          patient_id="siim_1.2.4", kind=ViewKind.NATURAL_NEGATIVE, answer="No", lesion_box=None)
+            (d / "views.jsonl").write_text("".join(json.dumps(x.to_dict()) + "\n" for x in (orig, neg)))
+            siim = d / "siim"
+            siim.mkdir()
+            for uid in ("1.2.3", "1.2.4", "9.9.9"):
+                (siim / f"{uid}.dcm").write_bytes(b"")
+            (siim / "train-rle.csv").write_text("ImageId, EncodedPixels\n1.2.3, 4100 30 994 30\n1.2.4, -1\n")
+            siim_fullres.read_dicom = lambda p: np.full((128, 128), 90, np.uint8)
+            argv = sys.argv
+            sys.argv = ["x", "--views", str(d / "views.jsonl"), "--siim", str(siim), "--out", str(d / "out")]
+            try:
+                siim_fullres.main()
+            finally:
+                sys.argv = argv
+            cases = [json.loads(l) for l in (d / "out" / "cases_test.jsonl").read_text().splitlines()]
+            negs = load_views(d / "out" / "negatives" / "views_negatives_external.jsonl")
+            self.assertEqual([c["case_id"] for c in cases], ["siimfull00003_ptx"])
+            self.assertEqual(cases[0]["question"], "Is there a pneumothorax in this chest X-ray?")
+            m = np.asarray(Image.open(cases[0]["mask_path"])) > 127
+            self.assertEqual(m.sum(), 60)
+            self.assertEqual([n.case_id for n in negs], ["siimfull00004neg_ptx"])
+
     def test_paraphrase_view_keeps_ids(self):
         with tempfile.TemporaryDirectory() as d:
             v = build_views(make_case(Path(d), "chestxdet1", 1), Path(d) / "v", np.random.default_rng(0))[1]

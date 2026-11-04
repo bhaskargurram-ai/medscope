@@ -70,6 +70,12 @@ insertions), the held-out inpainting tools for every seed-0 stage-1 arm, the thr
 highest reasoning setting on the same 150 test cases as the cautious and few-shot runs and on standard VQA, and the
 open models on standard VQA with their own plain prompt. None of these can change the selected model.
 
+**Post-hoc note 1 (3 November 2026; after the v4 test results; not part of the confirmatory evaluation).** The
+fresh external test showed every Qwen-based model missing nearly all SIIM pneumothoraxes, which came from a 256-pixel
+copy of SIIM. Notebook 26 rebuilds the same SIIM cases from the original SIIM-ACR images (same questions, same
+lesion-free images) and tests the same, unchanged models on them. It is reported separately as an exploratory
+analysis of the cause; it changes no model, no confirmatory number and no decision.
+
 No decision threshold, prompt or setting is tuned after this choice. The selected model is then evaluated once
 on every test set (notebook 24); no further v4 variant is trained after any v4 test result is seen.
 

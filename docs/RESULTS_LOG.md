@@ -771,3 +771,11 @@ Single selected model (v4 stage 3) on every test; all frontier runs re-checked f
   vs 0.27/0.29/0.43. By source: BUS-UCLM net 0.67 (argon 0.55), ETIS 0.38 (argon 0.75), BraTS-MEN -0.03 (argon 0.09),
   **SIIM pneumothorax CCR 0.00, net -1.10** (argon CCR 0.66, net -0.06; astra/opus CCR 0.28-0.29). Diagnosis: v4 answers a confident "No" on all 48 SIIM pneumothorax originals (answer prob ~1.0; no scoring or parsing error). Share of SIIM originals called present: base Qwen3.5-4B 0%, stage 1 without CF 0%, stage 1 with CF 21%, final v4 0%. The miss comes from the base model on subtle low-resolution (256 px) pneumothorax; counterfactual training does not cause it (it is the only arm above 0%), stages 2-3 remove what stage 1 had.
 - Standard VQA (all): PathVQA 0.477, SLAKE 0.730, VQA-RAD 0.514 (v3 0.520/0.767/0.554; argon 0.417/0.780/0.674).
+
+## 2026-11-03 — post-hoc SIIM check at original resolution (notebook 26, exploratory)
+
+Added notebook 26: the 48 SIIM pneumothorax cases and the SIIM lesion-free images of the fresh external test,
+rebuilt from the original SIIM-ACR DICOMs (scripts/siim_fullres.py, matched by image UID; case ids "siimfull"),
+views rebuilt with LaMa, and tested with v4, both stage-1 arms, base Qwen3.5-4B and (optionally) gemini-4-argon.
+Labelled post hoc in the pre-registration; no model is changed. Results to be added after the run.
+
