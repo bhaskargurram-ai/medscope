@@ -9,6 +9,7 @@ Rerunning with the same --out resumes from the last checkpoint.
 from __future__ import annotations
 
 import argparse
+from typing import Optional
 import sys
 from pathlib import Path
 
@@ -55,7 +56,7 @@ def v4_mix(views, args):
     return views
 
 
-def main() -> None:
+def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True)
     ap.add_argument("--views", required=True, nargs="+", help="one or more views files")
@@ -93,10 +94,11 @@ def main() -> None:
                          "an ablation arm uses the main arm's, so both follow the same schedule")
     ap.add_argument("--hard-repeat", type=int, default=1,
                     help="rejection sampling: repeat episodes kept from views the model mostly failed this many times")
-    args = ap.parse_args()
+    return ap
 
-    from medscope.train.hf_policy import HFPolicy
 
+def training_views(args) -> tuple[list, list, Optional[dict]]:
+    """Every view this run trains on (in order), the natural negatives among them, and the replayed episodes."""
     views = [v for f in args.views for v in load_views(f)]
     negs = [v for f in args.negatives for v in load_views(f)]
     if args.kinds:
@@ -131,6 +133,15 @@ def main() -> None:
         views = views + kept          # their own episodes, on top of the synthetic set
     views += negs
     views = v4_mix(views, args)
+    return views, negs, replays
+
+
+def main() -> None:
+    args = parser().parse_args()
+
+    from medscope.train.hf_policy import HFPolicy
+
+    views, negs, replays = training_views(args)
     print(f"training on {len(views)} views ({len(negs)} natural negatives)")
 
     import random

@@ -2383,6 +2383,76 @@ print(SIIM_TABLE)
     ]
 
 
+PTX_PROBE_CELL = r"""
+# GPU (about 15 min on an L4): stage 2 on the original-resolution SIIM cases, and every model asked a second question on
+# the same pneumothorax images ("Is there an abnormality in this chest X-ray?"): is the miss about the image or the word?
+!cd /content/medscope && git fetch -q && git reset -q --hard origin/main
+import json, torch
+from dataclasses import replace
+from medscope.eval.runner import load_views
+FULL = f'{V4}/siim_full'
+SIIMFULL = f'{FULL}/views/views_clean.jsonl {FULL}/negatives/views_negatives_external.jsonl'
+PROBE = f'{FULL}/probe_abnormality.jsonl'
+with open(PROBE, 'w') as f:
+    for v in load_views(f'{FULL}/views/views_clean.jsonl'):
+        if v.kind.value == 'original':
+            f.write(json.dumps(replace(v, view_id=v.view_id.replace('__original', 'abn__original'),
+                                       question='Is there an abnormality in this chest X-ray?').to_dict()) + '\n')
+BATCH = 24 if torch.cuda.get_device_properties(0).total_memory / 2 ** 30 >= 38 else 8
+FINAL = json.load(open(f'{ADAPTERS}/final_choice_v4.json'))['adapter']
+STAGES = [('v4q_cf_s0', f'{ADAPTERS}/v4_s1/final'), ('v4_s2', f'{ADAPTERS}/v4_s2/final'), ('v4_final', FINAL),
+          ('v2_base_qwen35', None)]
+!python scripts/evaluate.py --model Qwen/Qwen3.5-4B --adapter {ADAPTERS}/v4_s2/final --views {SIIMFULL} --out {RESULTS}/v4_s2_siimfull --name v4-stage2-siimfull --split siimfull --batch-size {BATCH}
+for run, adapter in STAGES:
+    a = f'--adapter {adapter}' if adapter else ''
+    !python scripts/evaluate.py --model Qwen/Qwen3.5-4B {a} --views {PROBE} --out {RESULTS}/{run}_siimabn --name {run}-siimabn --split siimabn --batch-size {BATCH}
+"""
+
+PTX_DIAG_CELL = r"""
+# CPU (a few minutes): what each stage was trained on, in-domain detection by stage, lesion size; report to Drive
+import subprocess, sys
+S1 = f"--views {TRAIN_V4} --negatives {TRAIN_NEG_V4} --mode agentic --subsample 16000 --window-prob 0.3 --small-zoom --oversample-small 2 --paraphrase-prob 0.5"
+S2 = (f"--views {TRAIN_V4} --negatives {TRAIN_NEG_V4} --subsample 3000 --replays {ADAPTERS}/v4_rft/samples.jsonl --hard-repeat 3 "
+      "--mode agentic --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+S3 = (f"--views {TRAIN_V4} {DRIVE}/external/vqa_train/views_vqa_train.jsonl --negatives {TRAIN_NEG_V4} --subsample 5000 "
+      "--mode agentic --min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+R = RESULTS
+runs = [('Stage 1, validation', 'v4_s1_val'), ('Stage 2, validation', 'v4_s2_val'), ('Stage 3, validation', 'v4_s3_val'),
+        ('Stage 1, main test', 'v4q_cf_s0_test'), ('Final, main test', 'v4_final_test'), ('Final, fresh internal', 'v4_final_fresh')]
+probes = [('Base Qwen', 'v2_base_qwen35_siimfull'), ('Stage 1', 'v4q_cf_s0_siimfull'), ('Stage 2', 'v4_s2_siimfull'),
+          ('Final', 'v4_final_siimfull'), ('Base Qwen, abnormality question', 'v2_base_qwen35_siimabn'),
+          ('Stage 1, abnormality question', 'v4q_cf_s0_siimabn'), ('Stage 2, abnormality question', 'v4_s2_siimabn'),
+          ('Final, abnormality question', 'v4_final_siimabn')]
+cmd = [sys.executable, 'scripts/diagnose_finding.py', '--finding', 'pneumothorax',
+       '--stage', 'Stage 1', S1, '--stage', 'Stage 2', S2, '--stage', 'Stage 3 (final)', S3,
+       '--views', *f'{VAL_V4} {VAL_NEG_V4} {TEST_VIEWS} {TEST_NEG} {FRESH}'.split(),
+       *[a for n, r in runs if os.path.exists(f'{R}/{r}') for a in ('--run', f'{n}={R}/{r}')],
+       '--probe-views', *SIIMFULL.split(), PROBE,
+       *[a for n, r in probes if os.path.exists(f'{R}/{r}') for a in ('--probe-run', f'{n}={R}/{r}')],
+       '--out', f'{R}/26b_pneumothorax_diagnosis.md']
+subprocess.run(cmd, check=True, cwd='/content/medscope')
+"""
+
+
+def nb26b_diagnosis() -> list[dict]:
+    """Why the final model misses pneumothorax (post hoc, nothing trained): run after notebook 26."""
+    return [
+        md("""
+# MedScope 26b: why is pneumothorax missed? (post-hoc diagnosis)
+
+Run after notebook 26, on an A100 or L4 (about 20 minutes). Trains nothing and changes no result. Writes
+`results/26b_pneumothorax_diagnosis.md`:
+1. what each training stage was trained to answer to questions naming pneumothorax (each stage's exact training list);
+2. pneumothorax detection by stage on validation, the main test and the fresh internal test;
+3. lesion size in training vs the SIIM cases, and detection by size;
+4. the same SIIM images asked "Is there an abnormality?" instead: a miss of the image or of the word.
+"""),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4),
+        code("assert os.path.exists(f'{V4}/siim_full/views/views_clean.jsonl') or os.path.exists(f'{RESULTS}/v4_final_siimfull/summary.json'), 'run notebook 26 first'"),
+        code(PTX_PROBE_CELL), code(PTX_DIAG_CELL),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -2469,6 +2539,7 @@ NOTEBOOKS = {
                                      "without CF; next to them seed 1 with CF. Two jobs at a time, about 10-11 hours"),
     "26_siim_fullres.ipynb": nb26_siim_fullres,
     "26L_siim_fullres_local.ipynb": nb26_local,
+    "26b_pneumothorax_diagnosis.ipynb": nb26b_diagnosis,
 }
 
 

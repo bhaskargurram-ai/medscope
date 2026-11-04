@@ -231,3 +231,42 @@ class TestV4(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DiagnoseFindingTest(unittest.TestCase):
+    def test_counts_training_targets_and_detection_per_asked_finding(self):
+        import json
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+        t = Path(tempfile.mkdtemp())
+
+        def view(cid, kind, q):
+            return {"view_id": f"{cid}__{kind}", "case_id": cid, "patient_id": "p", "kind": kind, "image_path": "x.png",
+                    "question": q, "answer": "Yes" if kind in ("original", "random_removal") else "No",
+                    "answer_aliases": [], "lesion_box": None if kind == "natural_negative" else [100, 100, 300, 400],
+                    "critical": True, "meta": {}}
+        ptx, nod = "Is there a pneumothorax in this chest X-ray?", "Is there a nodule in this chest X-ray?"
+        views = [view(f"chestxdet{i}_finding", k, ptx if i < 2 else nod) for i in range(6)
+                 for k in ("original", "target_removal", "random_removal", "degraded")]
+        negs = [view(f"chestxdet{i}neg_f_pneumothorax", "natural_negative", ptx) for i in range(5)]
+        (t / "v.jsonl").write_text("".join(json.dumps(x) + "\n" for x in views))
+        (t / "n.jsonl").write_text("".join(json.dumps(x) + "\n" for x in negs))
+        run = t / "run"
+        run.mkdir()
+        (run / "outcomes.jsonl").write_text("".join(json.dumps(
+            {"view_id": x["view_id"], "case_id": x["case_id"], "kind": x["kind"], "action": "answer",
+             "claims_absent": "pneumo" in x["question"]}) + "\n" for x in views + negs))
+        root = Path(__file__).resolve().parent.parent
+        subprocess.run([sys.executable, str(root / "scripts" / "diagnose_finding.py"), "--finding", "pneumothorax",
+                        "--stage", "S1", f"--views {t}/v.jsonl --negatives {t}/n.jsonl --mode agentic",
+                        "--stage", "S3", f"--views {t}/v.jsonl --negatives {t}/n.jsonl --mode agentic --min-absent-share 0.6",
+                        "--views", str(t / "v.jsonl"), str(t / "n.jsonl"), "--run", f"S1={run}",
+                        "--probe-views", str(t / "v.jsonl"), "--probe-run", f"S1={run}", "--out", str(t / "r.md")],
+                       check=True, capture_output=True)
+        report = (t / "r.md").read_text()
+        self.assertIn("| S1 | pneumothorax | 13 | 4/13 (31%) | 7/13 (54%) | 2/13 (15%) |", report)   # 2 cases x 4 views + 5 healthy
+        self.assertRegex(report, r"\| S3 \| pneumothorax \| \d+ \| 4/\d+ \(\d+%\) \|")              # 'absent' repeats only add No
+        self.assertIn("| S1 | pneumothorax | 0/2 (0%) | 0/2 (0%) | 0/5 (0%) |", report)
+        self.assertIn("| S1 | other finding | 4/4 (100%) |", report)
