@@ -2306,14 +2306,33 @@ import glob
 for k in ('KAGGLE_USERNAME', 'KAGGLE_KEY', 'GEMINI_API_KEY'):
     if secret(k):
         os.environ[k] = secret(k)
+import subprocess
 SIIM = f'{WORK}/raw/siim_full'
-if not glob.glob(f'{SIIM}/**/*.dcm', recursive=True):
+SOURCES = ['jesperdramsch/siim-acr-pneumothorax-segmentation-data', 'seesee/siim-train-test']   # SIIM-ACR DICOMs + RLE masks
+MANUAL = f'{DRIVE}/siim'      # or put the Kaggle download here yourself: archive.zip, or the unzipped folder
+dcm = lambda: glob.glob(f'{SIIM}/**/*.dcm', recursive=True)
+if not dcm() and os.path.isdir(MANUAL):
+    for z in glob.glob(f'{MANUAL}/*.zip'):
+        print('unzipping', z)
+        subprocess.run(['unzip', '-q', '-o', z, '-d', SIIM], check=True)
+    if not dcm() and glob.glob(f'{MANUAL}/**/*.dcm', recursive=True):
+        SIIM = MANUAL
+if not dcm():
     if not os.environ.get('KAGGLE_KEY'):
-        raise SystemExit('Add the Colab secrets KAGGLE_USERNAME and KAGGLE_KEY (kaggle.com -> Settings -> API -> '
-                         'Create New Token) with Notebook access switched on, then rerun this cell.')
+        raise SystemExit(f'Put the SIIM-ACR download (archive.zip) in {MANUAL}, or add the Colab secrets KAGGLE_USERNAME '
+                         'and KAGGLE_KEY with Notebook access switched on, then rerun this cell.')
     os.makedirs(SIIM, exist_ok=True)
-    !kaggle datasets download -d seesee/siim-train-test -p {SIIM} --unzip -q
-print(len(glob.glob(f'{SIIM}/**/*.dcm', recursive=True)), 'DICOM files;', glob.glob(f'{SIIM}/**/*rle*.csv', recursive=True))
+    for ds in SOURCES:
+        r = subprocess.run(['kaggle', 'datasets', 'download', '-d', ds, '-p', SIIM, '--unzip'], capture_output=True, text=True)
+        if dcm():
+            print('downloaded', ds)
+            break
+        print(ds, 'not available:', (r.stderr or r.stdout).strip()[-300:])
+if not dcm():
+    raise SystemExit(f'No SIIM-ACR DICOMs (see above). Download "SIIM ACR Pneumothorax Segmentation Data" from '
+                     'https://www.kaggle.com/datasets/jesperdramsch/siim-acr-pneumothorax-segmentation-data (Download '
+                     f'button -> archive.zip), put archive.zip in {MANUAL} on Drive, and rerun this cell.')
+print(len(dcm()), 'DICOM files;', glob.glob(f'{SIIM}/**/*.csv', recursive=True))
 """),
         md("## 2. The same SIIM cases at original resolution, and their views"),
         code(r"""

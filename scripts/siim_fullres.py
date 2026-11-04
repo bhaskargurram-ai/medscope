@@ -74,7 +74,11 @@ def main() -> None:
     rles = [p for p in root.rglob("*.csv") if "rle" in p.name.lower()]
     if not dicoms or not rles:
         raise SystemExit(f"need *.dcm files and a *rle*.csv under {root} (found {len(dicoms)} DICOMs, {len(rles)} csv)")
-    masks = read_rle(rles[0])
+    masks: dict[str, list[str]] = {}
+    for f in rles:                  # every RLE file found (some copies split the labels over several files)
+        for uid, encs in read_rle(f).items():
+            masks.setdefault(uid, [])
+            masks[uid] += [e for e in encs if e not in masks[uid]]
     views = [v for f in args.views for v in load_views(f) if v.case_id.startswith("siimext")]
     stats: Counter = Counter()
     cases, negs = [], []

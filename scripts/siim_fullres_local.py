@@ -12,7 +12,7 @@ while the GPU tests the local models.
   v4/v4.tar, adapters/final_choice_v4.json, adapters/v4_s3/final, adapters/v4_s1/final, adapters/v4q_nocf_s0/final,
   results/<the five *_ext2 runs> and (optional) models/big-lama.pt. Results are copied to <drive>/results.
 Kaggle key: ~/.kaggle/kaggle.json, or the KAGGLE_USERNAME and KAGGLE_KEY environment variables, or --siim DIR with
-  the SIIM-ACR training DICOMs and train-rle.csv already downloaded (Kaggle dataset seesee/siim-train-test).
+  the SIIM-ACR DICOMs and train-rle.csv already downloaded (Kaggle jesperdramsch/siim-acr-pneumothorax-segmentation-data).
 GEMINI_API_KEY in the environment adds gemini-4-argon (about $2).
 """
 
@@ -36,6 +36,7 @@ COLAB_WORK, COLAB_DRIVE = "/content/work", "/content/drive/MyDrive/medscope"
 BASE = "Qwen/Qwen3.5-4B"
 LOCAL_MODELS = [("v4_final", "final"), ("v4q_cf_s0", "adapters/v4_s1/final"),
                 ("v4q_nocf_s0", "adapters/v4q_nocf_s0/final"), ("v2_base_qwen35", None)]
+SIIM_SOURCES = ["jesperdramsch/siim-acr-pneumothorax-segmentation-data", "seesee/siim-train-test"]
 EXT2_FILES = ["v4/views_external2/test/views_clean.jsonl", "v4/external2/negatives/views_negatives_external.jsonl"]
 
 
@@ -76,9 +77,18 @@ def get_siim(siim: Path) -> None:
     api = KaggleApi()
     api.authenticate()            # ~/.kaggle/kaggle.json or KAGGLE_USERNAME / KAGGLE_KEY
     siim.mkdir(parents=True, exist_ok=True)
-    log("downloading SIIM-ACR (Kaggle seesee/siim-train-test)")
-    api.dataset_download_files("seesee/siim-train-test", path=str(siim), unzip=True, quiet=False)
-    log(f"SIIM-ACR: {sum(1 for _ in siim.rglob('*.dcm'))} DICOM files")
+    for ds in SIIM_SOURCES:
+        try:
+            log(f"downloading SIIM-ACR (Kaggle {ds})")
+            api.dataset_download_files(ds, path=str(siim), unzip=True, quiet=False)
+        except Exception as e:  # noqa: BLE001 - try the next copy of the data
+            log(f"{ds} not available: {e}")
+        if any(siim.rglob("*.dcm")):
+            break
+    n = sum(1 for _ in siim.rglob("*.dcm"))
+    if not n:
+        raise SystemExit("no SIIM-ACR DICOMs downloaded (see above)")
+    log(f"SIIM-ACR: {n} DICOM files")
 
 
 def get_qwen() -> None:
