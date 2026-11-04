@@ -2358,6 +2358,51 @@ print(SIIM_TABLE)
     ]
 
 
+def nb26_local() -> list[dict]:
+    """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
+    return [
+        md("""
+# MedScope 26 (local GPU): SIIM pneumothorax at original resolution (post-hoc analysis)
+
+Notebook 26 for your own computer instead of Colab. Needs an NVIDIA GPU with 12 GB or more (RTX 4070 or better),
+Linux or WSL2, Python 3.10+, about 15 GB free disk, and your medscope Google Drive folder on this computer (Google
+Drive for desktop, or a downloaded copy). Run the cells in order; a rerun continues where it stopped. About 2-3 hours
+on an RTX 4070 (the 256-pixel control on the same GPU included).
+
+Kaggle key: `~/.kaggle/kaggle.json` (kaggle.com -> Settings -> API -> Create New Token), or set `KAGGLE_USERNAME`
+and `KAGGLE_KEY` below. `GEMINI_API_KEY` (optional, about $2) adds gemini-4-argon, run over the API while the GPU works.
+"""),
+        code(r"""
+import os
+if os.path.basename(os.getcwd()) == 'notebooks':
+    os.chdir('..')                                                # run from the repository folder
+DRIVE = os.path.expanduser('~/GoogleDrive/My Drive/medscope')   # your medscope Drive folder (has v4/, adapters/, results/)
+WORK = os.path.expanduser('~/medscope_work')                     # local scratch (about 15 GB)
+# os.environ['KAGGLE_USERNAME'] = '...'; os.environ['KAGGLE_KEY'] = '...'
+# os.environ['GEMINI_API_KEY'] = '...'
+assert os.path.isdir(f'{DRIVE}/adapters') and os.path.exists(f'{DRIVE}/v4/v4.tar'), 'DRIVE must be the medscope folder'
+"""),
+        code(r"""
+import subprocess, sys
+subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', '-e', '.[train]', 'pydicom', 'kaggle', 'pyarrow',
+                'huggingface_hub', 'flash-linear-attention'], check=True)
+import torch
+print(torch.__version__, torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NO CUDA GPU')
+"""),
+        code(r"""
+import subprocess, sys
+p = subprocess.Popen([sys.executable, 'scripts/siim_fullres_local.py', '--drive', DRIVE, '--work', WORK],
+                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+for line in p.stdout:
+    print(line, end='')
+assert p.wait() == 0, 'failed: see the output above; rerunning this cell continues where it stopped'
+"""),
+        code(r"""
+print(open(f'{DRIVE}/results/26_siim_full_resolution_report.md').read())
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -2398,6 +2443,7 @@ NOTEBOOKS = {
                                      "no CF with matched 'absent' answers (resumes from its checkpoint), then seed 2 "
                                      "without CF; next to them seed 1 with CF. Two jobs at a time, about 10-11 hours"),
     "26_siim_fullres.ipynb": nb26_siim_fullres,
+    "26L_siim_fullres_local.ipynb": nb26_local,
 }
 
 
