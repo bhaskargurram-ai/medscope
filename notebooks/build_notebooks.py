@@ -2358,10 +2358,16 @@ if os.environ.get('GEMINI_API_KEY'):
         md("## 4. 256 pixels vs original resolution"),
         code(f"""
 from medscope.eval.runner import scored_rows
+# the same cases in both columns: only the SIIM cases found in the original-resolution data
+MATCHED = {{json.loads(l)['case_id'].replace('siimfull', 'siimext', 1) for l in open(f'{{FULL}}/cases_test.jsonl') if l.strip()}}
 def present(run, prefix):
-    rows = [r for r in scored_rows(f'{{RESULTS}}/{{run}}') if r['case_id'].startswith(prefix) and r['kind'] == 'original']
-    return (sum(r['action'] == 'answer' and not r.get('claims_absent') for r in rows), len(rows)) if rows else (0, 0)
-lines = ['| Model | Pneumothorax called present, 256 px | at original resolution |', '| --- | --- | --- |']
+    if not os.path.exists(f'{{RESULTS}}/{{run}}'):
+        return 0, 0
+    rows = [r for r in scored_rows(f'{{RESULTS}}/{{run}}') if r['case_id'].startswith(prefix) and r['kind'] == 'original'
+            and r['case_id'].replace('siimfull', 'siimext', 1) in MATCHED]
+    return sum(r['action'] == 'answer' and not r.get('claims_absent') for r in rows), len(rows)
+lines = [f'Same {{len(MATCHED)}} pneumothorax cases in both columns.', '',
+         '| Model | Pneumothorax called present, 256 px | at original resolution |', '| --- | --- | --- |']
 for low, full in zip({low_runs!r}, {full_runs!r}):
     (a, n), (b, m) = present(low, 'siimext'), present(full, 'siimfull')
     lines.append(f'| {{full.replace("_siimfull", "")}} | {{a}}/{{n}} ({{a / max(n, 1):.0%}}) | {{b}}/{{m}} ({{b / max(m, 1):.0%}}) |')
