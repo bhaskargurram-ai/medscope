@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Reading Study</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #5d6676; --line: #dde1e7;
+    --accent: #2457c5; --accent-text: #ffffff; --chosen: #e5edfd; --chosen-line: #2457c5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --card: #1d2128; --text: #e7eaf0; --muted: #9aa3b2; --line: #333a45;
+            --accent: #7aa2ff; --accent-text: #0d1117; --chosen: #22314f; --chosen-line: #7aa2ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  h1 { font-size: 1.4rem; margin: 0 0 8px; }
+  h2 { font-size: 1.05rem; margin: 18px 0 8px; }
+  p, li { color: var(--muted); }
+  input[type=text] { width: 100%; padding: 10px 12px; font-size: 1rem; border: 1px solid var(--line); border-radius: 8px;
+                     background: var(--bg); color: var(--text); }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+           color: var(--text); padding: 10px 14px; min-height: 44px; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .opts button[aria-pressed=true] { background: var(--chosen); border-color: var(--chosen-line); font-weight: 600; }
+  .img-wrap { background: #000; border-radius: 8px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+  .img-wrap img { max-width: 100%; max-height: 58vh; display: block; cursor: zoom-in; }
+  .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 16px; }
+  .progress { height: 6px; background: var(--line); border-radius: 3px; margin: 8px 0 14px; overflow: hidden; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; }
+  .meta { font-size: .9rem; color: var(--muted); }
+  .q { font-weight: 600; color: var(--text); margin: 14px 0 8px; }
+  #zoom { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: none; align-items: center; justify-content: center; z-index: 9; }
+  #zoom img { max-width: 100vw; max-height: 100vh; }
+  .hidden { display: none; }
+  code { word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+  <section id="start" class="card">
+    <h1>Image reading study</h1>
+    <p>You will see about 100 medical images (CT, MRI, X-ray, ultrasound, colonoscopy). Some are unmodified, some have been
+       digitally edited. For each image, answer two questions:</p>
+    <ol>
+      <li>Has the image been digitally edited?</li>
+      <li>The clinical question shown under the image (for example, "Is there a polyp?").</li>
+    </ol>
+    <p>Answer from the image alone, without other information. Tap the image to enlarge it. There is no time limit
+       (about 1 hour in total). Your progress is saved on this device, so you can stop and come back in the same browser.
+       At the end you download a small answer file and send it to the study team.</p>
+    <h2>Your initials or reader code</h2>
+    <input id="reader" type="text" autocomplete="off" placeholder="e.g. AB" maxlength="20">
+    <div class="bar"><span class="meta" id="resume-note"></span><button class="primary" id="go" disabled>Start</button></div>
+  </section>
+
+  <section id="item" class="card hidden">
+    <div class="meta" id="count"></div>
+    <div class="progress"><div id="prog"></div></div>
+    <div class="img-wrap"><img id="img" alt="Study image"></div>
+    <div class="q">1. Has this image been digitally edited?</div>
+    <div class="opts" id="q1">
+      <button data-v="1">Definitely real</button><button data-v="2">Probably real</button>
+      <button data-v="3">Probably edited</button><button data-v="4">Definitely edited</button>
+    </div>
+    <div class="q" id="q2text">2.</div>
+    <div class="opts" id="q2">
+      <button data-v="yes">Yes</button><button data-v="no">No</button><button data-v="unsure">Cannot tell</button>
+    </div>
+    <div class="bar"><button id="back">Back</button><button class="primary" id="next" disabled>Next</button></div>
+  </section>
+
+  <section id="done" class="card hidden">
+    <h1>Thank you</h1>
+    <p>All images answered. Please download your answer file and send it to the study team (email or WhatsApp).</p>
+    <div class="bar" style="justify-content:flex-start;flex-wrap:wrap">
+      <button class="primary" id="dl">Download answers</button>
+      <button id="copy">Copy answers</button>
+      <button id="review">Review my answers</button>
+    </div>
+    <p class="meta" id="copied"></p>
+  </section>
+</main>
+<p class="meta" style="max-width:760px;margin:0 auto;padding:0 16px 24px">Images from public research datasets
+  (SLAKE, Kvasir-SEG, HyperKvasir, ChestX-Det / NIH ChestX-ray14, BUSI, TCGA-LGG). No patient-identifying information.</p>
+<div id="zoom"><img alt="Enlarged study image"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  let items = [], order = [], answers = {}, pos = 0, reader = '', shownAt = 0;
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+  const key = () => 'reader-study:' + reader.toLowerCase();
+
+  function seeded(str) {           // deterministic shuffle per reader: each reader sees their own order
+    let h = 2166136261;
+    for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1e9) / 1e9; };
+  }
+  function shuffle(arr, rnd) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  function save() { store.set(key(), { order, answers, pos }); }
+
+  function show(view) { ['start', 'item', 'done'].forEach(v => $(v).classList.toggle('hidden', v !== view)); window.scrollTo(0, 0); }
+
+  function render() {
+    if (pos >= order.length) { show('done'); return; }
+    const it = items.find(x => x.id === order[pos]);
+    const a = answers[it.id] || {};
+    $('count').textContent = `Image ${pos + 1} of ${order.length}`;
+    $('prog').style.width = `${100 * pos / order.length}%`;
+    $('img').src = it.image;
+    $('q2text').textContent = '2. ' + it.question;
+    for (const [grp, field] of [['q1', 'edited'], ['q2', 'finding']]) {
+      for (const b of $(grp).querySelectorAll('button')) b.setAttribute('aria-pressed', String(a[field] === b.dataset.v));
+    }
+    $('next').disabled = !(a.edited && a.finding);
+    $('back').disabled = pos === 0;
+    shownAt = performance.now();
+    show('item');
+  }
+
+  function choose(grp, field, v) {
+    const id = order[pos];
+    const a = answers[id] || {};
+    a[field] = v;
+    a.seconds = Math.round(((a.seconds || 0) + (performance.now() - shownAt) / 1000) * 10) / 10;
+    shownAt = performance.now();
+    answers[id] = a;
+    save(); render();
+  }
+
+  function payload() {
+    return JSON.stringify({ reader, finished: new Date().toISOString(), n_items: order.length,
+                            user_agent: navigator.userAgent, answers: order.map(id => ({ id, ...answers[id] })) }, null, 1);
+  }
+
+  $('reader').addEventListener('input', e => {
+    reader = e.target.value.trim();
+    $('go').disabled = !reader;
+    const saved = reader && store.get(key());
+    $('resume-note').textContent = saved ? `Saved progress found: ${Object.keys(saved.answers).length} answered` : '';
+  });
+  $('go').addEventListener('click', () => {
+    const saved = store.get(key());
+    if (saved && saved.order && saved.order.length === items.length) ({ order, answers, pos } = saved);
+    else { order = shuffle(items.map(x => x.id), seeded(reader)); answers = {}; pos = 0; }
+    save(); render();
+  });
+  $('q1').addEventListener('click', e => e.target.dataset.v && choose('q1', 'edited', e.target.dataset.v));
+  $('q2').addEventListener('click', e => e.target.dataset.v && choose('q2', 'finding', e.target.dataset.v));
+  $('next').addEventListener('click', () => { pos++; save(); render(); });
+  $('back').addEventListener('click', () => { if (pos > 0) { pos--; save(); render(); } });
+  $('review').addEventListener('click', () => { pos = 0; render(); });
+  $('img').addEventListener('click', () => { $('zoom').querySelector('img').src = $('img').src; $('zoom').style.display = 'flex'; });
+  $('zoom').addEventListener('click', () => { $('zoom').style.display = 'none'; });
+  $('dl').addEventListener('click', () => {
+    const blob = new Blob([payload()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `reader_${reader.replace(/[^A-Za-z0-9_-]/g, '_')}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+  $('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(payload()); $('copied').textContent = 'Copied. Paste it into an email or message.'; }
+    catch (e) { $('copied').textContent = 'Copy not allowed here: use Download answers.'; }
+  });
+
+  fetch('items.json').then(r => r.json()).then(d => { items = d.items; })
+    .catch(() => { $('start').insertAdjacentHTML('beforeend', '<p>Could not load the study images.</p>'); });
+})();
+</script>
+</body>
+</html>

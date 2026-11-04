@@ -2599,6 +2599,63 @@ print(PTX_TABLE)
     ]
 
 
+def nb28_reader_study() -> list[dict]:
+    """Reader study: build the blinded page from the main test set, publish it, and later score the answers."""
+    return [
+        md("""
+# MedScope 28: reader study (physicians)
+
+Two questions per image, answered by physician readers on a web page: has the image been digitally edited, and is the
+finding there? The page mixes, in equal numbers and from different cases, unmodified lesion images, lesion-erased
+images (the LaMa erasures the models were tested on) and unmodified lesion-free images, so "no lesion" is not a cue for
+"edited". The page holds no answer key; the key stays in Drive.
+
+**Before you start (once):**
+1. On GitHub create an empty **public** repository named `medscope-reader` (no README).
+2. Your Colab secret `GITHUB_TOKEN` needs write access to it (fine-grained token: *Contents: Read and write* on
+   `medscope-reader`), with Notebook access switched on.
+3. After section 1 has run: in `medscope-reader` -> Settings -> Pages, choose *Deploy from a branch*, branch `main`,
+   folder `/ (root)`, Save. The page appears at `https://bhaskargurram-ai.github.io/medscope-reader/` within a minute.
+
+**Runtime:** CPU is fine. Section 1 takes about 5 minutes. Run section 2 after the readers have sent their answer files:
+put them (`reader_XX.json`) in `MyDrive/medscope/reader/answers/`.
+"""),
+        code(SETUP), code(RESTORE_ALL),
+        md("## 1. Build the page and publish it"),
+        code(r"""
+RS = f'{DRIVE}/reader'
+os.makedirs(f'{RS}/answers', exist_ok=True)
+PACK = f'{WORK}/reader_pack'
+if not os.path.exists(f'{RS}/key.json'):
+    !python scripts/make_reader_study.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {PACK} --per-kind 32 --seed 0
+    !cp {PACK}/key.json {RS}/key.json
+    !cd {PACK}/site && tar -cf {RS}/site.tar .
+elif not os.path.exists(f'{PACK}/site/index.html'):
+    os.makedirs(f'{PACK}/site', exist_ok=True)
+    !tar -C {PACK}/site -xf {RS}/site.tar
+tok = (secret('GITHUB_TOKEN') or '').strip()
+if not tok:
+    raise SystemExit('Add the Colab secret GITHUB_TOKEN (write access to medscope-reader), then rerun this cell.')
+remote = f'https://x-access-token:{tok}@github.com/bhaskargurram-ai/medscope-reader.git'
+r = subprocess.run(f'cd {PACK}/site && rm -rf .git && git init -q -b main && git add -A && '
+                   'git -c user.name="Bhaskar Gurram" -c user.email="bhaskargurram.g123@gmail.com" commit -q -m "Reader study" && '
+                   f'git push -q --force {remote} main', shell=True, capture_output=True, text=True)
+print(r.stderr.replace(tok, '***') or 'published')
+if r.returncode:
+    raise SystemExit('Push failed: check that medscope-reader exists and the token can write to it.')
+print('Readers open: https://bhaskargurram-ai.github.io/medscope-reader/  (after Pages is switched on, step 3 above)')
+"""),
+        md("## 2. Score the answers (after the readers have sent their files)"),
+        code(r"""
+import glob
+answers = sorted(glob.glob(f'{RS}/answers/*.json'))
+print(len(answers), 'answer file(s):', [os.path.basename(a) for a in answers])
+if answers:
+    !python scripts/make_reader_study.py --score --key {RS}/key.json --answers {' '.join(answers)} --out {RESULTS}/reader_study.md
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -2687,6 +2744,7 @@ NOTEBOOKS = {
     "26L_siim_fullres_local.ipynb": nb26_local,
     "26b_pneumothorax_diagnosis.ipynb": nb26b_diagnosis,
     "27_v41_pneumothorax_fix.ipynb": nb27_v41,
+    "28_reader_study.ipynb": nb28_reader_study,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

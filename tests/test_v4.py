@@ -319,3 +319,52 @@ class SiimTrainSplitTest(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         self.assertTrue(all(c["case_id"].startswith("siimtr") for c in cases["train"]))
         self.assertIn("patients shared between splits (must be 0): 0", (t / "out" / "report.txt").read_text())
+
+
+class ReaderStudyTest(unittest.TestCase):
+    def test_pack_is_blinded_balanced_and_scored(self):
+        import json
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+        import numpy as np
+        from PIL import Image
+        t = Path(tempfile.mkdtemp())
+        views, negs = [], []
+        for src in ("chestxdet", "busi"):
+            for i in range(8):
+                cid = f"{src}{i:03d}_finding"
+                for kind in ("original", "target_removal"):
+                    p = t / f"{cid}_{kind}.png"
+                    Image.fromarray(np.full((20, 20), i, np.uint8)).save(p)
+                    views.append({"view_id": f"{cid}__{kind}", "case_id": cid, "patient_id": "p", "kind": kind,
+                                  "image_path": str(p), "question": "Is there a lesion?", "answer": "Yes" if kind == "original" else "No",
+                                  "answer_aliases": [], "lesion_box": [1, 1, 5, 5], "critical": False, "meta": {}})
+                n = t / f"{src}{i:03d}neg.png"
+                Image.fromarray(np.full((20, 20), 9, np.uint8)).save(n)
+                negs.append({"view_id": f"{src}{i:03d}neg_abn__natural_negative", "case_id": f"{src}{i:03d}neg_abn",
+                             "patient_id": "p", "kind": "natural_negative", "image_path": str(n), "question": "Is there a lesion?",
+                             "answer": "No", "answer_aliases": [], "lesion_box": None, "critical": False, "meta": {}})
+        (t / "v.jsonl").write_text("".join(json.dumps(x) + "\n" for x in views))
+        (t / "n.jsonl").write_text("".join(json.dumps(x) + "\n" for x in negs))
+        script = Path(__file__).resolve().parent.parent / "scripts" / "make_reader_study.py"
+        subprocess.run([sys.executable, str(script), "--views", str(t / "v.jsonl"), "--negatives", str(t / "n.jsonl"),
+                        "--out", str(t / "pack"), "--per-kind", "4"], check=True, capture_output=True)
+        items = json.loads((t / "pack" / "site" / "items.json").read_text())["items"]
+        key = json.loads((t / "pack" / "key.json").read_text())
+        self.assertEqual(len(items), 12)
+        self.assertEqual(sorted(k["kind"] for k in key).count("target_removal"), 4)
+        self.assertEqual(len({k["case_id"] for k in key}), 12)                    # every image from a different case
+        page = json.dumps(items) + (t / "pack" / "site" / "index.html").read_text()
+        self.assertNotIn("target_removal", page)                                  # no answer key in what readers see
+        self.assertNotIn("natural_negative", page)
+        answers = [{"id": k["id"], "edited": "4" if k["edited"] else "1", "finding": "yes" if k["finding_present"] else "no"}
+                   for k in key]
+        for name in ("AB", "CD"):
+            (t / f"{name}.json").write_text(json.dumps({"reader": name, "answers": answers}))
+        subprocess.run([sys.executable, str(script), "--score", "--key", str(t / "pack" / "key.json"), "--answers",
+                        str(t / "AB.json"), str(t / "CD.json"), "--out", str(t / "r.md")], check=True, capture_output=True)
+        report = (t / "r.md").read_text()
+        self.assertIn("| AB | 12 | 4/4 | 0/8 | 1.00 | 100% |", report)
+        self.assertIn("AB vs CD: Cohen's kappa 1.00 on 12 images", report)
