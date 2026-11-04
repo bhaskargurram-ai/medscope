@@ -56,6 +56,8 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `24_v4_everywhere` | Final evaluation of the selected v4 model on every test (main, external, fresh internal and external, VQA, held-out inpainting tools and wordings, tools off); open models on the fresh sets and on VQA with their own prompt; frontier flagships on the fresh sets, held-out wordings, highest reasoning effort and VQA; robustness analyses; private Hugging Face release | A100 + API | 3–5 h in 4 parallel sessions (10–12 h in one), ~$90–130 |
 | `25_v4_recipe` | v4 stage-1 recipe like-for-like: without counterfactual views (3 seeds), absent-matched, erasures only, held-out tools for every arm, MedGemma 1.5 4B | A100 | ~12–16 h in 4–5 parallel sessions (~50 h in one) |
 | `26_siim_fullres` | Post hoc (exploratory): the fresh-external SIIM pneumothorax cases rebuilt at original resolution, same models | A100 or L4 | ~1 h |
+| `26b_pneumothorax_diagnosis` | Post hoc: why pneumothorax is missed (training targets per stage, detection by stage, lesion size, question swap) | A100 or L4 | ~20 min |
+| `27_v41_pneumothorax_fix` | Post hoc: v4.1, stage 3 redone with SIIM pneumothorax training patients; tested on new SIIM patients and every earlier test | A100 | ~4-5 h |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.

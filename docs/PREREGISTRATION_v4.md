@@ -76,6 +76,15 @@ copy of SIIM. Notebook 26 rebuilds the same SIIM cases from the original SIIM-AC
 lesion-free images) and tests the same, unchanged models on them. It is reported separately as an exploratory
 analysis of the cause; it changes no model, no confirmatory number and no decision.
 
+**Post-hoc note 2 (4 November 2026; after the v4 test results and the notebook 26b diagnosis; exploratory).** A
+separate model, v4.1, redoes stage 3 from the same stage 2 with the same data, settings and seed, plus 150 SIIM-ACR
+pneumothorax images and 150 lesion-free SIIM images from patients in no earlier evaluation (excluded by image UID and
+DICOM patient id; patient-disjoint train / validation / test split with a fixed seed). Fixed before any v4.1 result:
+v4.1 passes if its v4-validation net utility is at least v4's minus 0.02, its healthy-image claim rate at most v4's
+plus 0.02, and it detects more pneumothoraxes than v4 on the SIIM validation patients. It is tested on 100 new SIIM
+pneumothorax and 100 new lesion-free SIIM patients and on every earlier test set, and reported whether or not it
+passes. v4 remains the pre-registered model; every confirmatory claim stays with v4.
+
 No decision threshold, prompt or setting is tuned after this choice. The selected model is then evaluated once
 on every test set (notebook 24); no further v4 variant is trained after any v4 test result is seen.
 

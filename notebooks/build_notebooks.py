@@ -2453,6 +2453,142 @@ Run after notebook 26, on an A100 or L4 (about 20 minutes). Trains nothing and c
     ]
 
 
+def nb27_v41() -> list[dict]:
+    """Post-hoc remedy for the missed pneumothorax: v4.1 = stage 3 redone with SIIM pneumothorax training cases."""
+    c26 = nb26_siim_fullres()
+    siim_data = next(c for c in c26 if "MANUAL =" in "".join(c["source"]))
+    siim_full = next(c for c in c26 if "siim_fullres.py" in "".join(c["source"]))
+    s3 = ("--views {TRAIN_V4} {REPLAY} --negatives {TRAIN_NEG_V4} --subsample 5000 --lr 5e-5 --mode agentic "
+          "--min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    tests = ["test", "ext", "fresh", "ext2", "siimfull", "siimte"]
+    return [
+        md("""
+# MedScope 27: v4.1, a post-hoc fix for the missed pneumothorax
+
+**Post hoc, separate from the pre-registered evaluation; v4 stays the main model.** Notebook 26b showed that v4 misses
+pneumothorax because training held almost no pneumothorax images (4, all large) and validation none, and that the
+last stage (stage 3) turned the earlier stages' partial detection into none. v4.1 redoes only stage 3, from the same
+stage 2, with the same data, settings and seed, plus SIIM-ACR pneumothorax images (and as many lesion-free ones) from
+patients that appear nowhere in the evaluation. It is then tested on new SIIM patients and on every earlier test, to
+check that nothing else got worse.
+
+Also here: the control for the open question of notebook 26b (does v4 call every chest X-ray abnormal?).
+
+**Needs:** an A100 (about 4-5 hours, every step resumes), `HF_TOKEN`, the SIIM-ACR `archive.zip` in
+`MyDrive/medscope/siim/` (as for notebook 26). Optional `GEMINI_API_KEY` adds gemini-4-argon on the new SIIM test (about $2).
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code("!pip install -q kaggle pydicom"), code(LAMA_CELL), code(RESTORE_ALL),
+        code(RESTORE_V4), code(RESTORE_EVAL),
+        md("## 1. SIIM-ACR images, and the SIIM cases of notebook 26"),
+        siim_data,
+        code("FULL = f'{V4}/siim_full'\nif not os.path.exists(f'{FULL}/views/views_clean.jsonl'):\n" +
+             "".join("    " + l for l in "".join(siim_full["source"]).splitlines(keepends=True)) +
+             "\nSIIMFULL = f'{FULL}/views/views_clean.jsonl {FULL}/negatives/views_negatives_external.jsonl'"),
+        md("""## 2. The open question of notebook 26b (GPU, about 5 minutes)
+
+Asked "Is there an abnormality?", v4 said yes on 35 of the 42 pneumothorax images. Here the same question on the 48
+SIIM images without pneumothorax: if v4 says yes about as often there, the "yes" carries no information."""),
+        code(r"""
+import json, torch
+from dataclasses import replace
+from medscope.eval.runner import load_views, scored_rows
+BATCH = 24 if torch.cuda.get_device_properties(0).total_memory / 2 ** 30 >= 38 else 8
+FINAL = json.load(open(f'{ADAPTERS}/final_choice_v4.json'))['adapter']
+CTRL = f'{FULL}/probe_abnormality_healthy.jsonl'
+with open(CTRL, 'w') as f:
+    for v in load_views(f'{FULL}/negatives/views_negatives_external.jsonl'):
+        f.write(json.dumps(replace(v, view_id=v.view_id.replace('__natural_negative', 'abn__natural_negative'),
+                                   question='Is there an abnormality in this chest X-ray?').to_dict()) + '\n')
+for run, adapter in [('v4_final', FINAL), ('v4q_cf_s0', f'{ADAPTERS}/v4_s1/final'), ('v2_base_qwen35', None)]:
+    a = f'--adapter {adapter}' if adapter else ''
+    !python scripts/evaluate.py --model Qwen/Qwen3.5-4B {a} --views {CTRL} --out {RESULTS}/{run}_siimabnneg --name {run}-siimabnneg --split siimabnneg --batch-size {BATCH}
+said_yes = lambda run, kind: [r['action'] == 'answer' and not r.get('claims_absent') for r in scored_rows(f'{RESULTS}/{run}') if r['kind'] == kind] if os.path.exists(f'{RESULTS}/{run}') else []
+lines = ['| Model | "Abnormal": pneumothorax images | "Abnormal": images without pneumothorax |', '| --- | --- | --- |']
+for run in ('v4_final', 'v4q_cf_s0', 'v2_base_qwen35'):
+    p, n = said_yes(f'{run}_siimabn', 'original'), said_yes(f'{run}_siimabnneg', 'natural_negative')
+    lines.append(f'| {run} | {sum(p)}/{len(p)} | {sum(n)}/{len(n)} |')
+CTRL_TABLE = '\n'.join(lines)
+open(f'{RESULTS}/siim_abnormality_control.md', 'w').write(CTRL_TABLE + '\n')
+print(CTRL_TABLE)
+"""),
+        md("## 3. SIIM training, validation and new test patients (none in any earlier evaluation)"),
+        code(r"""
+ST = f'{V4}/siim_train'
+if not os.path.exists(f'{ST}/test/cases.jsonl'):
+    !python scripts/prepare_siim_train.py --siim {SIIM} --exclude-views {EXT2} {SIIMFULL} --out {ST} --train 150 --val 50 --test 100
+for split in ('train', 'val', 'test'):
+    extra = '--v4-degradations' if split == 'train' else ''
+    if not os.path.exists(f'{ST}/{split}/views/views_clean.jsonl'):
+        !python scripts/build_views.py --manifest {ST}/{split}/cases.jsonl --out {ST}/{split}/views --inpainter lama {extra}
+        !python scripts/check_views.py --views {ST}/{split}/views/views.jsonl
+SIIM_TRAIN = f'{ST}/train/views/views_clean.jsonl {ST}/train/negatives.jsonl'
+SIIM_VAL = f'{ST}/val/views/views_clean.jsonl {ST}/val/negatives.jsonl'
+SIIM_TEST = f'{ST}/test/views/views_clean.jsonl {ST}/test/negatives.jsonl'
+!cat {ST}/report.txt
+"""),
+        md("## 4. v4.1: stage 3 again, from the same stage 2, plus the SIIM training cases (GPU, about 1.5 hours)"),
+        code(f"""
+REPLAY = f'{{DRIVE}}/external/vqa_train/views_vqa_train.jsonl'
+if not os.path.exists(f'{{ADAPTERS}}/v41_s3/final/adapter_config.json'):
+    !python scripts/train_sft.py --model {BASE} --init {{ADAPTERS}}/v4_s2/final {s3} --extra-views {{SIIM_TRAIN}} --out {{ADAPTERS}}/v41_s3
+V41 = f'{{ADAPTERS}}/v41_s3/final'
+"""),
+        md("""## 5. Validation and the rule fixed before any v4.1 test result
+
+v4.1 passes if, on the v4 validation set, its net utility is at least v4's minus 0.02 and its rate of claimed findings
+on healthy images at most v4's plus 0.02 (the pre-registered stage rule), and it detects more pneumothoraxes than v4
+on the SIIM validation patients. It is tested either way; the paper reports whether it passed."""),
+        code(f"""
+!python scripts/evaluate.py --model {BASE} --adapter {{V41}} --views {{VAL_V4}} {{VAL_NEG_V4}} --out {{RESULTS}}/v41_val --name medscope-v4.1 --split validation --batch-size {{BATCH}}
+for run, adapter in [('v41', V41), ('v4_final', FINAL)]:
+    !python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{SIIM_VAL}} --out {{RESULTS}}/{{run}}_siimval --name {{run}}-siimval --split siimval --batch-size {{BATCH}}
+m = lambda run, k: json.load(open(f'{{RESULTS}}/{{run}}/summary.json'))['metrics'][k]['value']
+det = lambda run: (lambda p: sum(p) / max(1, len(p)))(said_yes(run, 'original'))
+U41, U4, H41, H4 = m('v41_val', 'net_utility'), m('v4_s3_val', 'net_utility'), m('v41_val', 'natural_hallucination_rate'), m('v4_s3_val', 'natural_hallucination_rate')
+passed = U41 >= U4 - 0.02 and H41 <= H4 + 0.02 and det('v41_siimval') > det('v4_final_siimval')
+RULE = (f'validation net utility {{U41:.3f}} (v4 {{U4:.3f}}), healthy-image claims {{H41:.1%}} (v4 {{H4:.1%}}), '
+        f'SIIM validation pneumothorax detected {{det("v41_siimval"):.0%}} (v4 {{det("v4_final_siimval"):.0%}}): '
+        + ('PASSED' if passed else 'NOT PASSED'))
+json.dump({{'adapter': V41, 'passed': passed, 'rule': RULE}}, open(f'{{ADAPTERS}}/v41_choice.json', 'w'), indent=1)
+print(RULE)
+"""),
+        md("## 6. Every test (GPU, about 1.5 hours) and gemini-4-argon on the new SIIM patients (optional)"),
+        code(f"""
+SETS = {{'test': f'{{TEST_VIEWS}} {{TEST_NEG}}', 'ext': EXT_VIEWS, 'fresh': FRESH, 'ext2': EXT2, 'siimfull': SIIMFULL, 'siimte': SIIM_TEST}}
+for split in {tests!r}:
+    !python scripts/evaluate.py --model {BASE} --adapter {{V41}} --views {{SETS[split]}} --out {{RESULTS}}/v41_{{split}} --name medscope-v4.1 --split {{split}} --batch-size {{BATCH}}
+!python scripts/evaluate.py --model {BASE} --adapter {{FINAL}} --views {{SIIM_TEST}} --out {{RESULTS}}/v4_final_siimte --name medscope-v4 --split siimte --batch-size {{BATCH}}
+!python scripts/evaluate.py --model {BASE} --views {{SIIM_TEST}} --out {{RESULTS}}/v2_base_qwen35_siimte --name qwen3.5-4b --split siimte --batch-size {{BATCH}}
+if secret('GEMINI_API_KEY'):
+    os.environ['GEMINI_API_KEY'] = secret('GEMINI_API_KEY')
+    !python scripts/evaluate.py --api gemini --model gemini-4-argon --views {{SIIM_TEST}} --out {{RESULTS}}/v2_gemini_siimte --name gemini-4-argon --split siimte --batch-size 8
+!python scripts/evaluate.py --model {BASE} --adapter {{V41}} --views {{VQA_VIEWS}} --out {{RESULTS}}/v41_vqa --name medscope-v4.1 --split vqa --batch-size {{BATCH}}
+lines = ['| Model | New SIIM patients: pneumothorax found | New SIIM patients: healthy called positive | Notebook 26 SIIM cases: found |',
+         '| --- | --- | --- | --- |']
+rate = lambda run, kind: (lambda p: f'{{sum(p)}}/{{len(p)}} ({{sum(p) / max(1, len(p)):.0%}})')(said_yes(run, kind))
+for tag in ('v41', 'v4_final', 'v2_base_qwen35', 'v2_gemini'):
+    lines.append(f'| {{tag}} | {{rate(tag + "_siimte", "original")}} | {{rate(tag + "_siimte", "natural_negative")}} | {{rate(tag + "_siimfull", "original")}} |')
+PTX_TABLE = '\\n'.join(lines)
+open(f'{{RESULTS}}/v41_pneumothorax.md', 'w').write(PTX_TABLE + '\\n')
+print(PTX_TABLE)
+"""),
+        publish("MedScope report - 27 v4.1 pneumothorax fix", f"""
+    ('Post hoc: what v4.1 is', 'Stage 3 of v4 redone from the same stage 2 with the same data, settings and seed, plus 150 SIIM pneumothorax images and 150 lesion-free SIIM images from patients in no earlier evaluation. v4 remains the pre-registered model.'),
+    ('SIIM patients', read_text(f'{{ST}}/report.txt')),
+    ('Does v4 call every chest X-ray abnormal? (open question of notebook 26b)', read_text(f'{{RESULTS}}/siim_abnormality_control.md')),
+    ('Rule fixed before any v4.1 test result', RULE),
+    ('Pneumothorax: new SIIM patients and the notebook 26 cases', read_text(f'{{RESULTS}}/v41_pneumothorax.md')),
+    ('Main test: v4.1 vs v4 (paired)', significance_table(RESULTS, 'v41_test', ['v4_final_test'])),
+    ('External centres: v4.1 vs v4 (paired)', significance_table(RESULTS, 'v41_ext', ['v4_final_ext'])),
+    ('Fresh internal: v4.1 vs v4 (paired)', significance_table(RESULTS, 'v41_fresh', ['v4_final_fresh'])),
+    ('Fresh external: v4.1 vs v4 (paired; its SIIM part shares the source with v4.1 training, not the patients)', significance_table(RESULTS, 'v41_ext2', ['v4_final_ext2'])),
+    ('New SIIM patients: v4.1 vs v4 (paired)', significance_table(RESULTS, 'v41_siimte', ['v4_final_siimte', 'v2_base_qwen35_siimte'])),
+    ('All metrics by source', by_dataset(RESULTS, ['v41_test', 'v4_final_test', 'v41_ext2', 'v4_final_ext2', 'v41_siimte', 'v4_final_siimte'])),
+    ('Standard VQA: v4.1 vs v4', vqa_table(RESULTS, ['v41_vqa', 'v4_final_vqa'])),
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -2540,6 +2676,8 @@ NOTEBOOKS = {
     "26_siim_fullres.ipynb": nb26_siim_fullres,
     "26L_siim_fullres_local.ipynb": nb26_local,
     "26b_pneumothorax_diagnosis.ipynb": nb26b_diagnosis,
+    "27_v41_pneumothorax_fix.ipynb": nb27_v41,
+    "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
 

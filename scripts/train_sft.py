@@ -92,6 +92,8 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--schedule-steps", type=int, default=None,
                     help="length of the learning-rate schedule (default: --max-steps, else the estimated steps); "
                          "an ablation arm uses the main arm's, so both follow the same schedule")
+    ap.add_argument("--extra-views", nargs="*", default=[],
+                    help="views added in full after subsampling (post-hoc v4.1: the SIIM pneumothorax training cases)")
     ap.add_argument("--hard-repeat", type=int, default=1,
                     help="rejection sampling: repeat episodes kept from views the model mostly failed this many times")
     return ap
@@ -132,6 +134,10 @@ def training_views(args) -> tuple[list, list, Optional[dict]]:
             kept = kept + extra
         views = views + kept          # their own episodes, on top of the synthetic set
     views += negs
+    if args.extra_views:
+        extra = [v for f in args.extra_views for v in load_views(f)]
+        print(f"{len(extra)} extra views added in full")
+        views += extra
     views = v4_mix(views, args)
     return views, negs, replays
 

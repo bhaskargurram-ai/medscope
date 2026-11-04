@@ -270,3 +270,52 @@ class DiagnoseFindingTest(unittest.TestCase):
         self.assertRegex(report, r"\| S3 \| pneumothorax \| \d+ \| 4/\d+ \(\d+%\) \|")              # 'absent' repeats only add No
         self.assertIn("| S1 | pneumothorax | 0/2 (0%) | 0/2 (0%) | 0/5 (0%) |", report)
         self.assertIn("| S1 | other finding | 4/4 (100%) |", report)
+
+
+class SiimTrainSplitTest(unittest.TestCase):
+    def test_splits_exclude_evaluation_patients_and_stay_disjoint(self):
+        import csv
+        import importlib.util
+        import json
+        import sys
+        import tempfile
+        from pathlib import Path
+        import numpy as np
+        root = Path(__file__).resolve().parent.parent
+        sys.path.insert(0, str(root / "scripts"))
+        spec = importlib.util.spec_from_file_location("prepare_siim_train", root / "scripts" / "prepare_siim_train.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        t = Path(tempfile.mkdtemp())
+        siim = t / "siim"
+        siim.mkdir()
+        rows = []
+        for i in range(40):
+            uid = f"1.2.{i}"
+            (siim / f"{uid}.dcm").write_bytes(b"")
+            # 20 with a pneumothorax (a 40x40 block = 2.4% of 256x256), one tiny one, the rest without
+            enc = "-1" if i >= 21 else ("100 2" if i == 20 else " ".join(f"{(0 if c == 0 else 256 - 40)} 40" for c in range(40)))
+            rows.append({"ImageId": uid, " EncodedPixels": enc})
+        with open(siim / "train-rle.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=["ImageId", " EncodedPixels"])
+            w.writeheader()
+            w.writerows(rows)
+        used = {"view_id": "siimext00001_ptx__original", "case_id": "siimext00001_ptx", "patient_id": "siim_1.2.0",
+                "kind": "original", "image_path": "x.png", "question": "q", "answer": "Yes", "answer_aliases": [],
+                "lesion_box": None, "critical": True, "meta": {}}
+        (t / "ext2.jsonl").write_text(json.dumps(used) + "\n")
+        mod.read_dicom = lambda p: np.full((256, 256), 100, np.uint8)
+        mod.patient_of = lambda p: "P" + p.stem.split(".")[-1]
+        sys.argv = ["x", "--siim", str(siim), "--exclude-views", str(t / "ext2.jsonl"), "--out", str(t / "out"),
+                    "--train", "10", "--val", "4", "--test", "5"]
+        mod.main()
+        cases = {s: [json.loads(l) for l in (t / "out" / s / "cases.jsonl").read_text().splitlines()] for s in ("train", "val", "test")}
+        negs = {s: [json.loads(l) for l in (t / "out" / s / "negatives.jsonl").read_text().splitlines()] for s in ("train", "val", "test")}
+        self.assertEqual([len(cases[s]) for s in ("train", "val", "test")], [10, 4, 5])
+        self.assertEqual([len(negs[s]) for s in ("train", "val", "test")], [10, 4, 5])
+        ids = [c["patient_id"] for s in cases for c in cases[s]] + [v["patient_id"] for s in negs for v in negs[s]]
+        self.assertNotIn("siim_1.2.0", ids)                     # used by the existing evaluation
+        self.assertNotIn("siim_1.2.20", ids)                    # thin rim
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertTrue(all(c["case_id"].startswith("siimtr") for c in cases["train"]))
+        self.assertIn("patients shared between splits (must be 0): 0", (t / "out" / "report.txt").read_text())
