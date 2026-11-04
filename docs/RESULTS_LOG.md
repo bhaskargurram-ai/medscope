@@ -801,3 +801,24 @@ Conclusion: a coverage gap (rare critical finding, almost no positives in traini
 more conservative stage turned into a complete miss. Fix for future work: positives of every critical finding in
 validation and a per-finding sensitivity floor in the selection rule.
 
+
+## 2026-11-04 — notebook 25 (partial) and post-hoc v4.1 (notebook 27, exploratory)
+
+Notebook 25, main test (net / ESG / erased claimed / healthy claimed): CF s0 0.69/0.74/12%/9%, CF s2 0.66/0.73/17%/17%;
+no CF s0 0.28/0.21/76%/39%, s1 0.30/0.22/73%/37%; no CF with matched "absent" answers 0.32/0.21/74%/32% (the gain is not
+the share of "No" answers); erasures only 0.67/0.71/7%/6% (random-edit denial 22% vs 11-15%); MedGemma CF 0.70/0.72/8%/6%,
+no CF 0.41/0.37/58%/32%, untrained -0.26/0.28/54%/24%. Held-out tools, ESG (random-edit denial): Telea CF 0.70 (22%),
+erasures only 0.49 (47%), no CF 0.11, matched 0.11; diffusion CF 0.59 (15%), erasures only 0.71 (24%), no CF 0.18,
+matched 0.16. Seeds CF s1 and no CF s2 still running.
+
+Abnormality control (notebook 27): "Is there an abnormality?" called yes on SIIM pneumothorax vs SIIM images without
+pneumothorax: v4 35/42 vs 28/48 (Fisher p 0.012), stage 1 34/42 vs 31/48 (p 0.10), base 38/42 vs 23/48 (p<0.001).
+v4 separates the two partly: it registers something abnormal but does not name pneumothorax.
+
+v4.1 (stage 3 redone with 150 + 150 SIIM training patients): pre-set rule NOT PASSED (validation net 0.610 vs 0.613;
+healthy-image claims 10.0% vs 7.7%, limit +2 points; SIIM validation detection 46% vs 2%). Tested anyway, as fixed:
+new SIIM patients (100 + 100): pneumothorax found 27% (v4 0%), healthy called positive 0% (v4 0%), net -0.62 (v4 -1.10);
+notebook 26 SIIM cases: found 33% (v4 0%). Main test: net 0.770 (v4 0.732), ESG 0.804 (0.758), erased claimed 5.5%
+(9.6%), healthy claimed 8.3% (7.6%), CCR 0.861 (0.849). v4 stays the reported model; v4.1 is an exploratory remedy that
+recovers part of the missed finding without harming the main test. Even with SIIM training cases detection stays far
+below gemini-4-argon (69%), consistent with the frozen vision encoder limiting subtle findings (future work).
