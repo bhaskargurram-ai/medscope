@@ -2313,8 +2313,18 @@ MANUAL = f'{DRIVE}/siim'      # or put the Kaggle download here yourself: archiv
 dcm = lambda: glob.glob(f'{SIIM}/**/*.dcm', recursive=True)
 if not dcm() and os.path.isdir(MANUAL):
     for z in glob.glob(f'{MANUAL}/*.zip'):
-        print('unzipping', z)
-        subprocess.run(['unzip', '-q', '-o', z, '-d', SIIM], check=True)
+        local = f'{WORK}/raw/{os.path.basename(z)}'       # copy off Drive first: unzip on a Drive file can fail mid-read
+        if not os.path.exists(local) or os.path.getsize(local) != os.path.getsize(z):
+            print('copying', z, f'({os.path.getsize(z) / 2 ** 30:.1f} GB)')
+            os.makedirs(os.path.dirname(local), exist_ok=True)
+            subprocess.run(['cp', z, local], check=True)
+        print('unzipping', local)
+        r = subprocess.run(['unzip', '-q', '-o', local, '-d', SIIM], capture_output=True, text=True)
+        if r.returncode not in (0, 1) and not dcm():    # 1 = warnings only; 2 with files extracted = minor zip damage
+            raise SystemExit(f'unzip failed ({r.returncode}): {(r.stderr or r.stdout)[-500:]}\n'
+                             'The zip on Drive may be incomplete: check its size, or download it again.')
+        if r.returncode:
+            print(f'unzip finished with code {r.returncode} (continuing: {len(dcm())} DICOM files extracted)')
     if not dcm() and glob.glob(f'{MANUAL}/**/*.dcm', recursive=True):
         SIIM = MANUAL
 if not dcm():
