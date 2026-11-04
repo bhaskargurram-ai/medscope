@@ -2126,10 +2126,11 @@ for i in sorted(range(len(JOBS)), key=lambda i: -JOBS[i][4]):     # longest firs
     owner[i], load[k] = k + 1, load[k] + JOBS[i][4]
 for k in range(1, PARTS + 1):
     print(f'part {{k}} (~{{load[k - 1]:.0f}} h):', ', '.join(f'{{j[1]}}_{{j[2]}}_s{{j[3]}}' for i, j in enumerate(JOBS) if owner[i] == k))
-MY_PARTS = [p.strip() for p in str(PART).split('+')]      # e.g. '3+4': two parts at once on one large GPU
+# '+' runs parts at the same time on one GPU ('3+4'); ',' runs parts one after the other ('2,9+6': 2 then 9, next to 6)
+TOKENS = [[p.strip() for p in t.split(',')] for t in str(PART).split('+')]
+MY_PARTS = [p for t in TOKENS for p in t]
 MINE = [j for i, j in enumerate(JOBS) if PART == 'all' or str(owner[i]) in MY_PARTS]
-GROUPS = [MINE] if PART == 'all' or len(MY_PARTS) == 1 else \
-    [[j for i, j in enumerate(JOBS) if str(owner[i]) == p] for p in MY_PARTS]
+GROUPS = [MINE] if PART == 'all' else [[j for i, j in enumerate(JOBS) if str(owner[i]) in t] for t in TOKENS]
 print('this session (PART', PART, '):', [f'{{j[1]}}_{{j[2]}}_s{{j[3]}}' for j in MINE] or 'no training or testing')
 """),
         md("## Quick check that MedGemma trains (3 steps on 50 views; only in the session that trains MedGemma)"),
@@ -2148,7 +2149,7 @@ def gpu_monitor(stop):        # GPU use every 5 minutes, printed and saved to Dr
                             '--format=csv,noheader'], capture_output=True, text=True).stdout.strip()
         line = time.strftime('%H:%M') + ' GPU util, memory used, memory total, power: ' + q
         print(line, flush=True)
-        with open(f"{{RESULTS}}/gpu_log_part{{str(PART).replace('+', '_')}}.txt", 'a') as f:
+        with open(f"{{RESULTS}}/gpu_log_part{{str(PART).replace('+', '_').replace(',', '_')}}.txt", 'a') as f:
             f.write(line + '\\n')
 def run_jobs(jobs):
     for model, tag, arm, seed, _ in jobs:
@@ -2251,11 +2252,12 @@ def nb25_part(parts: str, jobs: str):
         i = next(k for k, c in enumerate(cells) if "PARTS = " in "".join(c["source"]) and "#@param" in "".join(c["source"]))
         cells[i] = code(f"PARTS = 9\nPART = {parts!r}      # this notebook's jobs: {jobs}")
         cells.insert(0, md(f"""
-# MedScope 25 ({parts.replace('+', ' and ')}): {jobs}
+# MedScope 25 (part {parts.replace(',', ', then ').replace('+', ' and ')}): {jobs}
 
 Part of notebook 25 fixed to these jobs: open it in its own tab on an **A100 or G4** runtime and choose **Run all**.
-Nothing to set. The jobs run at the same time on the one GPU (each needs about 10 GB). Finished work is skipped and
-interrupted training resumes from its last checkpoint. Use 25a-25d with four GPUs, or 25e and 25f with two.
+Nothing to set. The jobs run at the same time on the one GPU (a Qwen job needs about 16 GB, so two fit on a 40 GB
+A100). Finished work is skipped and interrupted training resumes from its last checkpoint. With two 40 GB GPUs: 25e and
+25f, then 25g for the jobs that did not fit.
 """))
         return cells
     return build
@@ -2392,7 +2394,9 @@ NOTEBOOKS = {
     "25e_parts_2_to_5.ipynb": nb25_part("2+3+4+5", "four jobs on one GPU: no CF with matched 'absent' answers, "
                                                    "erasures only, MedGemma with and without CF"),
     "25f_parts_6_to_9.ipynb": nb25_part("6+7+8+9", "four jobs on one GPU: seeds 1 and 2, with and without CF"),
-    "25g_part_2.ipynb": nb25_part("2", "the no-CF arm with matched 'absent' answers (seed 0), resumed from its checkpoint"),
+    "25g_remaining.ipynb": nb25_part("2,9+6", "the three jobs that did not fit in 25e and 25f (out of GPU memory): "
+                                     "no CF with matched 'absent' answers (resumes from its checkpoint), then seed 2 "
+                                     "without CF; next to them seed 1 with CF. Two jobs at a time, about 10-11 hours"),
     "26_siim_fullres.ipynb": nb26_siim_fullres,
 }
 
