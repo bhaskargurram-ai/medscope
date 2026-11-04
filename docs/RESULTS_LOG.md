@@ -777,5 +777,27 @@ Single selected model (v4 stage 3) on every test; all frontier runs re-checked f
 Added notebook 26: the 48 SIIM pneumothorax cases and the SIIM lesion-free images of the fresh external test,
 rebuilt from the original SIIM-ACR DICOMs (scripts/siim_fullres.py, matched by image UID; case ids "siimfull"),
 views rebuilt with LaMa, and tested with v4, both stage-1 arms, base Qwen3.5-4B and (optionally) gemini-4-argon.
-Labelled post hoc in the pre-registration; no model is changed. Results to be added after the run.
+Labelled post hoc in the pre-registration; no model is changed. 42 of the 48 SIIM pneumothorax cases were found in
+the original-resolution data (Kaggle jesperdramsch copy), all 48 lesion-free images.
+
+Pneumothorax called present, same 42 cases, 256 px -> original resolution: final v4 0% -> 0%; stage 1 (CF) 19% -> 40%;
+stage 1 without CF 0% -> 5%; base Qwen3.5-4B 0% -> 12%; gemini-4-argon 69% -> 69%. Stage 2 at original resolution 40%
+(1/48 healthy images claimed). Resolution helps the earlier models but does not explain the final model's miss.
+
+Diagnosis (notebook 26b, scripts/diagnose_finding.py; nothing trained):
+- Training coverage: questions naming pneumothorax were 54 of ~7,000 chest X-ray training views in stage 1 (35 in stage 2,
+  15 in stage 3), trained to "No" 80% / 100% / 87% of the time; only 4 pneumothorax lesion images in all of stage 1, all
+  large (lesion box median 37% of the image vs 6.9% for the SIIM cases).
+- Selection could not see it: validation, main test and fresh internal hold no pneumothorax lesion image asked about
+  pneumothorax (only 7, 7 and 4 healthy images).
+- Stage 3 is the step that removes it (stage 1 and 2: 17/42; stage 3: 0/42, all sizes). Stage 3 shifts chest X-ray answers
+  towards "No" in general on validation (named findings detected 63% -> 56%, erased-lesion claims 16% -> 9%, healthy
+  claims 24% -> 10%); with almost no positive pneumothorax examples, the weak detection of stages 1-2 drops to zero.
+  The share of "No" targets alone does not explain it (stage 2 trained 35/35 "No" and still detected 40%).
+- Asked "Is there an abnormality?", the final model says yes on 35/42 of the same images (base 38/42, stage 1 34/42,
+  stage 2 37/42). Not specific evidence that it sees the pneumothorax: it also calls 4/8 healthy validation chest X-rays
+  abnormal.
+Conclusion: a coverage gap (rare critical finding, almost no positives in training, none in validation) that the final,
+more conservative stage turned into a complete miss. Fix for future work: positives of every critical finding in
+validation and a per-finding sensitivity floor in the selection rule.
 
