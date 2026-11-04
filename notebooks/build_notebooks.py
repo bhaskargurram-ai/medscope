@@ -2257,7 +2257,7 @@ def nb25_part(parts: str, jobs: str):
 Part of notebook 25 fixed to these jobs: open it in its own tab on an **A100 or G4** runtime and choose **Run all**.
 Nothing to set. The jobs run at the same time on the one GPU (a Qwen job needs about 16 GB, so two fit on a 40 GB
 A100). Finished work is skipped and interrupted training resumes from its last checkpoint. With two 40 GB GPUs: 25e and
-25f, then 25g for the jobs that did not fit.
+25f, then 25g and 25h for what is left.
 """))
         return cells
     return build
@@ -2534,9 +2534,9 @@ NOTEBOOKS = {
     "25e_parts_2_to_5.ipynb": nb25_part("2+3+4+5", "four jobs on one GPU: no CF with matched 'absent' answers, "
                                                    "erasures only, MedGemma with and without CF"),
     "25f_parts_6_to_9.ipynb": nb25_part("6+7+8+9", "four jobs on one GPU: seeds 1 and 2, with and without CF"),
-    "25g_remaining.ipynb": nb25_part("2,9+6", "the three jobs that did not fit in 25e and 25f (out of GPU memory): "
-                                     "no CF with matched 'absent' answers (resumes from its checkpoint), then seed 2 "
-                                     "without CF; next to them seed 1 with CF. Two jobs at a time, about 10-11 hours"),
+    "25g_seeds.ipynb": nb25_part("6+9", "seed 1 with CF and seed 2 without CF, both at once (about 7 hours on an A100)"),
+    "25h_ablations.ipynb": nb25_part("2,3", "no CF with matched 'absent' answers (resumes from its checkpoint, then its "
+                                     "tests), then the held-out inpainting tests of the erasures-only arm (about 3.5 hours)"),
     "26_siim_fullres.ipynb": nb26_siim_fullres,
     "26L_siim_fullres_local.ipynb": nb26_local,
     "26b_pneumothorax_diagnosis.ipynb": nb26b_diagnosis,
