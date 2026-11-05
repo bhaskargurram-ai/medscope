@@ -79,9 +79,11 @@ def extract(model_id: str, views, max_side: int = 768) -> np.ndarray:
 
     handle = module.register_forward_hook(hook)
     feats = []
+    from PIL import Image
     with torch.no_grad():
         for i, v in enumerate(views):
-            msgs = [{"role": "user", "content": [{"type": "image", "image": v.image_path}, {"type": "text", "text": "Describe the image."}]}]
+            img = np.asarray(Image.open(v.image_path).convert("RGB"))      # the policy takes an RGB array, as the agent loop does
+            msgs = [{"role": "user", "content": [{"type": "image", "image": img}, {"type": "text", "text": "Describe the image."}]}]
             inputs = policy.encode(msgs)
             grabbed.clear()
             model(**inputs)
