@@ -2757,6 +2757,74 @@ import shlex
     ]
 
 
+def nb30_audit() -> list[dict]:
+    """One ZIP for an auditor without repository or Drive access: repository snapshot, git history, the reports and every
+    evaluation run's metrics and rescored per-view outcomes (transcripts and adapters are left out)."""
+    return [
+        md("""
+# MedScope 30: audit package
+
+Builds one ZIP that lets a reviewer without access to GitHub or Drive trace every number in the paper:
+
+- the repository at its current commit (code, notebooks, docs, paper source), plus `git log` and the full history of
+  the pre-registration file (`git log -p`), with commit hashes and dates;
+- the reports behind the tables: notebooks 23, 24, 25, 26, 26b, 27, 29 and the seed, inpainter, probe and
+  patient-bootstrap summaries;
+- every evaluation run under `results/`: `summary.json` (metrics with bootstrap CIs), `report.md`, `scored.jsonl`
+  (one rescored row per view: action, correctness, reward, claims) and `outcomes.jsonl`. Transcripts and adapters are
+  left out to keep the ZIP small; they stay in Drive.
+
+**Runtime:** CPU. About 5 minutes. The ZIP is written to `MyDrive/medscope/audit/`; download it from Drive and send
+it to the reviewer with `docs/reviews/RESPONSE_v09.md`.
+""" + SECRETS_NOTE),
+        code(SETUP),
+        code(r"""
+import glob, zipfile, time
+commit = git('rev-parse', '--short', 'HEAD', cwd='/content/medscope').stdout.strip()
+AUD = f'{DRIVE}/audit'
+os.makedirs(AUD, exist_ok=True)
+zpath = f'{AUD}/medscope_audit_{commit}_{time.strftime("%Y%m%d")}.zip'
+skip_dirs = ('.git', '__pycache__', '.ipynb_checkpoints')
+n_runs = 0
+with zipfile.ZipFile(zpath, 'w', zipfile.ZIP_DEFLATED) as z:
+    # 1. repository snapshot and history
+    for root, dirs, files in os.walk('/content/medscope'):
+        dirs[:] = [d for d in dirs if d not in skip_dirs]
+        for f in files:
+            full = os.path.join(root, f)
+            z.write(full, 'repo/' + os.path.relpath(full, '/content/medscope'))
+    z.writestr('history/git_log.txt', git('log', '--format=%H %ci %an %s', cwd='/content/medscope').stdout)
+    z.writestr('history/preregistration_history.patch', git('log', '-p', '--format=commit %H%n%ci%n%s%n', '--',
+                                                            'docs/PREREGISTRATION_v4.md', cwd='/content/medscope').stdout)
+    z.writestr('history/HEAD.txt', commit + '\n')
+    # 2. reports and summaries at the top of results/
+    for f in sorted(glob.glob(f'{RESULTS}/*.md') + glob.glob(f'{RESULTS}/*.json') + glob.glob(f'{RESULTS}/*.txt')):
+        z.write(f, 'results/' + os.path.basename(f))
+    # 3. every run: metrics, report, rescored rows, raw outcomes
+    for run in sorted(d for d in glob.glob(f'{RESULTS}/*') if os.path.isdir(d)):
+        kept = [f for f in ('summary.json', 'report.md', 'scored.jsonl', 'outcomes.jsonl') if os.path.exists(f'{run}/{f}')]
+        for f in kept:
+            z.write(f'{run}/{f}', f'results/{os.path.basename(run)}/{f}')
+        for sub in ('probe.md', 'probe.json'):                    # the encoder probe folder
+            if os.path.exists(f'{run}/{sub}'):
+                z.write(f'{run}/{sub}', f'results/{os.path.basename(run)}/{sub}')
+        n_runs += bool(kept)
+    # 4. the reader-study key stays out (it would unblind the readers); say so
+    z.writestr('README_AUDIT.txt', f"""MedScope audit package, repository commit {commit}.
+repo/       the repository at this commit (code, notebooks, docs, paper/method_paper.tex and .pdf)
+history/    git log of every commit; the full patch history of docs/PREREGISTRATION_v4.md
+results/    every evaluation run: summary.json (metrics, 95% bootstrap CIs), report.md, scored.jsonl (one rescored
+            row per view), outcomes.jsonl (raw); and the reports of notebooks 23-29 at the top level
+Not included: per-view transcripts and model adapters (in Drive), and the reader-study answer key (would unblind readers).
+Run names: v4_final_* = the selected model; v2_<model>_<set> = comparators; v4q_<arm>_s<seed>_<set> = stage-1 arms;
+v4mg_* = MedGemma arms; *_inp_<tool>_* = held-out inpainting tools. Sets: test (main), ext (external centres),
+fresh (fresh internal), ext2 (fresh external), vqa, notools.
+""")
+print(f'{zpath}: {os.path.getsize(zpath) / 2**20:.0f} MB, {n_runs} runs')
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -2847,6 +2915,7 @@ NOTEBOOKS = {
     "27_v41_pneumothorax_fix.ipynb": nb27_v41,
     "28_reader_study.ipynb": nb28_reader_study,
     "29_review_checks.ipynb": nb29_review,
+    "30_audit_package.ipynb": nb30_audit,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
