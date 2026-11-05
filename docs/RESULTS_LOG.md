@@ -840,3 +840,19 @@ Patient-level bootstrap: main test 507 cases from 416 patients/groups (39 groups
 155; fresh internal 76 from 75; fresh external 316 from 230 (largest 8). Intervals widen by <= 0.01 (main) and <= 0.03
 (fresh external); all 27 primary comparisons stay p < 0.001; one comparison crosses 0.05: fresh-external ESG vs Claude
 Opus 5.5, p 0.037 -> 0.060. Paper v0.9 carries all three (Tables 7, 9; Sections 5.3-5.5, 8.5).
+
+## 2026-11-05 — cross-set crosswalk (notebook 31)
+
+Every unedited image of every split and cohort (training 5,257; validation 540; main test 491; external centres 169;
+fresh internal 76; fresh external 316) hashed (64-bit dhash) and every pair within 8 bits confirmed by pixel
+correlation at 64 px. No case id or patient/group id is shared by any two sets. Identical images (<= 4 bits, r >=
+0.98): exactly one pair in 6,849 images: validation lesion-free image chestxdet03089neg_abn (ChestX-Det "no finding",
+group chestxdet_g2428) is the same NIH ChestX-ray14 image as fresh-external pneumothorax case siimext00119_ptx
+(distance 0, r = 1.000). It was never in training; validation was used only for model selection; the case is 1 of
+316 fresh-external cases, so no fresh-external mean moves by more than 0.003, and the SIIM pneumothorax result is
+unchanged (the model answered "No" on every SIIM image). The two datasets label this image differently (no finding
+vs pneumothorax with a mask). Near tier (<= 8 bits, r 0.90-0.97): 1,834 pairs, all within the range reached by pairs
+that cannot share a patient (ChestX-Det across patient-split folds up to r = 0.946; SLAKE vs BraTS-Africa up to
+0.966), so at 64 px this tier reflects shared anatomy, not shared studies, and cannot tell a neighbouring slice of
+one SLAKE volume from another patient's similar slice. Report: results/crosswalk.md. Paper v0.12, Section 4.1 and
+limitations.

@@ -39,6 +39,13 @@ def images_of(files: list[str]) -> dict[str, dict]:
     return out
 
 
+def source(case_id: str) -> str:
+    """The dataset prefix of a case id (letters before the first digit or underscore)."""
+    head = case_id.split("_")[0]
+    letters = head[:next((i for i, ch in enumerate(head) if not ch.isalpha()), len(head))]
+    return letters or head
+
+
 def candidate_pairs(ha: np.ndarray, hb: np.ndarray, max_distance: int, chunk: int = 512) -> list[tuple[int, int, int]]:
     """(i, j, distance) for every hash of A within max_distance bits of a hash of B, vectorised in chunks."""
     out = []
@@ -97,7 +104,7 @@ def main() -> None:
                    f"{len({m['patient'] for m in sets[n].values()})} |")
     out += ["", "| Set A | Set B | Same image | Near | Shared case ids | Shared patient/group ids |",
             "| --- | --- | --- | --- | --- | --- |"]
-    details = []
+    details, pairs = [], []
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             same, near = matches(sets, hashes, a, b)
@@ -106,9 +113,20 @@ def main() -> None:
             out.append(f"| {a} | {b} | {len(same)} | {len(near)} | {len(cases)} | {len(pats)} |")
             print(f"{a} vs {b}: {len(same)} same, {len(near)} near, {len(cases)} shared cases, {len(pats)} shared patients", flush=True)
             for pa, pb, d, c in same + near:
+                pairs.append((a, b, pa, pb, d, c))
                 details.append(f"| {a} | {b} | {sets[a][pa]['case']} ({sets[a][pa]['patient']}) | {sets[b][pb]['case']} "
                                f"({sets[b][pb]['patient']}) | {d} | {c:.3f} |")
     if details:
+        by_src: dict[tuple[str, str], list[float]] = {}
+        for a, b, pa, pb, d, c in pairs:
+            by_src.setdefault((source(sets[a][pa]["case"]), source(sets[b][pb]["case"])), []).append(c)
+        out += ["", "## Near-tier calibration by source", "",
+                "Pairs of sources that cannot share a patient (different datasets from different hospitals, or different "
+                "patients of one dataset split by patient id) show how high the correlation of two different images of the "
+                "same anatomy gets at 64 px; a cross-dataset pair below that level is not evidence of a shared study.", "",
+                "| Source A | Source B | Pairs | Highest correlation | Pairs at or above 0.95 |", "| --- | --- | --- | --- | --- |"]
+        for (sa, sb), cs in sorted(by_src.items(), key=lambda kv: -len(kv[1])):
+            out.append(f"| {sa} | {sb} | {len(cs)} | {max(cs):.3f} | {sum(c >= 0.95 for c in cs)} |")
         out += ["", "## Matches", "",
                 "| Set A | Set B | Image A: case (patient) | Image B: case (patient) | Hash distance | Correlation |",
                 "| --- | --- | --- | --- | --- | --- |"] + details
