@@ -2880,6 +2880,59 @@ sets = [f'Training={TRAIN_V4} {TRAIN_NEG_V4}', f'Validation={VAL_V4} {VAL_NEG_V4
     ]
 
 
+def nb32_comparators() -> list[dict]:
+    """Comparator sensitivity on the 150-case subset: the providers' highest image-processing setting, and each
+    flagship's own free reply with no action format (the plain prompt)."""
+    return [
+        md("""
+# MedScope 32: comparator sensitivity (API, CPU runtime)
+
+Two settings the review asked about, on the same 150 main-test cases as the cautious, few-shot and highest-reasoning
+checks, for the three flagships:
+
+1. **Highest image-processing setting.** Every model receives the same PNG (long side at most 768 px, the size the
+   benchmark images are stored at). OpenAI and Gemini also choose how finely they process an image: this arm sets
+   OpenAI's image detail to `high` and Gemini's media resolution to `high`. Anthropic has no such setting (an image
+   up to 1568 px is processed as sent), so its main run already uses its highest setting.
+2. **Plain prompt.** The flagship's own free reply to the generic VQA prompt, no action format and no tools, read as
+   prose by the same parser as the open models' plain-prompt runs (paper, Section 5.5).
+
+Each arm is compared with the same model's standard run on the same cases, and with MedScope-4B on the same cases.
+
+**Runtime:** CPU; about 1-2 hours; about $30-50 in API fees. Colab secrets `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+`GEMINI_API_KEY`. Every run resumes; finished runs are skipped.
+""" + SECRETS_NOTE),
+        code(SETUP), code(RESTORE_ALL),
+        code(r"""
+for name in ('OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY'):
+    if secret(name):
+        os.environ[name] = secret(name)
+FLAGSHIPS = [('gpt6astra', 'openai', 'gpt-6-astra'), ('claudeopus', 'anthropic', 'claude-opus-5-5'),
+             ('gemini', 'gemini', 'gemini-4-argon')]
+FLAGSHIPS = [f for f in FLAGSHIPS if os.environ.get({'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}[f[1]])]
+DETAIL = [f for f in FLAGSHIPS if f[1] != 'anthropic']
+print('models:', [m for _, _, m in FLAGSHIPS])
+"""),
+        md("## 1. Highest image-processing setting (OpenAI, Gemini)"),
+        code(r"""
+for tag, p, m in DETAIL:
+    !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --image-detail high --out {RESULTS}/v2_detail_{tag}_test --name {p}-{m}-detail --split test --batch-size 8 | tail -4
+"""),
+        md("## 2. Plain prompt: the model's own free reply, no tools"),
+        code(r"""
+for tag, p, m in FLAGSHIPS:
+    !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --prompt plain --out {RESULTS}/v2_plain_{tag}_test --name {p}-{m}-plain --split test --batch-size 8 | tail -4
+"""),
+        md("## 3. Report"),
+        publish("MedScope report - 32 comparator sensitivity", """
+    ('Highest image-processing setting vs the default, same model, same 150 cases', '\\n\\n'.join(significance_table(RESULTS, f'v2_detail_{t}_test', [f'v2_{t}_test']) for t, _, _ in DETAIL)),
+    ('Plain prompt vs the agent prompt, same model, same 150 cases', '\\n\\n'.join(significance_table(RESULTS, f'v2_plain_{t}_test', [f'v2_{t}_test']) for t, _, _ in FLAGSHIPS)),
+    ('MedScope-4B vs flagships at their highest image setting (paired, 150 cases)', significance_table(RESULTS, 'v4_final_test', [f'v2_detail_{t}_test' for t, _, _ in DETAIL])),
+    ('MedScope-4B vs flagships with the plain prompt (paired, 150 cases)', significance_table(RESULTS, 'v4_final_test', [f'v2_plain_{t}_test' for t, _, _ in FLAGSHIPS])),
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -2972,6 +3025,7 @@ NOTEBOOKS = {
     "29_review_checks.ipynb": nb29_review,
     "30_audit_package.ipynb": nb30_audit,
     "31_crosswalk.ipynb": nb31_crosswalk,
+    "32_comparator_sensitivity.ipynb": nb32_comparators,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

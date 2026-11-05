@@ -26,11 +26,16 @@ class Fake(_ApiPolicy):
 class TestApiPolicy(unittest.TestCase):
     def test_openai_message_format(self):
         img = np.zeros((20, 30, 3), np.uint8)
-        msgs = OpenAIPolicy.to_openai(start_messages(img, "Is there a polyp?"))
+        from medscope.api_policy import _ApiPolicy
+        plain, high = _ApiPolicy("m"), _ApiPolicy("m", image_detail="high")
+        msgs = OpenAIPolicy.to_openai(plain, start_messages(img, "Is there a polyp?"))
         self.assertEqual(msgs[0]["role"], "system")
         self.assertEqual(msgs[1]["content"][0]["type"], "image_url")
         self.assertTrue(msgs[1]["content"][0]["image_url"]["url"].startswith("data:image/png;base64,"))
+        self.assertNotIn("detail", msgs[1]["content"][0]["image_url"])       # provider default in the main runs
         self.assertEqual(msgs[1]["content"][1]["text"], "Question: Is there a polyp?")
+        msgs = OpenAIPolicy.to_openai(high, start_messages(img, "Is there a polyp?"))
+        self.assertEqual(msgs[1]["content"][0]["image_url"]["detail"], "high")
 
     def test_batch_with_retries_runs_episodes(self):
         import medscope.api_policy as ap

@@ -62,6 +62,7 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `29_review_checks` | Review checks: factorial ablation (control edits vs insertions), linear probe on the frozen vision encoder, patient-level bootstrap | A100 | ~9 h |
 | `30_audit_package` | One ZIP for an auditor: repository snapshot, git history, every report and every run's metrics and rescored outcomes | CPU | ~5 min |
 | `31_crosswalk` | Cross-set crosswalk: pixel-level search for the same image or a near-copy between any two splits or cohorts, plus id overlap | CPU | ~15 min |
+| `32_comparator_sensitivity` | Flagships at their highest image-processing setting and with their own plain prompt, same 150 cases (API) | CPU | ~1-2 h |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.

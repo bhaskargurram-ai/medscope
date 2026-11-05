@@ -94,11 +94,18 @@ class _ApiPolicy:
     load_in_4bit = False
     dtype = "api"
 
-    def __init__(self, model: str, max_tokens: int = 16000, workers: int = 8, effort: Optional[str] = None):
+    def __init__(self, model: str, max_tokens: int = 16000, workers: int = 8, effort: Optional[str] = None,
+                 image_detail: Optional[str] = None):
         # effort="high": the provider's highest reasoning setting (OpenAI reasoning_effort="high", Anthropic
         # output_config effort "max" with adaptive thinking, Gemini thinking level "high"); None keeps the provider
         # default used in the main comparison. Thinking counts toward the output limit, so it is raised.
+        # image_detail="high": the provider's highest image-processing setting (OpenAI image detail "high", Gemini
+        # media resolution "high"); None keeps the provider default. Anthropic has no such setting: images up to
+        # 1568 px are always processed at the size sent, so the main runs already use its highest setting.
         self.model, self.max_tokens, self.workers, self.effort = model, max_tokens, workers, effort
+        self.image_detail = image_detail
+        if image_detail not in (None, "high"):
+            raise ValueError(f"image_detail must be None or 'high', not {image_detail!r}")
         if effort == "high":
             self.max_tokens = max(max_tokens, 64000)
         self.usage = {"requests": 0, "input_tokens": 0, "output_tokens": 0, "errors": 0}
@@ -133,8 +140,7 @@ class OpenAIPolicy(_ApiPolicy):
         from openai import OpenAI
         self.client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=TIMEOUT_S, max_retries=0)
 
-    @staticmethod
-    def to_openai(messages: list[dict]) -> list[dict]:
+    def to_openai(self, messages: list[dict]) -> list[dict]:
         out = []
         for m in messages:
             if m["role"] == "system":
@@ -147,7 +153,10 @@ class OpenAIPolicy(_ApiPolicy):
             for c in m["content"]:
                 if c["type"] == "image":
                     b64 = base64.b64encode(png_bytes(c["image"])).decode()
-                    parts.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
+                    url = {"url": f"data:image/png;base64,{b64}"}
+                    if self.image_detail == "high":
+                        url["detail"] = "high"
+                    parts.append({"type": "image_url", "image_url": url})
                 else:
                     parts.append({"type": "text", "text": c["text"]})
             out.append({"role": "user", "content": parts})
@@ -186,6 +195,8 @@ class AnthropicPolicy(_ApiPolicy):
         return system, out
 
     def _call(self, messages: list[dict]) -> str:
+        if self.image_detail:
+            raise ValueError("Anthropic models have no image-detail setting (images up to 1568 px are processed as sent)")
         system, msgs = self.to_anthropic(messages)
         if self.effort == "high":
             # highest effort; a long output limit needs streaming in the SDK
@@ -219,11 +230,13 @@ class GeminiPolicy(_ApiPolicy):
                      else types.Part.from_text(text=c["text"]) for c in m["content"]]
             contents.append(types.Content(role="model" if m["role"] == "assistant" else "user", parts=parts))
         extra = {}
+        if self.image_detail == "high":
+            extra["media_resolution"] = types.MediaResolution.MEDIA_RESOLUTION_HIGH   # raises on an SDK without it
         if self.effort == "high":
             try:
-                extra = {"thinking_config": types.ThinkingConfig(thinking_level="high")}
+                extra = {**extra, "thinking_config": types.ThinkingConfig(thinking_level="high")}
             except Exception:          # older SDKs: a large thinking budget instead
-                extra = {"thinking_config": types.ThinkingConfig(thinking_budget=32768)}
+                extra = {**extra, "thinking_config": types.ThinkingConfig(thinking_budget=32768)}
         r = self.client.models.generate_content(
             model=self.model, contents=contents,
             config=types.GenerateContentConfig(system_instruction=system, max_output_tokens=self.max_tokens, **extra))
@@ -233,9 +246,10 @@ class GeminiPolicy(_ApiPolicy):
         return r.text or ""
 
 
-def api_policy(provider: str, model: str, workers: int = 8, effort: Optional[str] = None) -> _ApiPolicy:
+def api_policy(provider: str, model: str, workers: int = 8, effort: Optional[str] = None,
+               image_detail: Optional[str] = None) -> _ApiPolicy:
     return {"openai": OpenAIPolicy, "anthropic": AnthropicPolicy, "gemini": GeminiPolicy}[provider](
-        model, workers=workers, effort=effort)
+        model, workers=workers, effort=effort, image_detail=image_detail)
 
 
 def available_models(provider: str) -> Optional[list[str]]:

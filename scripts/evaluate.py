@@ -57,6 +57,9 @@ def main() -> None:
                          "--model is its id")
     ap.add_argument("--effort", choices=["default", "high"], default="default",
                     help="API models: the provider's maximum reasoning setting (high) instead of its default")
+    ap.add_argument("--image-detail", choices=["default", "high"], default="default",
+                    help="API models: the provider's highest image-processing setting (OpenAI detail 'high', Gemini "
+                         "media resolution 'high') instead of its default; Anthropic has none")
     ap.add_argument("--batch-size", type=int, default=8,
                     help="episodes advanced together; each sees exactly what it would see alone")
     ap.add_argument("--prompt", choices=["agent", "plain", "cautious", "fewshot"], default="agent",
@@ -95,7 +98,8 @@ def main() -> None:
         raise SystemExit(f"no usable views in {args.views}")
     if args.api:
         from medscope.api_policy import api_policy
-        policy = api_policy(args.api, args.model, effort=None if args.effort == "default" else args.effort)
+        policy = api_policy(args.api, args.model, effort=None if args.effort == "default" else args.effort,
+                            image_detail=None if args.image_detail == "default" else args.image_detail)
         precision = "api"
     else:
         from medscope.train.hf_policy import HFPolicy
@@ -118,6 +122,8 @@ def main() -> None:
     meta["prompt"] = args.prompt
     if args.api and args.effort != "default":
         meta["effort"] = args.effort
+    if args.api and args.image_detail != "default":
+        meta["image_detail"] = args.image_detail
     if fewshot:
         meta["fewshot"] = fewshot
     summary = evaluate(policy, views, cfg, args.out, meta, batch_size=args.batch_size)
