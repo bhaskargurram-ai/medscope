@@ -11,100 +11,129 @@
 \usepackage{graphicx}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,decorations.pathreplacing}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 \usepackage{caption}
 \usepackage{enumitem}
 \usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
 \usepackage{tcolorbox}
 \usepackage{listings}
-\usepackage{longtable}
+\usepackage{array}
 \lstset{basicstyle=\ttfamily\scriptsize,breaklines=true,columns=fullflexible,frame=single,framerule=0.3pt}
-\newcommand{\pend}[1]{\textcolor{orange!80!black}{[TO DO: #1]}}
+\newcommand{\pend}[1]{\textcolor{orange!80!black}{[#1]}}
 \newcommand{\best}[1]{\textbf{#1}}
 \captionsetup{font=small,labelfont=bf}
 \setlength{\parskip}{3pt}
-\renewcommand{\topfraction}{0.9}\renewcommand{\textfraction}{0.07}\renewcommand{\floatpagefraction}{0.7}\setcounter{topnumber}{3}\setcounter{totalnumber}{5}
+\renewcommand{\topfraction}{0.9}\renewcommand{\textfraction}{0.07}\renewcommand{\floatpagefraction}{0.75}
+\setcounter{topnumber}{3}\setcounter{totalnumber}{5}
 
 \title{\textbf{Seeing Is Not Believing: Counterfactual Lesion Erasure Teaches a Small Medical Vision--Language Agent to Report Only What the Image Shows}}
 \author{Bhaskar Gurram\\ \small Independent researcher \quad \texttt{github.com/bhaskargurram-ai/medscope}}
-\date{\small Draft v0.5, 1 November 2026 --- method paper}
+\date{\small Manuscript draft v0.7, 4 November 2026}
 
 \begin{document}
 \maketitle
 
 \begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title=Draft status (remove before submission),fonttitle=\bfseries\small]
 \small
-All experiments are complete; every number below comes from the evaluation runs of 31 October 2026 and is
-regenerated from stored per-view transcripts by one script. Remaining: training seeds 1--2 (notebook 18, running; seed 1 with counterfactual views done); held-out inpainting tools and few-shot frontier prompts (notebook 20); the same recipe on a second base model (notebook 21). Adapters and benchmark are uploaded as private Hugging Face repositories.
+Draft for expert review. Every number comes from the pre-registered v4 runs (notebooks 23--25) and is regenerated from stored per-view transcripts. Items in orange brackets are open: the reader study (Section~\ref{sec:reader}), a few values to be pulled from the stored runs, and a final check of every reference. Not for reader-study participants until they have submitted their answers.
 \end{tcolorbox}
 
 \begin{abstract}
-Medical vision--language models (VLMs) often report a finding because the question presupposes it, not because the image shows it. We make this failure measurable and trainable without any human annotation. For every image with an expert lesion mask we build \emph{counterfactual views}: the lesion erased by learned inpainting, a matched control in which an equal-sized region elsewhere is erased with the same operator, and a degraded copy; unedited lesion-free images from the same sources complete the set. The \emph{evidence sensitivity gap} (ESG) --- treating the finding as absent when the lesion is erased minus doing so after the matched edit --- is zero for any model that always answers ``yes'', always answers ``no'', always abstains, or reacts to editing. MedScope-4B, a 4-billion-parameter agent with zoom and windowing tools trained only on trajectories derived from dataset labels, reaches an ESG of 0.744 on 507 test cases across five imaging types, against 0.27--0.47 for nine frontier models from three providers and 0.15--0.42 for six open medical and general VLMs, all evaluated through the identical agent loop (all $p<0.001$, paired bootstrap). It claims an erased lesion in 13.7\% of cases, against 41--62\% for every frontier model, while matching them on real lesions (no significant difference against eight of nine). The gain is specific to evidence: on unedited healthy images its false-finding rate (14.6\%) is lower than that of seven frontier models but higher than gemini-4-argon's (9.0\%). A cautious prompt does not close the gap (frontier claims 43--47\%), nor do the open models' own native prompts (53--72\%). Removing only the counterfactual views from otherwise identical first-stage training raises erased-lesion claims from 11.9\% to 53.0\%, the frontier level, so the advantage does not come from familiarity with the data or the answer format. The effect holds at four external centres (ESG 0.672 vs 0.28--0.41 for three frontier flagships), where, however, frontier models detect more real lesions (0.95--0.97 vs 0.77) and net utility does not differ significantly. Code, recipes, benchmark and model are released.
+\noindent\textbf{Background.} Medical vision--language models (VLMs) often report a finding because the question names it, not because the image shows it. Standard benchmarks rarely detect this, because the asked finding is usually present.
+
+\noindent\textbf{Methods.} From public segmentation datasets we built counterfactual views without human annotation: the lesion erased by inpainting; a control in which a region of the same shape elsewhere is erased with the same tool; a degraded copy; and unedited lesion-free images. The \emph{evidence sensitivity gap} (ESG) is the rate of ``absent'' answers after erasure minus the rate after the control edit; it is zero for any model that ignores the image or only detects edits. MedScope-4B, Qwen3.5-4B with LoRA and zoom and windowing tools, was trained in three stages on label-derived trajectories. Data, recipe and model-selection rule were pre-registered; the selected model was tested once against nine frontier and six open VLMs in an identical agent loop, with paired bootstrap tests.
+
+\noindent\textbf{Results.} On 507 internal test cases across five imaging types, MedScope-4B reached ESG 0.758 and claimed an erased lesion in 9.6\% of cases, against ESG 0.27--0.47 and 41--62\% for the frontier models (all $p<0.001$). Accuracy on real lesions did not differ from any frontier model, and false findings on unedited healthy images (7.6\%) were lower than for eight of nine. Removing only the counterfactual views lowered ESG from $0.741\pm0.019$ to $0.279\pm0.107$ over three seeds and raised erased-lesion claims from 13\% to 68\%; the effect replicated on MedGemma 1.5 4B and on two inpainting tools never used in training. At four external centres the ESG advantage held (0.597 vs 0.28--0.41), but frontier models detected more real lesions and net utility did not differ. On a fresh external test MedScope-4B missed every pneumothorax; diagnosis traced this to a training coverage gap amplified by the final training stage.
+
+\noindent\textbf{Conclusions.} Counterfactual training gives a small model an evidence-gated reading disposition that prompting does not give frontier models. It does not improve perception, and rare critical findings need explicit coverage in training and selection.
+
+\medskip\noindent\textbf{Keywords:} medical vision--language models; hallucination; counterfactual data; evidence sensitivity; inpainting; pre-registration; agentic AI
 \end{abstract}
 
+\begin{tcolorbox}[colback=blue!3,colframe=blue!40!black,title=Highlights,fonttitle=\bfseries\small]
+\small
+\begin{itemize}[leftmargin=*,nosep]
+\item Lesion erasure with a same-shape, same-tool edit elsewhere tests whether an answer follows the image.
+\item The evidence sensitivity gap is zero for every image-blind strategy, including edit detection.
+\item A 4B agent trained only from dataset labels claims erased lesions in 9.6\% of cases; nine frontier models, 41--62\%.
+\item Without the counterfactual views, erased-lesion claims rise to 68\% (three seeds); the effect replicates on a second base model.
+\item A pre-registered fresh test exposed a complete pneumothorax miss, traced to training coverage.
+\end{itemize}
+\end{tcolorbox}
+
+%==============================================================================
 \section{Introduction}
 
-A radiologist asked ``Is there a polyp?'' looks for one. A VLM asked the same question may answer ``Yes, a sessile polyp is visible'' whether or not the image contains one, because in its training data a question that names a finding is itself strong evidence for that finding. Standard medical VQA benchmarks cannot reveal this, because the presupposition there is usually true.
+A radiologist asked ``Is there a polyp?'' looks for one. A vision--language model asked the same question may answer ``Yes, a sessile polyp is visible'' whether or not the image contains one. In the image--text data these models learn from, a question that names a finding is itself strong evidence that the finding is present, and a model can learn to answer from the question rather than from the pixels. For a clinical assistant this is the most dangerous kind of error: a confident, plausible report of something that is not there.
 
-Testing whether an answer depends on the image needs image pairs that differ only in the finding. Such pairs cannot be acquired clinically for most findings, and clinician verification of synthetic pairs at scale is costly. We construct the pairs automatically from public segmentation datasets and control the obvious confound: a model could learn to detect \emph{that an image was edited} rather than \emph{whether the lesion is there}. Every lesion-erased view therefore has a twin in which a region of exactly the same shape is erased elsewhere with the same inpainting operator, leaving the lesion intact. Only a model that reads the lesion can treat the two differently.
+Medical VLMs are now built by instruction-tuning general models on biomedical data~\cite{llavamed,huatuo,medgemma,medgemma15,lingshu} and are evaluated mainly on VQA-RAD, SLAKE and PathVQA~\cite{vqarad,slake,pathvqa}. In these benchmarks the presupposition of a closed question is usually true, so a model that leans on the question scores well. Hallucination benchmarks~\cite{pope,cares,medhallmark,medvh,medheval} probe absent findings, but they change the question or the answer while the image stays the same, so they cannot tell whether a correct ``No'' came from the image or from a learned prior about the question.
+
+Testing whether an answer depends on the image needs image pairs that differ only in the finding. Such pairs cannot be acquired clinically for most findings, and expert checking of synthetic pairs at scale is costly. We build them automatically from public segmentation datasets by erasing the expert-masked lesion with learned inpainting~\cite{lama}. The obvious confound is that a model could learn to detect \emph{that an image was edited} rather than \emph{whether the lesion is there}. Every lesion-erased view therefore has a twin in which a region of exactly the same shape is erased elsewhere with the same tool, leaving the lesion intact. Only a model that reads the lesion can treat the two differently.
+
+We use these views twice: to measure evidence sensitivity, and to train it. A 4-billion-parameter agent that can zoom and window the image is trained on trajectories derived from dataset labels alone, selected by a rule committed before any of its data existed, and tested once against nine frontier and six open models through an identical agent loop.
 
 \paragraph{Contributions.}
 \begin{enumerate}[leftmargin=*,nosep]
-\item \textbf{Counterfactual evidence views with an edit-matched control}, built and quality-controlled fully automatically across five imaging types (Section~\ref{sec:views}).
-\item \textbf{The evidence sensitivity gap (ESG)}, zero for every degenerate strategy, reported with hallucination on erased lesions and on unedited healthy images, grounding, and a clinical cost-matrix utility (Section~\ref{sec:metrics}).
-\item \textbf{MedScope-4B}, a tool-using agent trained only from dataset labels that hallucinates erased findings three to four times less often than nine frontier models while matching their accuracy on real lesions; on unedited healthy images it lies within the frontier range (Section~\ref{sec:main}).
-\item \textbf{Evidence on what produces the behaviour}: an ablation of the counterfactual views, tools switched off at test time, and negative results for on-policy RL and adapter merging (Sections~\ref{sec:ablation}, \ref{sec:robust}, \ref{sec:negative}).
-\item \textbf{A stress test of the result}: native prompts for open models, a cautious prompt for frontier models, external centres, lesion size, alternative cost matrices, and two independent tests of edit visibility (Section~\ref{sec:robust}).
+\item \textbf{Counterfactual evidence views with an edit-matched control}, built and quality-checked automatically across five imaging types, with no human annotation (Section~\ref{sec:views}).
+\item \textbf{The evidence sensitivity gap (ESG)}, zero for every image-blind strategy (always yes, always no, always abstain, react to edits), reported with false findings on erased lesions and on unedited healthy images, grounding, and a clinical cost-matrix utility (Section~\ref{sec:metrics}).
+\item \textbf{MedScope-4B}, selected by a pre-registered rule, which claims erased findings four to six times less often than nine frontier models while matching their accuracy on real lesions, robustly to prompting, question wording and unseen inpainting tools (Sections~\ref{sec:main}--\ref{sec:robust}).
+\item \textbf{Causal evidence on what produces the behaviour}: a three-seed ablation of the counterfactual views, an arm matched for the share of ``absent'' answers, an erasures-only arm and a second base model (Section~\ref{sec:ablation}).
+\item \textbf{A transparent account of failure}: at new centres frontier models detect more real lesions, and a confirmatory fresh test revealed a complete miss of pneumothorax, whose cause we trace to training coverage (Sections~\ref{sec:gen}, \ref{sec:ptx}).
 \end{enumerate}
 
+%==============================================================================
 \section{Related work}
 
-\paragraph{Medical VLMs.} General medical assistants are built by instruction-tuning general VLMs on biomedical image--text data: LLaVA-Med~\cite{llavamed}, HuatuoGPT-Vision~\cite{huatuo}, MedGemma~\cite{medgemma,medgemma15} and Lingshu~\cite{lingshu}. They are evaluated mostly on VQA-RAD~\cite{vqarad}, SLAKE~\cite{slake} and PathVQA~\cite{pathvqa}.
+\paragraph{Medical vision--language models.} General medical assistants are built by instruction-tuning general VLMs on biomedical image--text data: LLaVA-Med~\cite{llavamed}, HuatuoGPT-Vision~\cite{huatuo}, MedGemma~\cite{medgemma,medgemma15} and Lingshu~\cite{lingshu}. They are evaluated mostly on VQA-RAD~\cite{vqarad}, SLAKE~\cite{slake} and PathVQA~\cite{pathvqa}, where the asked finding is usually present and accuracy rewards agreement with the question's presupposition.
 
-\paragraph{Hallucination benchmarks and detectors.} POPE~\cite{pope} probes object hallucination with questions about absent objects. Medical benchmarks --- CARES~\cite{cares}, Med-HallMark~\cite{medhallmark}, MedVH~\cite{medvh} and MedHEval~\cite{medheval} --- curate or perturb questions and answers. Two recent training-free detectors use counterfactual probes at inference time: CoEV~\cite{coev} blacks out the region supporting a claim and checks whether the claim persists, and counterfactual visual grounding uncertainty~\cite{cvgu} contrasts grounding on factual and perturbed inputs. We differ in three ways: we change the \emph{image} while holding the question fixed, we control the edit with a matched operator and shape, and we use the views to \emph{train} a model rather than to audit one.
+\paragraph{Hallucination benchmarks and detectors.} POPE~\cite{pope} probes object hallucination with questions about absent objects. Medical benchmarks --- CARES~\cite{cares}, Med-HallMark~\cite{medhallmark}, MedVH~\cite{medvh} and MedHEval~\cite{medheval} --- curate or perturb questions and answers. Two recent training-free detectors use counterfactual probes at inference: counter-evidence verification~\cite{coev} blacks out the region supporting a claim and checks whether the claim persists, and counterfactual visual grounding uncertainty~\cite{cvgu} contrasts grounding on factual and perturbed inputs. Our work differs in three ways: we change the \emph{image} while holding the question fixed; we control the edit with a matched tool and shape, so that edit detection earns nothing; and we use the views to \emph{train} a model, not only to audit one.
 
-\paragraph{Counterfactual image editing.} Agarwal et al.~\cite{causalvqa} edited natural images for VQA, removing objects so that the answer should change (covariant) or irrelevant objects so that it should not (invariant), and showed that VQA models rely on spurious correlations. Our target and random removals are the medical analogue, with two additions: the invariant edit uses the same operator and the \emph{same shape} as the covariant one, and abstention and clarification are scored by a clinical cost matrix. Learned inpainting such as LaMa~\cite{lama} makes plausible fills of large masks possible.
+\paragraph{Counterfactual image editing.} Agarwal et al.~\cite{causalvqa} edited natural images for VQA, removing objects so that the answer should change (covariant edits) or irrelevant objects so that it should not (invariant edits), and showed that VQA models rely on spurious correlations. Our target and random removals are the medical analogue, with two additions: the invariant edit uses the same tool and the \emph{same shape} as the covariant one, and abstention and clarification are scored by a clinical cost matrix. Learned inpainting such as LaMa~\cite{lama} makes plausible fills of large masks possible; classical inpainting~\cite{telea}, Poisson blending~\cite{poisson} and diffusion inpainting~\cite{ldm} provide independent tools for testing whether a model learned one tool's traces.
 
-\paragraph{Tool-using and reinforcement-trained VLM agents.} Recent agents zoom or crop to ``think with images'' and are trained with RL~\cite{deepeyes,pixelreasoner}; in medicine, MMedAgent~\cite{mmedagent} learns to call tools and MMedAgent-RL~\cite{mmedagentrl} optimises multi-agent collaboration. Our agent uses two simple tools; we report when on-policy RL (GRPO~\cite{grpo}, DAPO-style dynamic sampling~\cite{dapo}) fails to help and use rejection-sampling fine-tuning~\cite{star,rft} instead. Selective prediction is summarised by the area under the risk--coverage curve (AURC)~\cite{aurc}.
+\paragraph{Tool-using and reinforcement-trained agents.} Recent agents zoom or crop to ``think with images'' and are trained with reinforcement learning~\cite{deepeyes,pixelreasoner}; in medicine, MMedAgent~\cite{mmedagent} learns to call tools and MMedAgent-RL~\cite{mmedagentrl} optimises multi-agent collaboration. Our agent uses two simple tools. On-policy RL (GRPO~\cite{grpo} with DAPO-style dynamic sampling~\cite{dapo}) gave no signal in pilot runs, so we use rejection-sampling fine-tuning~\cite{star,rft}. Selective prediction is summarised by the area under the risk--coverage curve~\cite{aurc}. We follow the CLAIM 2024 checklist~\cite{claim} (Appendix~\ref{app:claim}).
 
-\section{Method}
+%==============================================================================
+\section{Methods}
 
 \subsection{Task and agent protocol}
-An episode presents one image and one question. Each turn the model writes brief reasoning followed by exactly one tagged JSON action (prompt in Appendix~\ref{app:prompt}):
-\texttt{zoom} (a box on the original image, coordinates 0--1000) or \texttt{window} (centre and width), returning a new image, at most 3 calls per episode; \texttt{answer} with an optional evidence box and a stated confidence; \texttt{refer} (usable image, cannot decide); or \texttt{clarify} (unusable image or wrong anatomy). When the asked finding is not visible the model must say so (``No'' to ``Is there\dots?'', ``Yes'' to ``Is \dots healthy?'', ``No abnormality'' to open questions). Every model in this paper receives the same prompt, tools and turn structure.
+An episode presents one image and one question whose answer depends on a lesion. Each turn the model writes brief reasoning followed by exactly one tagged JSON action (prompt in Appendix~\ref{app:prompt}): \texttt{zoom} (a box on the original image, integer coordinates 0--1000, returning the cropped region) or \texttt{window} (centre and width on a 0--255 scale, returning the contrast-adjusted image), at most three calls per episode; \texttt{answer}, with an optional evidence box and a stated confidence; \texttt{refer} (usable image, cannot decide); or \texttt{clarify} (unusable image or wrong anatomy). When the asked finding is not visible the model must say so (``No'' to ``Is there\dots?'', ``Yes'' to ``Is \dots healthy?'', ``No abnormality'' to an open question). Every model in this paper receives the same prompt, tools and turn structure.
 
 \subsection{Counterfactual views}\label{sec:views}
-For every case (image, lesion mask, question whose answer depends on the lesion) we build four views; lesion-free images from the same sources form a fifth kind (Figure~\ref{fig:views}; real examples in Figure~\ref{fig:examples}).
+For every case (image, expert lesion mask, question whose answer depends on the lesion) we build four views; unedited lesion-free images from the same sources form a fifth kind (Figure~\ref{fig:views}; real test views in Figure~\ref{fig:examples}).
 \begin{description}[leftmargin=*,nosep,font=\normalfont\itshape]
-\item[Original.] Unchanged. Expected: correct answer, box on the lesion.
-\item[Target removal.] The lesion mask, dilated by 5 pixels, is inpainted with LaMa~\cite{lama}. Expected: the answer that says the finding is absent.
-\item[Random removal (control).] The same dilated shape, moved to a random foreground position that does not touch the dilated lesion, inpainted with the same operator. No lesion pixel changes. Expected: the original answer.
-\item[Degraded.] Gaussian blur ($\sigma=\max(h,w)/40$), Gaussian noise ($\sigma=60$), 8$\times$ down-/up-sampling, or an image of a different imaging type. Expected: \texttt{clarify}.
+\item[Original.] Unchanged. Expected: the correct answer with a box on the lesion.
+\item[Target removal.] The lesion mask, dilated by 5 pixels, is inpainted. Expected: the answer stating the finding is absent.
+\item[Random removal (control).] The same dilated shape, moved to a random foreground position that does not touch the dilated lesion, inpainted with the same tool. No lesion pixel changes. Expected: the original answer.
+\item[Degraded.] Gaussian blur ($\sigma=\max(h,w)/40$), Gaussian noise ($\sigma=60$), $8\times$ down- and up-sampling, JPEG compression, motion blur, or an image of a different imaging type. Expected: \texttt{clarify}.
 \item[Natural negative.] An unedited lesion-free image with the dataset's label. Expected: the absent answer, with exactly the reward of target removal.
 \end{description}
-Lesions under 20 pixels or over 20\% of the image are excluded. Target removal and natural negatives share expected reply and reward, so detecting edits earns nothing; target and random removal share operator and shape, so reacting to edits treats them alike.
+Two symmetries make the design work. Target removal and natural negatives share expected answer and reward, so learning to detect edits earns nothing. Target and random removal share tool and shape, so a model that reacts to edits treats them alike and scores ESG~0. Lesions under 20 pixels or over 20\% of the image are excluded. Training additionally uses lesion-insertion views (a real lesion moved into a healthy training image; expected: present) and a second erasure tool, tissue transplant (tissue from elsewhere in the same image, Poisson-blended~\cite{poisson}), for half of the cases.
 
 \begin{figure}[t]
 \centering
-\begin{tikzpicture}[node distance=4mm and 6mm,
-  box/.style={draw,rounded corners=2pt,align=center,font=\scriptsize,minimum height=9mm,text width=22mm},
+\begin{tikzpicture}[scale=0.9,transform shape,node distance=4mm and 6mm,
+  box/.style={draw,rounded corners=2pt,align=center,font=\scriptsize,minimum height=9mm,text width=24mm},
   act/.style={draw,rounded corners=2pt,align=center,font=\scriptsize,fill=gray!8,text width=22mm,minimum height=7mm},
   >={Stealth[length=2mm]}]
-\node[box,fill=blue!6,text width=27mm] (case) {Case: image $+$\\expert lesion mask\\$+$ question};
+\node[box,fill=blue!6,text width=26mm] (case) {Case: image $+$\\expert lesion mask\\$+$ question};
 \node[box,right=10mm of case,yshift=17mm] (o) {Original};
-\node[box,below=1.5mm of o] (t) {Target removal\\(lesion inpainted)};
-\node[box,below=1.5mm of t] (r) {Random removal\\(same shape elsewhere)};
-\node[box,below=1.5mm of r] (d) {Degraded (blur,\\noise, low-res,\\mismatch)};
-\node[box,fill=green!6,text width=27mm,below=22mm of case] (n) {Natural negative:\\unedited\\lesion-free image};
+\node[box,below=1.5mm of o,fill=blue!10] (t) {Target removal\\(lesion inpainted)};
+\node[box,below=1.5mm of t] (r) {Random removal\\(same shape elsewhere,\\same tool)};
+\node[box,below=1.5mm of r] (d) {Degraded (blur,\\noise, low resolution)};
+\node[box,fill=green!6,text width=26mm,below=24mm of case] (n0) {Lesion-free image\\(unedited)};
+\node[box,right=10mm of n0] (n) {Natural negative\\(same reward as\\target removal)};
 \node[act,right=8mm of o] (ao) {Answer $+$ box};
 \node[act,right=8mm of t] (at) {Finding absent};
 \node[act,right=8mm of r] (ar) {Answer $+$ box};
 \node[act,right=8mm of d] (ad) {Clarify};
+\node[act,right=8mm of n] (an) {Finding absent};
 \foreach \v in {o,t,r,d} \draw[->] (case.east) -- (\v.west);
-\foreach \v/\a in {o/ao,t/at,r/ar,d/ad} \draw[->] (\v) -- (\a);
-\draw[->] (n.east) -| ($(at.west)+(-4mm,0)$) -- (at.west);
-\draw[decorate,decoration={brace,amplitude=4pt,mirror},thick] ($(ar.south east)+(1.5mm,0)$) -- node[right=2mm,font=\scriptsize,align=left] {ESG: target $-$\\random} ($(at.north east)+(1.5mm,0)$);
+\foreach \v/\a in {o/ao,t/at,r/ar,d/ad,n/an} \draw[->] (\v) -- (\a);
+\draw[->] (n0) -- (n);
+\draw[decorate,decoration={brace,amplitude=4pt,mirror},thick,blue!60!black] ($(ar.south east)+(1.5mm,0)$) -- node[right=2mm,font=\scriptsize,align=left] {ESG $=$ absent after\\target removal $-$\\absent after\\random removal} ($(at.north east)+(1.5mm,0)$);
 \end{tikzpicture}
-\caption{Views built from each case and the expected action. Target removal and natural negatives share expected reply and reward; target and random removal share the editing operator and the edited shape, so only a model that reads the lesion can separate them.}
+\caption{Views built from each case and the expected action. Target removal and the random-removal control share the editing tool and the edited shape, so a model that only notices edits treats them alike; ESG measures the difference. Natural negatives share target removal's expected answer and reward, so detecting edits earns nothing.}
 \label{fig:views}
 \end{figure}
 
@@ -116,18 +145,18 @@ Lesions under 20 pixels or over 20\% of the image are excluded. Target removal a
 \end{figure}
 
 \subsection{Automated quality control}
-No human checks any view. A case is kept only if the lesion no longer stands out in the target-removal view, no lesion pixel changed in the random-removal view, and no view is a near-duplicate of a training image (perceptual hash confirmed by pixel correlation). Splits are made over patients or groups of near-identical images; SLAKE's official split leaks neighbouring slices across splits (4 of 63 validation/test images had a near-copy in training), which group splitting removes. A texture classifier separating target- from random-removal edits drives adversarial filtering until its AUC is at most 0.6 (test: 0.56).
+No human checks any view. A case is kept only if (i) the lesion no longer stands out after target removal \pend{exact criterion from the code}, (ii) no lesion pixel changed in random removal, and (iii) no view is a near-copy of a training image (perceptual hash, confirmed by pixel correlation). Splits are made over patients, or over groups of near-identical images where patient identifiers are missing; SLAKE's official split leaks neighbouring slices (4 of 63 validation and test images had a near-copy in training), which group splitting removes. A texture classifier trained to separate target from random edits drives adversarial filtering until its AUC is at most 0.6 (test set: 0.56). A hand-crafted shortcut classifier on the v4 training views reached AUC 0.59, so no further filtering was needed.
 
 \subsection{Reward and net utility}
-Each decision is scored with a clinical cost matrix (Table~\ref{tab:cost}), used as the selection/RL reward and as the \emph{net utility} metric. A correct answer on an original or random-removal view earns 0.5 more when its box overlaps the lesion with IoU $\ge0.3$ (boxes over half the image earn none); unparseable output scores $-1$; tool calls beyond the first cost 0.05. Section~\ref{sec:robust} reports net utility under four other matrices.
+Each decision is scored with a clinical cost matrix (Table~\ref{tab:cost}). It is the selection reward during training and the \emph{net utility} metric at test. A correct answer on an original or random-removal view earns 0.5 more when its box overlaps the lesion with IoU $\ge0.3$ (boxes covering over half the image earn no bonus); unparseable output scores $-1$; each tool call beyond the first costs 0.05. Section~\ref{sec:robust} reports net utility under four alternative matrices.
 
 \begin{table}[t]
 \centering\small\setlength{\tabcolsep}{4pt}
-\caption{Cost matrix (reward per view). Target removal and natural negatives are identical by design.}
+\caption{Cost matrix (reward per view). Target removal and natural negatives are scored identically by design.}
 \label{tab:cost}
 \begin{tabular}{lcccc}
 \toprule
-View & Correct / absent answer & Wrong or claims finding & Refer & Clarify \\
+View & Correct / absent answer & Wrong, or claims finding & Refer & Clarify \\
 \midrule
 Original, random removal & $+1.0$ & $-2.0$ ($-4.0$ critical) & $-0.3$ & $-0.3$ \\
 Target removal, natural negative & $+1.0$ & $-2.0$ & $+0.5$ & $-0.5$ \\
@@ -136,353 +165,451 @@ Degraded & $+0.25$ & $-2.0$ & $0.0$ & $+0.5$ \\
 \end{tabular}
 \end{table}
 
-\subsection{Training MedScope-4B}\label{sec:training}
-The base model is Qwen3.5-4B with LoRA~\cite{lora} ($r=16$, $\alpha=32$, dropout 0.05, all linear layers of the language model; vision encoder frozen).
-\textbf{Stage 1, SFT on synthetic trajectories.} For every training view a multi-turn trajectory is generated from the labels alone: optionally a zoom on a jittered box around the lesion, then the expected final action (answer with the lesion box, the absent answer, or a clarification request) with short template reasoning; about 11,000 views, one epoch, learning rate $2\times10^{-4}$, gradient accumulation 8, 1,980 optimiser steps.
-\textbf{Stage 2, rejection-sampling fine-tuning (RFT).} The stage-1 model samples 4 episodes on 150 training views per view kind; the best successful episode is kept (at least one success on 95--100\% of views); training continues on these plus 3,000 synthetic views (learning rate $5\times10^{-5}$, about 670 steps). This checkpoint is \emph{MedScope-4B-R}.
-\textbf{Stage 3, general-VQA replay.} Stages 1--2 taught the model to over-use ``No abnormality'' on open questions (``Where are the kidneys?''). We continue from RFT on 5,000 views mixing MedScope views with ordinary questions from the \emph{training} splits of VQA-RAD, SLAKE and PathVQA, excluding any image near-identical to an evaluation image and any SLAKE image in our validation or test sets. The adoption rule was fixed before testing (adopt if validation net utility is within 0.02 of RFT); it scored 0.804 against 0.801 and is the final \emph{MedScope-4B}. We report both checkpoints throughout.
+\subsection{Model and training}\label{sec:training}
+The base model is Qwen3.5-4B~\cite{qwen35} with LoRA~\cite{lora} (rank 16, $\alpha=32$, dropout 0.05, on all linear layers of the language model); the vision encoder is frozen throughout. Training trajectories are generated from the labels alone: optionally a zoom on a jittered box around the lesion (always for lesions under 2\% of the image), windowing on 30\% of grey-scale images, then the expected final action with short template reasoning. Half of the templated questions are reworded with one of four training paraphrases; three further paraphrases are reserved for testing.
+
+\textbf{Stage 1, supervised fine-tuning.} 16,000 views drawn once at random from the training pools, one pass (3,706 optimiser steps), learning rate $2\times10^{-4}$; cases with lesions under 2\% of the image are repeated twice.
+\textbf{Stage 2, rejection-sampling fine-tuning}~\cite{star,rft}. The stage-1 model samples $k=4$ episodes at temperature 1.2 on 200 training views per view kind, 500 lesion-free and 300 lesion-erased views; the best successful episode of each view is kept, and episodes from views the model mostly failed (at most two of four right) are repeated three times. Training continues on these plus 3,000 synthetic views at learning rate $5\times10^{-5}$.
+\textbf{Stage 3, general-VQA replay.} 5,000 views mixing MedScope views with ordinary questions from the \emph{training} splits of VQA-RAD, SLAKE and PathVQA (any image near-identical to an evaluation image excluded), with ``absent'' views at no less than 35\% of the mix and ``Is X healthy?'' replay questions balanced between yes and no; learning rate $5\times10^{-5}$.
+
+\subsection{Pre-registered selection}\label{sec:select}
+The data plan, recipe, selection rule and reporting rule were committed to the public repository on 1 November 2026, before any v4 data was built or model trained. Let $U$ be validation net utility and $H$ the validation rate of claimed findings on healthy images. Stage 3 is selected if $U_3\ge U_2-0.02$ and $H_3\le H_2+0.02$; otherwise stage 2 under the same rule against stage 1; otherwise stage 1. Amendment 1 (after the stage-1 validation result, before any later result) also evaluated the previous release, v3, on the enlarged validation set, to be kept if the chosen stage fell more than 0.02 below it. Amendment 2 (before any test result) added comparisons that cannot change the selection.
+
+On 540 validation cases (1,473 views), $U$ and $H$ were 0.585 and 13.6\% for stage 1, 0.610 and 12.7\% for stage 2, and 0.613 and 7.7\% for stage 3; v3 scored 0.593 and 8.2\%. The rule selected stage 3, which is MedScope-4B. It was then evaluated once on every test set; no setting, threshold or prompt was tuned afterwards.
 
 \subsection{Metrics}\label{sec:metrics}
 With $O,T,R,N,D$ the original, target-removal, random-removal, natural-negative and degraded views:
-\textbf{CCR}, the fraction of answerable views ($O\cup R$) answered correctly;
-\textbf{ESG},
-\[\mathrm{ESG}=P(\text{absent answer or refer}\mid T)-P(\text{absent answer or refer}\mid R),\]
-and the \textbf{strict ESG} counting explicit absent answers only;
-\textbf{erased-lesion hallucination}, $P(\text{claims finding}\mid T)$; \textbf{healthy-image hallucination}, $P(\text{claims finding}\mid N)$;
-\textbf{grounded accuracy}, correct with IoU $\ge0.3$ on $O$;
-\textbf{clarify rate} on $D$; \textbf{net utility}, the mean reward over all views; and \textbf{AURC} with confidence equal to the geometric mean of greedy answer-token probabilities.
-95\% confidence intervals use 2,000 bootstrap resamples of cases; model comparisons use a paired bootstrap on shared cases with two-sided $p$-values.
+\[\mathrm{ESG}=P(\text{absent answer or refer}\mid T)-P(\text{absent answer or refer}\mid R).\]
+\textbf{CCR} (covered-and-correct rate) is the share of answerable views ($O\cup R$) answered correctly; the \textbf{strict ESG} counts explicit absent answers only; \textbf{erased-lesion claims} is $P(\text{claims finding}\mid T)$ and \textbf{healthy-image claims} $P(\text{claims finding}\mid N)$; \textbf{grounded accuracy} is correct with IoU $\ge0.3$ on $O$; the \textbf{clarify rate} is $P(\texttt{clarify}\mid D)$; \textbf{net utility} is the mean reward over all views; \textbf{AURC}~\cite{aurc} uses the geometric mean of greedy answer-token probabilities as confidence.
 
-\subsection{Evaluation harness}\label{sec:harness}
-All models decode greedily (API models: provider defaults) with identical prompt and tools and without model-specific repetition penalties. Answers are parsed from the first action; matching accepts paraphrases and health-question polarity and reads the asked finding first (``no pneumothorax'' is no; ``pneumothorax without mediastinal shift'' is yes). A reply without an action tag is read as the model's decision --- a plain answer, or a clarification request when it states the image is unusable --- identically for every model, and the plain-prose rate is reported. Correctness and rewards are recomputed from stored transcripts by one script for every run. API models receive PNG images with the long side at most 768 pixels.
+\subsection{Statistics}\label{sec:stats}
+95\% confidence intervals use 2,000 bootstrap resamples of cases~\cite{efron}. Model comparisons use a paired bootstrap over shared cases with two-sided $p$-values. Seed results are reported as mean $\pm$ standard deviation over three seeds, with each seed pair also compared by paired bootstrap. Proportions on small subsets use Fisher's exact test. We do not adjust for multiple comparisons; the primary comparisons (ESG, erased-lesion claims and net utility against each frontier model on the main test) were fixed in advance, and all reach $p<0.001$.
 
+\subsection{Evaluation harness}
+Open models decode greedily in bf16 on one A100 40\,GB; API models use provider defaults. No model receives a model-specific repetition penalty. API models receive PNG images with the long side at most 768 pixels. Answers are parsed from the first final action; matching accepts paraphrases and health-question polarity and reads the asked finding first (``no pneumothorax'' is no; ``pneumothorax without mediastinal shift'' is yes). A reply with no action tag is read as the model's decision, identically for every model, and that rate is reported. Correctness and rewards are recomputed from stored per-view transcripts by one script for every run.
+
+%==============================================================================
 \section{Experimental setup}
 
-\subsection{Study design and data}
-This is a retrospective study on public, de-identified datasets; the reference standard is each dataset's expert segmentation masks and labels. Table~\ref{tab:data} gives the sources and partitions. The main test set has 507 cases: 219 counterfactual cases (original, target-removal and random-removal views; 170 also with a degraded view) and 288 natural negatives, 1,115 views in total.
+\subsection{Study design and data}\label{sec:data}
+This is a retrospective study on public, de-identified datasets. The reference standard is each dataset's expert segmentation masks and image labels; expected answers are derived from them by rule (Section~\ref{sec:views}). No human annotation was used for training, selection or scoring.
+
+\textbf{Training and validation.} Training uses SLAKE CT/MRI~\cite{slake}, Kvasir-SEG~\cite{kvasir} with HyperKvasir normal landmarks as lesion-free images~\cite{hyperkvasir}, ChestX-Det~\cite{chestxdet} (from NIH ChestX-ray14~\cite{chestxray14}), BUSI~\cite{busi} and TCGA-LGG~\cite{lgg}: 1,508 SLAKE and colonoscopy cases plus 1,792 chest X-ray, breast ultrasound and brain MRI cases after quality checks, with 690 lesion-free images from the latter three sources. Validation holds 540 cases (1,473 views). Diffuse chest findings, oversized lesions and brain slices with little tissue are excluded. Table~\ref{tab:data} gives the main test set and Table~\ref{tab:tests} the further test sets, none of which was used for training or selection.
 
 \begin{table}[t]
-\centering\small\setlength{\tabcolsep}{3.5pt}
-\caption{Data. Counterfactual (CF) cases have a lesion mask; negatives are unedited lesion-free images. Training/validation counts are planned split sizes before view checks; test counts are final.}
+\centering\footnotesize
+\caption{Main (internal) test set by source.}
 \label{tab:data}
-\begin{tabular}{p{3.4cm}p{1.7cm}cccc p{3.1cm}}
+\begin{tabular}{llccl}
 \toprule
-Source & Imaging & Train CF & Val CF & Test CF & Test neg. & Notes \\
+Source & Imaging & Cases with mask & Lesion-free & Split level \\
 \midrule
-SLAKE~\cite{slake} & CT / MRI & \multirow{2}{*}{1,508} & \multirow{2}{*}{102} & 17 & 90 & group split \\
-Kvasir-SEG~\cite{kvasir} + HyperKvasir~\cite{hyperkvasir} & Colonoscopy & & & 83 & 91 & negatives: normal landmarks \\
-ChestX-Det~\cite{chestxdet} & Chest X-ray & 500 & 25 & 41 & 50 & diffuse findings excluded \\
-BUSI~\cite{busi} & Breast US & 393 & 25 & 42 & 15 & large lesions excluded \\
-TCGA-LGG~\cite{lgg} & Brain MRI & 391 & 25 & 36 & 42 & patient split \\
+SLAKE~\cite{slake} & CT / MRI & 17 & 90 & near-copy groups \\
+Kvasir-SEG~\cite{kvasir} + HyperKvasir~\cite{hyperkvasir} & Colonoscopy & 83 & 91 & near-copy groups \\
+ChestX-Det~\cite{chestxdet} & Chest X-ray & 41 & 50 & patient \\
+BUSI~\cite{busi} & Breast ultrasound & 42 & 15 & near-copy groups \\
+TCGA-LGG~\cite{lgg} & Brain MRI (FLAIR) & 36 & 42 & patient \\
 \midrule
-\multicolumn{7}{p{15.5cm}}{\textbf{External testing} (never used in training; 169 cases, 526 views): CVC-ClinicDB~\cite{cvc} (Barcelona), QaTa-COV19~\cite{qata} (Qatar), BUS-BRA~\cite{busbra} (Brazil), BraTS-Africa 2023~\cite{bratsafrica,bratsafricaj} (sub-Saharan Africa; axial FLAIR slice with the largest tumour plus a tumour-free slice of the same patient). SIIM pneumothorax and BraTS 2020/2021 were rejected because they share images with NIH ChestX-ray14 and TCGA.} \\
-\multicolumn{7}{p{15.5cm}}{\textbf{General VQA}: VQA-RAD test (451)~\cite{vqarad}, SLAKE English test (300 sampled)~\cite{slake}, PathVQA test (300 sampled)~\cite{pathvqa}.} \\
+\textbf{Total} & & \textbf{219} & \textbf{288} & 507 cases, 1,115 views \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{3.5pt}
+\caption{Further test sets. ``Fresh'' sets were untouched until the model was selected (confirmatory).}
+\label{tab:tests}
+\begin{tabular}{l c p{7.7cm} p{2.6cm}}
+\toprule
+Test set & Cases & Sources (cases) & Purpose \\
+\midrule
+External centres & 169 & CVC-ClinicDB~\cite{cvc} (40), QaTa-COV19~\cite{qata} (20), BUS-BRA~\cite{busbra} (45), BraTS-Africa 2023~\cite{bratsafrica,bratsafricaj} (64, with 50 tumour-free slices) & New scanners, populations \\
+Fresh internal & 76 & ChestX-Det, unused test-split patients (36 with a lesion, 40 lesion-free) & Confirmatory \\
+Fresh external & 316 & BraTS 2023 meningioma~\cite{bratsmen} (82), BUS-UCLM~\cite{busuclm} (99), SIIM-ACR pneumothorax~\cite{siim} (96), ETIS-LaribPolypDB~\cite{etis} (39) & Confirmatory, new sources \\
+Held-out wordings & 373 & Main test with three test-only paraphrases & Question wording \\
+Standard VQA & 1,051 & VQA-RAD test (451), SLAKE English test (300 sampled), PathVQA test (300 sampled) & No regression \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Protection of the test sets.} When the v4 data were built, every existing test image was located in its source and checked to be identical (ChestX-Det 93, BUSI 57, TCGA-LGG 79 images; none differed or was missing), and every patient or near-copy group holding one was removed from all v4 splits. Patients seen in earlier training or validation were kept out of the fresh sets, and the fresh sets contain no near-copy of any training or test image. TCGA-LGG contributed no fresh internal cases because all 14 of its test-split patients already hold existing test images.
+
 \subsection{Models compared}
-\textbf{Open models} (bf16, one A100 40\,GB): Qwen3.5-4B (MedScope's base), MedGemma 1.5 4B~\cite{medgemma15}, Lingshu-7B~\cite{lingshu}, HuatuoGPT-Vision-7B~\cite{huatuo}, Qwen2.5-VL-7B~\cite{qwen25vl} and Qwen3-VL-8B~\cite{qwen3vl}, each with the agent prompt and, separately, with its own short native prompt.
-\textbf{Frontier models} through their APIs, identical agent loop, provider default settings, evaluated on 31 October 2026: OpenAI gpt-6-sol, gpt-6-astra, gpt-6.1-sol; Anthropic Claude Fable 5.1, Opus 5.5, Sonnet 5.5; Google gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash. The full main-test runs cost US\$132 in API fees (provider token counts; Appendix~\ref{app:repro}).
-\textbf{Ablations:} stage-1 SFT without counterfactual views (original, natural-negative and degraded views only, same number of steps); an earlier refer-only agent; trivial policies that ignore the image.
+\textbf{Frontier models} through their APIs, identical agent loop and provider defaults, evaluated on 31 October 2026: OpenAI gpt-6-sol, gpt-6-astra, gpt-6.1-sol; Anthropic Claude Fable 5.1, Claude Opus 5.5, Claude Sonnet 5.5; Google gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash. The three flagships (gpt-6-astra, Claude Opus 5.5, gemini-4-argon) were also run on the same 150 main-test cases with a cautious prompt, with four solved training examples in context, at their highest reasoning setting, and with held-out wordings.
+\textbf{Open models} (bf16): Qwen3.5-4B (MedScope's base)~\cite{qwen35}, MedGemma 1.5 4B~\cite{medgemma15}, Lingshu-7B~\cite{lingshu}, HuatuoGPT-Vision-7B~\cite{huatuo}, Qwen2.5-VL-7B~\cite{qwen25vl} and Qwen3-VL-8B~\cite{qwen3vl}, each with the agent prompt and, separately, with its own plain prompt.
+\textbf{Ablation arms}, all at stage 1 with the same 16,000-view draw, optimiser steps and learning-rate schedule: with counterfactual views (the recipe); without them (originals, degraded and lesion-free views only); without them but with lesion-free images repeated to match the recipe's share of ``absent'' answers; and erasures only (no edits elsewhere, no insertions). The first two are trained with three seeds each (seeds change LoRA initialisation, data order and trajectory sampling); both are repeated on MedGemma 1.5 4B.
+\textbf{Trivial policies} that ignore the image: always claim the finding, always say it is absent, always refer, always clarify.
 
-\textbf{Which checkpoint is reported where.} MedScope-4B (stage 3) is the headline model; it was fixed by the validation rule of Section~\ref{sec:training} before any test result was seen. MedScope-4B-R (stage 2) is reported beside it in every main, external, robustness, label and VQA table, so no checkpoint is chosen per scenario. The ablation and the seed study compare \emph{stage-1} models, the stage at which the counterfactual views enter; stages 2--3 were not repeated for the ablated arm. This does not weaken the comparison with frontier models: stage-1 SFT alone already reaches ESG 0.758 and 11.9\% erased-lesion claims (Table~\ref{tab:main}), so the gap to frontier models exists before stages 2 and 3.
+\subsection{Compute and software}
+Every training stage ran on a single NVIDIA A100 40\,GB (Google Colab), about 4 hours per stage; one evaluation of a local model on the main test takes about 1 hour. Software: PyTorch 2.11, Transformers 5.22.1, PEFT 0.21.2, bitsandbytes 0.50.2. \pend{Total API cost of all frontier runs, from the stored token counts.}
 
+%==============================================================================
 \section{Results}
 
 \subsection{Main test}\label{sec:main}
-Table~\ref{tab:main} gives every model on the 507 test cases and Table~\ref{tab:paired} the paired differences. MedScope-4B has the highest ESG (0.744) and the lowest erased-lesion hallucination of any model that answers (13.7\%). Every frontier model claims an erased lesion in 41--62\% of cases, although on real lesions they are statistically indistinguishable from MedScope (eight of nine; MedScope is better than gpt-6-sol). The gap also appears on \emph{unedited} healthy images, where seven of nine frontier models report a finding more often than MedScope; gemini-4-argon reports fewer (9.0\% vs 14.6\%, $p=0.033$), and the MedScope-4B-R checkpoint matches it (8.3\%). Open models are worse on every evidence metric; Qwen3-VL-8B's low erased-lesion rate reflects that it seldom answers (CCR 0.553).
+MedScope-4B has the highest ESG (0.758) and the lowest erased-lesion claims (9.6\%) of any model that answers (Table~\ref{tab:main}). It is better than all nine frontier and all six open models on ESG, erased-lesion claims and net utility (all $p<0.001$; Table~\ref{tab:paired}). Its accuracy on real lesions does not differ from any frontier model (CCR 0.849 vs 0.829--0.888; all $p\ge0.12$). On unedited healthy images it reports a finding in 7.6\% of cases, fewer than eight of nine frontier models ($p\le0.001$); against gemini-4-argon (9.0\%) the difference is not significant ($p=0.59$). It asks to clarify on every degraded view (170 of 170). Qwen3-VL-8B and Qwen2.5-VL-7B claim few erased lesions because they rarely answer lesion questions correctly at all (CCR 0.55 and 0.14); their ESG stays low.
 
-\begin{table}[p]
-\centering\footnotesize\setlength{\tabcolsep}{3.5pt}
-\caption{Main test (507 cases, 1,115 views; agent prompt for every model). Erased, Healthy: \% of views on which the model claims the finding after the lesion was erased, or on an unedited lesion-free image. Clarify: on degraded input. Net utility with 95\% bootstrap CI.}
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{5pt}
+\caption{Main test (507 cases, 1,115 views; agent prompt for every model). Erased, Healthy: \% of views on which the model claims the finding after the lesion was erased, or on an unedited lesion-free image.}
 \label{tab:main}
-\begin{tabular}{lccccccc}
-\toprule
-Model & CCR & ESG & Erased \% & Healthy \% & Grounded & Clarify & Net utility \\
-\midrule
-\textbf{MedScope-4B (final)} & 0.881 & 0.744 & 13.7 & 14.6 & 0.817 & 0.994 & 0.714 [0.638, 0.793] \\
-MedScope-4B-R (RFT checkpoint) & 0.865 & 0.758 & 11.4 & 8.3 & 0.813 & 0.994 & 0.752 [0.673, 0.829] \\
-SFT stage 1 & 0.877 & 0.758 & 11.9 & 8.7 & 0.817 & 0.994 & 0.760 [0.683, 0.837] \\
-Ablation: no counterfactual views & 0.929 & 0.402 & 53.0 & 22.2 & 0.858 & 1.000 & 0.494 [0.415, 0.567] \\
-Ablation: refer-only agent & 0.660 & 0.594 & 5.9 & 13.2 & 0.575 & 1.000 & 0.537 [0.476, 0.600] \\
-\midrule
-gemini-4-argon & 0.874 & 0.470 & 41.1 & 9.0 & 0.726 & 0.941 & 0.565 [0.489, 0.638] \\
-Claude Sonnet 5.5 & 0.870 & 0.402 & 48.4 & 16.7 & 0.589 & 0.353 & 0.381 [0.300, 0.464] \\
-gemini-3.1-pro-preview & 0.849 & 0.384 & 51.6 & 26.7 & 0.712 & 0.412 & 0.306 [0.221, 0.395] \\
-gpt-6-sol & 0.829 & 0.342 & 51.6 & 25.7 & 0.639 & 0.506 & 0.261 [0.181, 0.339] \\
-Claude Fable 5.1 & 0.856 & 0.342 & 52.1 & 23.3 & 0.388 & 0.559 & 0.255 [0.173, 0.340] \\
-Claude Opus 5.5 & 0.863 & 0.329 & 53.9 & 23.6 & 0.735 & 0.629 & 0.358 [0.279, 0.442] \\
-gpt-6.1-sol & 0.888 & 0.324 & 58.9 & 30.9 & 0.708 & 0.488 & 0.276 [0.191, 0.352] \\
-gpt-6-astra & 0.886 & 0.306 & 58.9 & 27.8 & 0.717 & 0.547 & 0.309 [0.224, 0.387] \\
-gemini-3.8-flash & 0.868 & 0.269 & 61.6 & 27.8 & 0.721 & 0.671 & 0.263 [0.173, 0.344] \\
-\midrule
-Lingshu-7B & 0.527 & 0.416 & 32.0 & 12.5 & 0.000 & 0.188 & $-$0.249 [$-$0.359, $-$0.137] \\
-Qwen3.5-4B (base) & 0.758 & 0.338 & 42.0 & 19.4 & 0.192 & 0.441 & 0.134 [0.044, 0.227] \\
-Qwen3-VL-8B & 0.553 & 0.297 & 12.8 & 12.5 & 0.388 & 0.894 & 0.186 [0.101, 0.275] \\
-MedGemma 1.5 4B & 0.674 & 0.283 & 54.3 & 24.0 & 0.137 & 0.100 & $-$0.255 [$-$0.351, $-$0.155] \\
-HuatuoGPT-Vision-7B & 0.498 & 0.265 & 30.1 & 22.9 & 0.000 & 0.047 & $-$0.426 [$-$0.538, $-$0.317] \\
-Qwen2.5-VL-7B & 0.144 & 0.146 & 5.5 & 24.7 & 0.005 & 0.329 & $-$0.742 [$-$0.838, $-$0.646] \\
-\midrule
-Always claims the finding & 1.000 & 0.000 & 100 & 100 & --- & 0.000 & $-$0.478 \\
-Always says it is absent & 0.000 & 0.000 & 0 & 0 & --- & 0.000 & $-$0.848 \\
-Always refers & 0.000 & 0.000 & 0 & 0 & --- & 0.000 & 0.110 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[p]
-\centering\footnotesize\setlength{\tabcolsep}{3.5pt}
-\caption{MedScope-4B minus each model, paired bootstrap over the same 507 cases: difference ($p$). Positive is better for ESG, CCR and net utility; negative is better for the two hallucination rates.}
-\label{tab:paired}
-\begin{tabular}{lccccc}
-\toprule
-Compared with & ESG & Erased-lesion claims & Healthy-image claims & CCR & Net utility \\
-\midrule
-gemini-4-argon & +0.274 ($<$0.001) & $-$0.274 ($<$0.001) & +0.056 (0.033) & +0.007 (0.806) & +0.150 (0.003) \\
-Claude Sonnet 5.5 & +0.342 ($<$0.001) & $-$0.347 ($<$0.001) & $-$0.021 (0.448) & +0.011 (0.623) & +0.334 ($<$0.001) \\
-gemini-3.1-pro-preview & +0.361 ($<$0.001) & $-$0.379 ($<$0.001) & $-$0.122 ($<$0.001) & +0.032 (0.110) & +0.408 ($<$0.001) \\
-gpt-6-sol & +0.402 ($<$0.001) & $-$0.379 ($<$0.001) & $-$0.111 (0.001) & +0.053 (0.013) & +0.454 ($<$0.001) \\
-Claude Fable 5.1 & +0.402 ($<$0.001) & $-$0.384 ($<$0.001) & $-$0.087 (0.001) & +0.025 (0.287) & +0.459 ($<$0.001) \\
-Claude Opus 5.5 & +0.416 ($<$0.001) & $-$0.402 ($<$0.001) & $-$0.090 (0.011) & +0.018 (0.444) & +0.357 ($<$0.001) \\
-gpt-6.1-sol & +0.420 ($<$0.001) & $-$0.452 ($<$0.001) & $-$0.163 ($<$0.001) & $-$0.007 (0.795) & +0.438 ($<$0.001) \\
-gpt-6-astra & +0.438 ($<$0.001) & $-$0.452 ($<$0.001) & $-$0.132 ($<$0.001) & $-$0.005 (0.909) & +0.406 ($<$0.001) \\
-gemini-3.8-flash & +0.475 ($<$0.001) & $-$0.479 ($<$0.001) & $-$0.132 ($<$0.001) & +0.014 (0.596) & +0.452 ($<$0.001) \\
-\midrule
-Lingshu-7B & +0.329 ($<$0.001) & $-$0.183 ($<$0.001) & +0.021 (0.484) & +0.354 ($<$0.001) & +0.964 ($<$0.001) \\
-Qwen3.5-4B (base) & +0.406 ($<$0.001) & $-$0.283 ($<$0.001) & $-$0.049 (0.071) & +0.123 ($<$0.001) & +0.581 ($<$0.001) \\
-Qwen3-VL-8B & +0.447 ($<$0.001) & +0.009 (0.821) & +0.021 (0.491) & +0.329 ($<$0.001) & +0.528 ($<$0.001) \\
-MedGemma 1.5 4B & +0.461 ($<$0.001) & $-$0.406 ($<$0.001) & $-$0.094 (0.007) & +0.208 ($<$0.001) & +0.970 ($<$0.001) \\
-HuatuoGPT-Vision-7B & +0.479 ($<$0.001) & $-$0.164 ($<$0.001) & $-$0.083 (0.003) & +0.384 ($<$0.001) & +1.140 ($<$0.001) \\
-Qwen2.5-VL-7B & +0.598 ($<$0.001) & +0.082 (0.001) & $-$0.101 ($<$0.001) & +0.737 ($<$0.001) & +1.456 ($<$0.001) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{What produces the behaviour: ablation}\label{sec:ablation}
-Removing only the counterfactual views from stage-1 training, with everything else fixed (Table~\ref{tab:ablation}), raises erased-lesion claims from 11.9\% to 53.0\% and healthy-image claims from 8.7\% to 22.2\%, although natural negatives remained in the training data. The ablated model says ``Yes'' more readily, which helps on real lesions (CCR $+0.053$) and fails whenever the lesion is gone. The pattern is the same at the external centres.
-
-\begin{table}[t]
-\centering\small
-\caption{Ablation: stage-1 SFT with vs without counterfactual (CF) views, paired bootstrap ($^{**}p\le0.001$, $^{***}p<0.001$).}
-\label{tab:ablation}
-\begin{tabular}{lcccc}
-\toprule
- & \multicolumn{2}{c}{Main test (507 cases)} & \multicolumn{2}{c}{External centres (169 cases)} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}
-Metric & With CF & Without CF & With CF & Without CF \\
-\midrule
-ESG & \best{0.758} & 0.402$^{***}$ & \best{0.655} & 0.479$^{**}$ \\
-Erased-lesion claims & \best{11.9\%} & 53.0\%$^{***}$ & \best{10.9\%} & 41.2\%$^{***}$ \\
-Healthy-image claims & \best{8.7\%} & 22.2\%$^{***}$ & \best{8.0\%} & 36.0\%$^{***}$ \\
-CCR & 0.877 & \best{0.929}$^{***}$ & 0.761 & \best{0.895}$^{***}$ \\
-Net utility & \best{0.760} & 0.494$^{***}$ & \best{0.519} & 0.436 ($p=0.19$) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{By imaging type and lesion size}
-Table~\ref{tab:types} breaks the main test down by imaging type. MedScope is strongest on colonoscopy, brain MRI and breast ultrasound (ESG 0.71--0.94) and weakest on chest X-ray (0.46) and SLAKE CT/MRI, where the final model regressed after replay (ESG 0.59 $\to$ 0.47; healthy-image claims 17\% $\to$ 33\%), plausibly because the replay mixes back ordinary SLAKE questions that presuppose findings and come without counterfactual counterparts, partly restoring the presupposition prior that stages 1--2 removed. MedScope-4B-R, trained before replay, does not show this regression. Frontier models trail on every imaging type. By lesion size (Table~\ref{tab:size}), MedScope is weakest on the smallest quartile (under 1.8\% of the image: ESG 0.51, erased claims 25\%) and strong above it (ESG 0.78--0.86); frontier models do not improve with size --- gpt-6-astra claims a large erased lesion in 75\% of cases.
-
-\begin{table}[t]
-\centering\footnotesize
-\caption{Main test by imaging type (cases include natural negatives). Erased / Healthy as fractions.}
-\label{tab:types}
-\begin{tabular}{llccccc}
-\toprule
-Model & Imaging & Cases & ESG & Erased & Healthy & Net \\
-\midrule
-MedScope-4B & Colonoscopy & 174 & 0.92 & 0.04 & 0.01 & 1.02 \\
- & Brain MRI & 78 & 0.83 & 0.06 & 0.00 & 0.85 \\
- & Breast US & 57 & 0.71 & 0.21 & 0.07 & 0.86 \\
- & Chest X-ray & 91 & 0.46 & 0.29 & 0.20 & 0.44 \\
- & SLAKE CT/MRI & 107 & 0.47 & 0.24 & 0.33 & $-$0.06 \\
-\midrule
-MedScope-4B-R & Colonoscopy & 174 & 0.94 & 0.01 & 0.00 & 1.03 \\
- & Brain MRI & 78 & 0.83 & 0.08 & 0.02 & 0.87 \\
- & Breast US & 57 & 0.71 & 0.21 & 0.13 & 0.82 \\
- & Chest X-ray & 91 & 0.44 & 0.29 & 0.12 & 0.41 \\
- & SLAKE CT/MRI & 107 & 0.59 & 0.00 & 0.17 & 0.24 \\
-\midrule
-No CF views & Colonoscopy & 174 & 0.42 & 0.57 & 0.00 & 0.75 \\
- & Brain MRI & 78 & 0.67 & 0.22 & 0.02 & 0.74 \\
- & Breast US & 57 & 0.50 & 0.40 & 0.20 & 0.62 \\
- & Chest X-ray & 91 & 0.17 & 0.73 & 0.16 & 0.37 \\
- & SLAKE CT/MRI & 107 & 0.06 & 0.82 & 0.58 & $-$0.46 \\
-\midrule
-gemini-4-argon & Colonoscopy & 174 & 0.69 & 0.31 & 0.11 & 0.83 \\
- & Brain MRI & 78 & 0.42 & 0.47 & 0.00 & 0.56 \\
- & Breast US & 57 & 0.40 & 0.48 & 0.13 & 0.53 \\
- & Chest X-ray & 91 & 0.20 & 0.49 & 0.06 & 0.21 \\
- & SLAKE CT/MRI & 107 & 0.35 & 0.41 & 0.12 & 0.38 \\
-\midrule
-gpt-6-astra & Colonoscopy & 174 & 0.40 & 0.58 & 0.37 & 0.40 \\
- & Brain MRI & 78 & 0.50 & 0.31 & 0.10 & 0.43 \\
- & Breast US & 57 & 0.12 & 0.83 & 0.60 & 0.28 \\
- & Chest X-ray & 91 & 0.15 & 0.66 & 0.26 & 0.14 \\
- & SLAKE CT/MRI & 107 & 0.29 & 0.47 & 0.22 & 0.17 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[t]
-\centering\footnotesize\setlength{\tabcolsep}{4pt}
-\caption{By quartile of lesion area (55, 54, 55, 55 counterfactual cases): ESG / erased-lesion claims.}
-\label{tab:size}
-\begin{tabular}{lcccc}
-\toprule
-Model & Q1 (0--1.8\%) & Q2 (1.8--4.2\%) & Q3 (4.2--8.4\%) & Q4 (8.4--20\%) \\
-\midrule
-MedScope-4B & 0.51 / 0.25 & 0.78 / 0.11 & 0.84 / 0.11 & 0.86 / 0.07 \\
-MedScope-4B-R & 0.53 / 0.22 & 0.80 / 0.06 & 0.86 / 0.11 & 0.86 / 0.07 \\
-No CF views & 0.35 / 0.49 & 0.52 / 0.44 & 0.42 / 0.56 & 0.33 / 0.62 \\
-gemini-4-argon & 0.40 / 0.38 & 0.56 / 0.32 & 0.42 / 0.51 & 0.51 / 0.44 \\
-Claude Opus 5.5 & 0.20 / 0.53 & 0.35 / 0.54 & 0.35 / 0.56 & 0.42 / 0.53 \\
-gpt-6-astra & 0.27 / 0.47 & 0.33 / 0.57 & 0.40 / 0.56 & 0.22 / 0.75 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{External centres}
-On 169 cases from four centres never used for training (Table~\ref{tab:ext}), MedScope keeps its evidence sensitivity (ESG 0.672, erased-lesion claims 10.1\%), while three frontier flagships claim an erased lesion in 54--66\% of cases (ESG 0.28--0.41; all $p<0.001$). The frontier models, however, detect more real lesions at these centres (CCR 0.95--0.97 vs 0.77, $p<0.001$), and net utility does not differ significantly ($p=0.12$--$0.78$). By source, MedScope's ESG is 0.93 on BraTS-Africa, 0.80 on CVC-ClinicDB, 0.71 on BUS-BRA and 0.15 on QaTa-COV19, where diffuse COVID-19 opacities are erased far less completely than focal lesions. On the three focal-lesion centres alone (149 cases), where the erasure assumption holds, MedScope reaches ESG 0.778 with 4.0\% erased-lesion claims and net utility 0.642, against ESG 0.35--0.48, 49--60\% claims and net utility 0.49--0.62 for the flagships (net utility better than gpt-6-astra, $p=0.024$; not different from Claude Opus 5.5 and gemini-4-argon); the flagships keep their CCR advantage (0.96--0.98 vs 0.82). The two effects pull net utility in opposite directions: frontier models behave as high-sensitivity, high-hallucination readers that earn more on lesion views and lose more on erased and healthy ones, while MedScope behaves as an evidence-gated reader that misses more out-of-distribution lesions but rarely reports absent ones. The external result therefore separates the two abilities that coincide on the internal test set: zero-shot perception across new scanners, where pretraining scale helps, and the disposition to report only what is seen, which a 4B adapter trained on counterfactuals transfers to four unseen centres.
-
-\begin{table}[t]
-\centering\footnotesize
-\caption{External centres (169 cases, 526 views). Healthy-image claims rest on 50 BraTS-Africa negatives (the other sources provide none).}
-\label{tab:ext}
 \begin{tabular}{lccccc}
 \toprule
 Model & CCR & ESG & Erased \% & Healthy \% & Net utility \\
 \midrule
-MedScope-4B & 0.773 & 0.672 & 10.1 & 10.0 & 0.522 \\
-MedScope-4B-R & 0.752 & 0.664 & 10.9 & 4.0 & 0.534 \\
-No CF views & 0.895 & 0.479 & 41.2 & 36.0 & 0.436 \\
-Qwen3.5-4B & 0.803 & 0.328 & 44.5 & 20.0 & 0.160 \\
-MedGemma 1.5 4B & 0.790 & 0.319 & 50.4 & 10.0 & $-$0.127 \\
-Lingshu-7B & 0.471 & 0.370 & 30.3 & 8.0 & $-$0.572 \\
-HuatuoGPT-Vision-7B & 0.689 & 0.336 & 37.0 & 4.0 & $-$0.343 \\
-Qwen3-VL-8B & 0.336 & 0.227 & 5.9 & 4.0 & 0.037 \\
+\textbf{MedScope-4B (this work)} & 0.849 & \best{0.758} & \best{9.6} & \best{7.6} & \best{0.732} \pend{CI} \\
 \midrule
-gpt-6-astra & 0.945 & 0.277 & 66.4 & 24.0 & 0.424 \\
-Claude Opus 5.5 & 0.966 & 0.412 & 53.8 & 30.0 & 0.544 \\
-gemini-4-argon & 0.950 & 0.370 & 58.8 & 18.0 & 0.544 \\
+gemini-4-argon & 0.874 & 0.470 & 41.1 & 9.0 & 0.565 \\
+Claude Sonnet 5.5 & 0.870 & 0.402 & 48.4 & 16.7 & 0.381 \\
+gemini-3.1-pro-preview & 0.849 & 0.384 & 51.6 & 26.7 & 0.306 \\
+gpt-6-sol & 0.829 & 0.342 & 51.6 & 25.7 & 0.261 \\
+Claude Fable 5.1 & 0.856 & 0.342 & 52.1 & 23.3 & 0.255 \\
+Claude Opus 5.5 & 0.863 & 0.329 & 53.9 & 23.6 & 0.358 \\
+gpt-6.1-sol & 0.888 & 0.324 & 58.9 & 30.9 & 0.276 \\
+gpt-6-astra & 0.886 & 0.306 & 58.9 & 27.8 & 0.309 \\
+gemini-3.8-flash & 0.868 & 0.269 & 61.6 & 27.8 & 0.263 \\
+\midrule
+Lingshu-7B & 0.527 & 0.416 & 32.0 & 12.5 & $-$0.249 \\
+Qwen3.5-4B (base) & 0.758 & 0.338 & 42.0 & 19.4 & 0.134 \\
+Qwen3-VL-8B & 0.553 & 0.297 & 12.8 & 12.5 & 0.186 \\
+MedGemma 1.5 4B & 0.674 & 0.283 & 54.3 & 24.0 & $-$0.255 \\
+HuatuoGPT-Vision-7B & 0.498 & 0.265 & 30.1 & 22.9 & $-$0.426 \\
+Qwen2.5-VL-7B & 0.144 & 0.146 & 5.5 & 24.7 & $-$0.742 \\
+\midrule
+Always claims the finding & 1.000 & 0.000 & 100 & 100 & $-$0.478 \\
+Always says it is absent & 0.000 & 0.000 & 0 & 0 & $-$0.848 \\
+Always refers & 0.000 & 0.000 & 0 & 0 & 0.110 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Robustness of the result}\label{sec:robust}
-\paragraph{Is it the prompt? Open models with their own prompt.} With a short native VQA prompt and one plain-prose reply, every open model hallucinates \emph{more} than under the agent prompt: erased-lesion claims 53--72\% and healthy-image claims 22--50\% (Table~\ref{tab:robust}a). MedScope is better on ESG, both hallucination rates and net utility against all six ($p<0.001$; healthy vs Lingshu $p=0.032$).
-\paragraph{Is it the prompt? A cautious prompt for frontier models.} Adding an explicit warning that the question may name an absent finding lowers erased-lesion claims for gpt-6-astra (52.9\% $\to$ 47.1\%, $p=0.031$) and Claude Opus 5.5 (54.4\% $\to$ 44.1\%, $p=0.016$, at a cost in CCR) and not for gemini-4-argon (41.2\% $\to$ 42.6\%), on the same 150 cases. MedScope remains better than each cautious model by 29--34 points ($p<0.001$; Table~\ref{tab:robust}b).
-\paragraph{Is it the tools?} With every tool call refused at test time, ESG stays at 0.70--0.73 (paired change not significant), while CCR and net utility fall (final model: CCR $-0.098$, net $-0.114$, $p<0.001$; Table~\ref{tab:robust}c). Evidence sensitivity comes from training; the tools add accuracy on real lesions. MedScope makes 0.93--0.94 zoom calls per lesion view and its first zoom covers the lesion in 96--98\% of them; on erased views it zooms less (0.59--0.67 calls per view), 87--88\% of first zooms landing on the erased site. It never uses windowing. Of the frontier models, gpt-6-astra almost never calls a tool (0.01--0.07 calls per view), and Claude Sonnet 5.5 calls most (0.6--1.4).
-\paragraph{Is it the cost matrix?} The trivial always-refer policy earns $+0.110$ under the published matrix, a weakness of that matrix; with referral on lesion-free images paid 0 it earns $-0.118$, and $-0.300$ when referral costs $-0.3$ everywhere. the MedScope checkpoints rank first among all models under every one of five matrices (wrong-answer penalty $-2$, $-1$, $-0.5$; referral rewards as above), and the strict ESG equals the ESG within 0.005 for every model, since referral is rare.
-\paragraph{Would examples help frontier models?} MedScope learned from thousands of counterfactual views; the frontier models saw none. Given the cautious prompt plus four solved examples from the training split (a lesion, the same image with it erased, an edit elsewhere with the lesion intact, a healthy image) before every case, \pend{notebook 20: few-shot results on the same 150 cases}.
-\paragraph{Is it the base model?} \pend{notebook 21: MedGemma 1.5 4B trained with the same stage-1 recipe, with and without counterfactual views.}
-\paragraph{Is it label noise?} Without human review, we used the nine frontier models as an independent panel: a lesion-free test image that at least seven of them call abnormal is treated as a disputed label (26 of 288: 12 colonoscopy, 11 SLAKE, 2 breast ultrasound, 1 chest X-ray; MedScope does not vote). Without these images every model's healthy-image hallucination falls by 1--7 points, every comparison in Table~\ref{tab:paired} keeps its direction and significance, and against all nine frontier models the ESG, erased-lesion and net-utility differences remain at $p\le0.001$; MedScope's healthy-image claims become 13.0\% (MedScope-4B-R 7.3\%) against 4.6\% for gemini-4-argon and 10.3--24.4\% for the other frontier models.
-
 \begin{table}[t]
-\centering\footnotesize\setlength{\tabcolsep}{3.5pt}
-\caption{Robustness checks on the main test. (a) Open models with their own plain prompt (507 cases). (b) Frontier flagships with a cautious prompt (same 150 cases; standard $\to$ cautious). (c) MedScope with tools switched off (on $\to$ off).}
-\label{tab:robust}
-\begin{tabular}{llcccc}
+\centering\scriptsize\setlength{\tabcolsep}{2.5pt}
+\caption{MedScope-4B minus each model, paired bootstrap over the same 507 cases: difference [95\% CI]. Positive is better for ESG and net utility; negative is better for the claim rates. Against the other four open models every ESG and net-utility difference is also $p<0.001$.}
+\label{tab:paired}
+\resizebox{\linewidth}{!}{\begin{tabular}{lccccc}
 \toprule
- & Model & CCR & ESG & Erased \% & Healthy \% \\
+Compared with & ESG & Erased-lesion claims & Healthy-image claims & CCR & Net utility \\
 \midrule
-\multirow{6}{*}{(a)} & Qwen3.5-4B, plain & 0.890 & 0.183 & 72.1 & 45.1 \\
- & MedGemma 1.5 4B, plain & 0.849 & 0.192 & 72.1 & 49.0 \\
- & Lingshu-7B, plain & 0.728 & 0.301 & 53.0 & 21.5 \\
- & HuatuoGPT-Vision-7B, plain & 0.799 & 0.265 & 59.8 & 46.9 \\
- & Qwen2.5-VL-7B, plain & 0.699 & 0.192 & 56.2 & 50.3 \\
- & Qwen3-VL-8B, plain & 0.811 & 0.260 & 55.7 & 41.0 \\
+gemini-4-argon & $+$0.288 [0.208, 0.367] & $-$0.315 [$-$0.385, $-$0.243] & $-$0.014 [$-$0.059, 0.028] & $-$0.025 [$-$0.070, 0.017] & $+$0.168 [0.083, 0.254] \\
+Claude Sonnet 5.5 & $+$0.356 [0.284, 0.431] & $-$0.388 [$-$0.459, $-$0.318] & $-$0.090 [$-$0.137, $-$0.045] & $-$0.021 [$-$0.069, 0.026] & $+$0.351 [0.267, 0.437] \\
+gemini-3.1-pro-prev. & $+$0.374 [0.298, 0.448] & $-$0.420 [$-$0.491, $-$0.350] & $-$0.191 [$-$0.252, $-$0.133] & 0.000 [$-$0.043, 0.044] & $+$0.426 [0.337, 0.519] \\
+gpt-6-sol & $+$0.416 [0.341, 0.489] & $-$0.420 [$-$0.491, $-$0.346] & $-$0.181 [$-$0.235, $-$0.126] & $+$0.021 [$-$0.022, 0.063] & $+$0.472 [0.389, 0.554] \\
+Claude Fable 5.1 & $+$0.416 [0.339, 0.496] & $-$0.425 [$-$0.500, $-$0.355] & $-$0.156 [$-$0.212, $-$0.102] & $-$0.007 [$-$0.054, 0.039] & $+$0.477 [0.384, 0.566] \\
+Claude Opus 5.5 & $+$0.429 [0.345, 0.507] & $-$0.443 [$-$0.515, $-$0.368] & $-$0.160 [$-$0.217, $-$0.103] & $-$0.014 [$-$0.066, 0.036] & $+$0.374 [0.283, 0.466] \\
+gpt-6.1-sol & $+$0.434 [0.354, 0.520] & $-$0.493 [$-$0.566, $-$0.423] & $-$0.233 [$-$0.292, $-$0.178] & $-$0.039 [$-$0.088, 0.010] & $+$0.456 [0.360, 0.552] \\
+gpt-6-astra & $+$0.452 [0.364, 0.539] & $-$0.493 [$-$0.562, $-$0.426] & $-$0.201 [$-$0.261, $-$0.145] & $-$0.037 [$-$0.087, 0.014] & $+$0.424 [0.329, 0.522] \\
+gemini-3.8-flash & $+$0.489 [0.407, 0.566] & $-$0.521 [$-$0.596, $-$0.446] & $-$0.201 [$-$0.259, $-$0.143] & $-$0.018 [$-$0.065, 0.029] & $+$0.470 [0.380, 0.560] \\
 \midrule
-\multirow{4}{*}{(b)} & gpt-6-astra & 0.868 $\to$ 0.838 & 0.338 $\to$ 0.397 & 52.9 $\to$ 47.1 & 32.9 $\to$ 24.4 \\
- & Claude Opus 5.5 & 0.890 $\to$ 0.846 & 0.338 $\to$ 0.382 & 54.4 $\to$ 44.1 & 25.6 $\to$ 17.1 \\
- & gemini-4-argon & 0.860 $\to$ 0.853 & 0.441 $\to$ 0.412 & 41.2 $\to$ 42.6 & 6.1 $\to$ 7.3 \\
- & MedScope-4B (same cases) & 0.868 & 0.735 & 13.2 & 12.2 \\
-\midrule
-\multirow{2}{*}{(c)} & MedScope-4B & 0.881 $\to$ 0.783 & 0.744 $\to$ 0.703 & 13.7 $\to$ 6.8 & 14.6 $\to$ 12.8 \\
- & MedScope-4B-R & 0.865 $\to$ 0.847 & 0.758 $\to$ 0.726 & 11.4 $\to$ 11.9 & 8.3 $\to$ 11.1 \\
+Qwen3.5-4B (base) & $+$0.420 [0.338, 0.498] & $-$0.324 [$-$0.398, $-$0.249] & $-$0.118 [$-$0.171, $-$0.070] & $+$0.091 [0.035, 0.148] & $+$0.599 [0.503, 0.695] \\
+MedGemma 1.5 4B & $+$0.475 [0.391, 0.556] & $-$0.447 [$-$0.518, $-$0.376] & $-$0.163 [$-$0.223, $-$0.104] & $+$0.176 [0.116, 0.235] & $+$0.988 [0.878, 1.099] \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
-\subsection{Are the edits visible, and does MedScope exploit them?}\label{sec:edit}
-\textbf{Erasures made by tools never seen in training.} \pend{notebook 20: the edited views of every test case remade on the same masks with Telea, tissue transplant with Poisson blending, and Stable Diffusion inpainting; MedScope and three frontier flagships.}
-
-Two tests address edit visibility (Table~\ref{tab:edit}). A ResNet-18 trained on 5,126 training views separates random-removal from original views with AUC 0.83: the inpainting leaves a trace a trained detector can find. Frontier VLMs asked for the probability that an image was edited cannot separate random-removal views from originals (AUC 0.52--0.55) but do find lesion-erased views suspicious (0.70--0.75): erasing a lesion leaves an unnaturally smooth region where structure is expected (visible in the colonoscopy row of Figure~\ref{fig:examples}).
-
-Why do frontier models find erased lesions suspicious but not random edits? Because they are at chance on random removals made with the same operator and shape, they are not detecting the inpainting texture itself; more plausibly, erasing a lesion from its usual location leaves the local anatomy discontinuous, or leaves secondary signs (mass effect, oedema, fold convergence) that the edit does not remove.
-
-Four results argue that MedScope's answers follow the lesion rather than such traces. (i) An edit detector scores ESG 0 by construction, and MedScope-4B denies the lesion on only 11.4\% of random-removal views, which carry the same operator traces. (ii) Its vision encoder is frozen throughout training; the LoRA adapter can only read features the pretrained encoder already produces and cannot learn a pixel-level detector of the kind the ResNet-18 learns. (iii) gemini-4-argon's ratings of the erased views are bimodal (every rating is either $\le0.2$ or $\ge0.75$), so splitting the 219 erased views into rated-unedited (61) and rated-edited (158) involves no threshold choice. On the rated-unedited views MedScope-4B still claims the lesion in only 21\% (MedScope-4B-R 18\%), against 49--64\% for gpt-6-sol, gpt-6-astra, gpt-6.1-sol and Claude Fable 5.1; on the rated-edited views 11\% against 48--58\%. Visible traces help MedScope somewhat, but the gap to frontier models is as large where the erasure looks clean. (iv) On completely unedited lesion-free images, where no edit hypothesis applies, counterfactual training lowers false findings from 22.2\% to 8.7\% internally and from 36.0\% to 8.0\% externally (Table~\ref{tab:ablation}).
+\subsection{By imaging type}
+The advantage holds in every imaging type (Table~\ref{tab:types}). MedScope-4B is strongest on colonoscopy (ESG 0.95), brain MRI and breast ultrasound (0.74--0.75), and weakest on chest X-ray (0.51) and SLAKE CT/MRI (0.47). No flagship exceeds ESG 0.69 in any type, and on chest X-ray the three flagships lie between $-0.05$ and 0.20.
 
 \begin{table}[t]
-\centering\footnotesize
-\caption{Edit visibility on the 219 test cases (438 or 657 images). High AUC: the two kinds of view can be told apart.}
-\label{tab:edit}
-\begin{tabular}{lccc}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{Main test by imaging type: ESG / erased-lesion claims (fraction) / net utility.}
+\label{tab:types}
+\begin{tabular}{lcccc}
 \toprule
-Detector & Random removal vs original & Target removal vs original & Target vs random removal \\
+Imaging (cases) & MedScope-4B & gemini-4-argon & Claude Opus 5.5 & gpt-6-astra \\
 \midrule
-ResNet-18 (trained) & 0.832 [0.799, 0.868] & --- & 0.928 [0.904, 0.948] \\
-gemini-4-argon (zero-shot) & 0.524 [0.474, 0.575] & 0.753 [0.708, 0.795] & 0.737 [0.689, 0.779] \\
-gpt-6.1-sol (zero-shot) & 0.546 [0.491, 0.598] & 0.698 [0.647, 0.744] & 0.658 [0.606, 0.706] \\
+Colonoscopy (174) & \best{0.95} / 0.01 / 1.06 & 0.69 / 0.31 / 0.83 & 0.57 / 0.40 / 0.53 & 0.40 / 0.58 / 0.40 \\
+Brain MRI (78) & \best{0.75} / 0.14 / 0.75 & 0.42 / 0.47 / 0.56 & 0.31 / 0.61 / 0.51 & 0.50 / 0.31 / 0.43 \\
+Breast ultrasound (57) & \best{0.74} / 0.14 / 0.78 & 0.40 / 0.48 / 0.53 & 0.29 / 0.62 / 0.40 & 0.12 / 0.83 / 0.28 \\
+Chest X-ray (91) & \best{0.51} / 0.17 / 0.40 & 0.20 / 0.49 / 0.21 & $-$0.05 / 0.66 / $-$0.12 & 0.15 / 0.66 / 0.14 \\
+SLAKE CT/MRI (107) & \best{0.47} / 0.12 / 0.22 & 0.35 / 0.41 / 0.38 & 0.24 / 0.59 / 0.32 & 0.29 / 0.47 / 0.17 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{General medical VQA and calibration}
-After replay, MedScope-4B is the most accurate model on all three standard benchmarks (Table~\ref{tab:vqa}); before replay (MedScope-4B-R) open-question accuracy had collapsed. The final model saw the benchmarks' training splits (evaluation images excluded) while the other models are zero-shot, so these numbers establish the absence of a regression rather than a like-for-like comparison. Fine-tuning collapsed the stated confidence to nearly a constant (AURC 0.18), but the answer-token probability ranks right and wrong answers well (AURC 0.021 on the main test, 0.078 externally).
+\subsection{What produces the behaviour}\label{sec:ablation}
+\textbf{The counterfactual views are the active ingredient.} Removing them from stage-1 training, with the same data draw, optimiser steps and schedule, lowers ESG on every seed (seed by seed $+0.525$, $+0.539$ and $+0.324$ in favour of the recipe, all $p<0.001$) and raises erased-lesion claims to the frontier level or above (Table~\ref{tab:ablation}). The arm without counterfactual views says ``present'' more readily, so it is more accurate on real lesions (CCR 0.955 vs 0.871) and fails whenever the lesion is gone. Healthy-image claims also fall with the recipe (13.9\% vs 35.9\%), although both arms train on the same lesion-free images.
+
+\textbf{It is not the share of ``No'' answers.} Repeating lesion-free images until the share of ``absent'' targets equals the recipe's leaves ESG at 0.215 (recipe 0.735; difference $+0.521$ [0.440, 0.600], $p<0.001$).
+
+\textbf{The control edit matters.} Training on erasures alone (no edit elsewhere, no insertions) reaches a similar ESG on the main test (0.708 vs 0.735, $p=0.37$) by denying more: it claims fewer erased lesions (6.8\% vs 11.9\%, $p=0.019$) but is less accurate on real lesions (CCR 0.788 vs 0.847, $p=0.002$). The cost shows on an unseen tool: after a Telea edit elsewhere it denies the intact lesion in 43\% of cases (recipe 23\%, $p<0.001$), so without the control a model partly learns to react to edits (Section~\ref{sec:edit}).
+
+\textbf{It replicates on a second base model.} The same recipe on MedGemma 1.5 4B gives ESG 0.721 vs 0.374 without counterfactual views ($+0.347$ [0.276, 0.425], $p<0.001$) and erased-lesion claims 7.8\% vs 57.5\%. With counterfactual views the two base models do not differ (net utility $-0.005$, $p=0.83$; ESG $+0.014$, $p=0.73$).
+
+\textbf{Stages 2 and 3 add little on the main test.} The final model against its own stage 1: net utility $+0.040$ ($p=0.15$), ESG $+0.023$ ($p=0.39$), healthy-image claims $-1.7$ points ($p=0.35$). Their contribution is on validation healthy-image claims, which the selection rule used (13.6\% $\to$ 7.7\%), and on ordinary VQA questions (Section~\ref{sec:gen}).
+
+The recipe's effect also holds at the external centres (three seeds: ESG $0.622\pm0.030$ vs $0.389\pm0.043$; erased-lesion claims 14.6\% vs 48.2\%; healthy-image claims 9.3\% vs 49.3\%) and on the fresh external test (net utility $0.070\pm0.008$ vs $-0.149\pm0.033$; healthy-image claims 9.7\% vs 26.1\%), where the ESG difference is smaller (0.381 vs 0.288) and significant on two of three seeds.
 
 \begin{table}[t]
-\centering\footnotesize
-\caption{Standard medical VQA accuracy, closed / open / all questions, same prompt and matching for every model.}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{Stage-1 arms on the main test (507 cases). Three-seed arms: mean $\pm$ sd.}
+\label{tab:ablation}
+\begin{tabular}{lccccc}
+\toprule
+Arm & CCR & ESG & Erased \% & Healthy \% & Net utility \\
+\midrule
+Qwen3.5-4B, with counterfactual views (3 seeds) & 0.871 $\pm$ 0.022 & \best{0.741 $\pm$ 0.019} & 13.2 $\pm$ 3.2 & 13.9 $\pm$ 4.0 & \best{0.684 $\pm$ 0.021} \\
+Qwen3.5-4B, without (3 seeds) & 0.955 $\pm$ 0.008 & 0.279 $\pm$ 0.107 & 67.6 $\pm$ 11.9 & 35.9 $\pm$ 3.9 & 0.341 $\pm$ 0.090 \\
+Without, ``absent'' share matched (seed 0) & 0.945 & 0.215 & 73.5 & 31.6 & 0.321 \\
+Erasures only (seed 0) & 0.788 & 0.708 & 6.8 & 5.9 & 0.667 \\
+\midrule
+MedGemma 1.5 4B, with counterfactual views & 0.806 & 0.721 & 7.8 & 5.9 & 0.698 \\
+MedGemma 1.5 4B, without & 0.947 & 0.374 & 57.5 & 31.6 & 0.409 \\
+MedGemma 1.5 4B, untrained & 0.674 & 0.283 & 54.3 & 24.0 & $-$0.255 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Does it read the lesion or the edit?}\label{sec:edit}
+Every training erasure used LaMa or tissue transplant. If MedScope-4B had learned those tools' traces, its advantage should vanish on other tools. We remade both edited views of 125 main-test cases on the same masks with Telea~\cite{telea} and Stable Diffusion inpainting~\cite{ldm}, neither used in training or selection, and with tissue transplant (Table~\ref{tab:inpaint}).
+
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{Edited views by inpainting tool, 125 cases: ESG / erased-lesion claims (\%).}
+\label{tab:inpaint}
+\begin{tabular}{lcccc}
+\toprule
+Model & LaMa (training) & Transplant (training) & Telea (unseen) & Stable Diffusion (unseen) \\
+\midrule
+\textbf{MedScope-4B} & \best{0.752} / 7.2 & \best{0.720} / 8.0 & \best{0.664} / 7.2 & 0.640 / 17.6 \\
+gemini-4-argon & 0.536 / 32.8 & 0.488 / 32.8 & 0.560 / 8.8 & 0.392 / 40.0 \\
+Claude Opus 5.5 & 0.376 / 45.6 & 0.264 / 56.8 & 0.296 / 41.6 & 0.352 / 46.4 \\
+gpt-6-astra & 0.312 / 55.2 & 0.240 / 64.0 & 0.256 / 60.8 & 0.256 / 61.6 \\
+\midrule
+Stage 1, with counterfactual views & 0.720 / 12.0 & 0.744 / 8.0 & 0.696 / 7.2 & 0.568 / 24.8 \\
+Stage 1, erasures only & 0.688 / 7.2 & 0.656 / 4.8 & 0.544 / 2.4 & \best{0.712} / 4.8 \\
+Stage 1, without counterfactual views & 0.272 / 69.6 & 0.200 / 76.8 & 0.144 / 83.2 & 0.232 / 73.6 \\
+Stage 1, without, ``absent'' share matched & 0.224 / 72.0 & 0.208 / 73.6 & 0.096 / 85.6 & 0.184 / 77.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+MedScope-4B beats all three flagships on every tool (ESG differences $+0.10$ to $+0.48$, $p\le0.049$). On Telea its erased-lesion claims are unchanged (7.2\%; ESG $-0.088$, $p=0.025$, from more denials after the edit elsewhere); on Stable Diffusion they rise by 10.4 points ($p=0.006$), the largest drop, yet still two to four times below Claude Opus 5.5 and gpt-6-astra. The arms without counterfactual views stay near ESG 0.1--0.3 on every tool. gemini-4-argon's erased-lesion claims fall from 33\% to 9\% on Telea only, whose smooth fills it recognises as edits: its absent answers partly follow visible traces.
+
+\textbf{Clean-looking erasures.} Asked for the probability that an image was edited, gemini-4-argon's ratings of the 219 erased views are bimodal (61 rated $\le0.20$, 158 rated $\ge0.75$, none in between), so the split needs no threshold choice. On erasures it rates as unedited, MedScope-4B still claims the lesion in only 15\% (8\% on visible ones), against 41--64\% for the nine frontier models, which claim the lesion as often on visible erasures (41--58\%).
+
+\textbf{Edit visibility.} A ResNet-18 trained on 5,126 training views separates random-removal from original views with AUC 0.83 [0.80, 0.87], so the inpainting leaves a trace that a trained detector can find. Zero-shot, gemini-4-argon and gpt-6.1-sol cannot separate random-removal views from originals (AUC 0.52--0.55) but find erased-lesion views suspicious (0.70--0.75): erasing a lesion leaves a smooth region where structure is expected.
+
+Four results argue that MedScope's answers follow the lesion rather than edit traces: (i) an edit detector scores ESG~0 by construction, and MedScope-4B denies the lesion on only 14.6\% of random-removal views, which carry the same traces; (ii) the vision encoder is frozen, so the adapter can only reweight features the pretrained encoder already produces and cannot learn a pixel-level detector of the kind the ResNet-18 learns; (iii) the advantage holds on clean-looking erasures and on two unseen tools; (iv) on completely unedited lesion-free images, where no edit hypothesis applies, the recipe lowers false findings from 35.9\% to 13.9\% (Table~\ref{tab:ablation}).
+
+\subsection{Robustness}\label{sec:robust}
+\textbf{Lesion size.} Evidence sensitivity rises with lesion area, and the smallest lesions remain the weakest (Figure~\ref{fig:size}; erased-lesion claims 18.2\% in the smallest quartile and 1.8\% in the largest). The flagships show no such trend: their ESG stays between 0.20 and 0.56 in every quartile, and gpt-6-astra claims a large erased lesion in 75\% of cases.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.78\linewidth,height=6.2cm,ymin=0,ymax=1.05,ytick={0,0.25,0.5,0.75,1},
+  xtick={1,2,3,4},xticklabels={{Q1\\0--1.8\%},{Q2\\1.8--4.2\%},{Q3\\4.2--8.4\%},{Q4\\8.4--20\%}},
+  xticklabel style={align=center,font=\footnotesize},yticklabel style={font=\footnotesize},
+  ylabel={ESG},xlabel={Quartile of lesion area (share of image)},label style={font=\footnotesize},
+  ymajorgrids,grid style={gray!25},xmin=0.8,xmax=4.2,clip=false,axis lines*=left]
+\addplot[very thick,blue!70!black,mark=*] coordinates {(1,0.545) (2,0.741) (3,0.836) (4,0.909)};
+\addplot[gray!70,mark=*,mark size=1.5pt] coordinates {(1,0.400) (2,0.556) (3,0.418) (4,0.509)};
+\addplot[gray!70,mark=*,mark size=1.5pt] coordinates {(1,0.200) (2,0.352) (3,0.345) (4,0.418)};
+\addplot[gray!70,mark=*,mark size=1.5pt] coordinates {(1,0.273) (2,0.333) (3,0.400) (4,0.218)};
+\node[anchor=west,font=\footnotesize\bfseries,blue!70!black] at (axis cs:4.07,0.909) {MedScope-4B};
+\node[anchor=west,font=\footnotesize,gray!80!black] at (axis cs:4.07,0.509) {gemini-4-argon};
+\node[anchor=west,font=\footnotesize,gray!80!black] at (axis cs:4.07,0.418) {Claude Opus 5.5};
+\node[anchor=west,font=\footnotesize,gray!80!black] at (axis cs:4.07,0.218) {gpt-6-astra};
+\node[above=2pt,font=\scriptsize] at (axis cs:1,0.545) {0.55};
+\node[above=2pt,font=\scriptsize] at (axis cs:2,0.741) {0.74};
+\node[above=2pt,font=\scriptsize] at (axis cs:3,0.836) {0.84};
+\node[above=2pt,font=\scriptsize] at (axis cs:4,0.909) {0.91};
+\end{axis}
+\end{tikzpicture}
+\caption{Evidence sensitivity gap by quartile of lesion area on the main test (55, 54, 55, 55 cases with a lesion mask). The gap between MedScope-4B and the flagships grows with lesion size but holds in the smallest quartile (0.55 vs 0.20--0.40).}
+\label{fig:size}
+\end{figure}
+
+\textbf{Prompting the frontier models harder.} MedScope learned from thousands of counterfactual views; the frontier models saw none. On the same 150 cases we gave the three flagships a cautious prompt (an explicit warning that the question may name an absent finding), four solved training examples in context (a lesion; the same image erased; an edit elsewhere with the lesion intact; a healthy image), and their highest reasoning setting. None closes the gap (Table~\ref{tab:prompt}). At the highest reasoning setting no flagship differs from its default (all $p\ge0.13$). MedScope-4B stays better than every flagship under every condition on ESG ($p\le0.001$) and net utility ($p\le0.034$).
+
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{Flagships under four prompting conditions, same 150 cases: ESG / erased-lesion claims (\%). MedScope-4B on these cases: 0.750 / 7.4.}
+\label{tab:prompt}
+\begin{tabular}{lcccc}
+\toprule
+Model & Default & Cautious prompt & Four solved examples & Highest reasoning \\
+\midrule
+gemini-4-argon & 0.441 / 41.2 & 0.412 / 42.6 & 0.456 / 36.8 & 0.456 / 39.7 \\
+Claude Opus 5.5 & 0.338 / 54.4 & 0.382 / 44.1 & 0.309 / 52.9 & 0.397 / 51.5 \\
+gpt-6-astra & 0.338 / 52.9 & 0.397 / 47.1 & 0.500 / 38.2 & 0.324 / 58.8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Open models with their own prompt.} With a short native prompt and one plain reply, every open model claims erased lesions more often than under the agent prompt (53--72\%) \pend{regenerate with the v4-era runs}, so the agent loop does not handicap them on this task.
+
+\textbf{Question wording.} On 373 cases with three test-only paraphrases, net utility is unchanged against the original wording ($+0.006$ [$-0.033$, 0.041], $p=0.74$). With the same paraphrases on 150 cases, MedScope-4B leads the flagships by $+0.35$ to $+0.57$ in net utility ($p<0.001$).
+
+\textbf{Tools off.} With every tool call refused at test time, ESG is unchanged (0.753 vs 0.758, $p=0.92$) and net utility falls by 0.092 ($p=0.003$): the model says ``absent'' more often on lesion views (21\% vs 15\%). Evidence sensitivity comes from training; the tools add accuracy on real lesions. MedScope-4B calls a tool on 0.99 of lesion views (35\% of calls are windowing), and its first zoom covers the lesion in 93\%. gpt-6-sol and gpt-6-astra almost never call a tool.
+
+\textbf{Cost matrix.} The always-refer policy earns $+0.110$ under the published matrix, a weakness of that matrix; with referral on lesion-free images paid 0 it earns $-0.118$, and $-0.300$ when referral costs $-0.3$ everywhere. MedScope-4B ranks first among all models under all five matrices (wrong-answer penalty $-2$, $-1$, $-0.5$; the two referral variants), and its strict ESG equals its ESG (0.758), since it never refers.
+
+\textbf{Degraded views.} Without the degraded views, which favour a model trained to clarify, net utility is 0.774 for MedScope-4B and 0.310--0.579 for the flagships (MedScope better, $p<0.001$).
+
+\textbf{Label noise.} Without human review, the nine frontier models served as an independent panel: a lesion-free test image that at least seven call abnormal is treated as a disputed label (26 of 288: 12 colonoscopy, 11 SLAKE, 2 breast ultrasound, 1 chest X-ray; MedScope does not vote). Without them, MedScope-4B's healthy-image claims are 6.9\% (gemini-4-argon 4.6\%, other frontier models 10.3--24.4\%), and every comparison in Table~\ref{tab:paired} keeps its direction and significance.
+
+\subsection{Generalisation}\label{sec:gen}
+On every new test set MedScope-4B keeps the lowest erased-lesion claims and the lowest (once tied) healthy-image claims of the four models, but the flagships detect more real lesions (Table~\ref{tab:ext}). Net utility, which weighs both, does not differ at the external centres, favours MedScope-4B on the fresh internal set, and favours gemini-4-argon on the fresh external set.
+
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{MedScope-4B and the three flagships on the further test sets.}
+\label{tab:ext}
+\begin{tabular}{llccccc}
+\toprule
+Test set & Model & CCR & ESG & Erased \% & Healthy \% & Net utility \\
+\midrule
+\multirow{4}{*}{External centres (169)} & \textbf{MedScope-4B} & 0.727 & \best{0.597} & \best{11.8} & \best{4.0} & 0.530 \\
+ & gemini-4-argon & 0.950 & 0.370 & 58.8 & 18.0 & 0.544 \\
+ & Claude Opus 5.5 & 0.966 & 0.412 & 53.8 & 30.0 & 0.544 \\
+ & gpt-6-astra & 0.945 & 0.277 & 66.4 & 24.0 & 0.424 \\
+\midrule
+\multirow{4}{*}{Fresh internal (76)} & \textbf{MedScope-4B} & 0.681 & \best{0.472} & \best{19.4} & \best{12.5} & \best{0.402} \\
+ & gemini-4-argon & 0.639 & 0.056 & 61.1 & 12.5 & 0.048 \\
+ & Claude Opus 5.5 & 0.653 & 0.000 & 63.9 & 25.0 & $-$0.023 \\
+ & gpt-6-astra & 0.847 & 0.083 & 75.0 & 17.5 & 0.219 \\
+\midrule
+\multirow{4}{*}{Fresh external (316)} & \textbf{MedScope-4B} & 0.476 & 0.393 & \best{8.3} & \best{4.7} & $-$0.053 \\
+ & gemini-4-argon & 0.741 & 0.435 & 31.5 & 9.5 & \best{0.310} \\
+ & Claude Opus 5.5 & 0.696 & 0.292 & 42.3 & 18.9 & 0.056 \\
+ & gpt-6-astra & 0.634 & 0.268 & 35.7 & 34.5 & $-$0.106 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{External centres.} ESG is higher than every flagship's ($p\le0.002$), erased-lesion claims are 42--55 points lower ($p<0.001$) and healthy-image claims 14--26 points lower ($p\le0.026$), while CCR is 0.22--0.24 lower ($p<0.001$); net utility does not differ ($p\ge0.07$). By source, ESG is 0.85 on CVC-ClinicDB, 0.71 on BraTS-Africa, 0.58 on BUS-BRA and 0.05 on QaTa-COV19, where diffuse COVID-19 opacities are erased far less completely than focal lesions.
+
+\textbf{Fresh internal (confirmatory, chest X-ray).} ESG 0.47 against 0.00--0.08 for the flagships ($p\le0.001$); net utility better than Claude Opus 5.5 and gemini-4-argon ($p=0.002$), not different from gpt-6-astra ($p=0.15$).
+
+\textbf{Fresh external (confirmatory).} The result is mixed. ESG is higher than gpt-6-astra's and Claude Opus 5.5's ($p\le0.037$) and not different from gemini-4-argon's ($p=0.34$); net utility is below gemini-4-argon's ($-0.363$ [$-0.496$, $-0.233$], $p<0.001$). The by-source breakdown (Table~\ref{tab:ext2}) locates the loss: MedScope-4B leads on breast ultrasound and trails on colonoscopy and meningioma MRI, and on SIIM pneumothorax it answers ``No'' to every one of 48 pneumothorax images (Section~\ref{sec:ptx}).
+
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{Fresh external test by source: CCR / net utility.}
+\label{tab:ext2}
+\begin{tabular}{lcccc}
+\toprule
+Source (cases) & MedScope-4B & gemini-4-argon & Claude Opus 5.5 & gpt-6-astra \\
+\midrule
+BUS-UCLM, breast ultrasound (99) & 0.73 / \best{0.67} & 0.71 / 0.55 & 0.93 / 0.48 & 0.98 / 0.18 \\
+ETIS-Larib, colonoscopy (39) & 0.69 / 0.38 & 0.97 / \best{0.75} & 0.92 / 0.59 & 0.73 / 0.35 \\
+BraTS 2023 meningioma, MRI (82) & 0.53 / $-$0.03 & 0.62 / \best{0.09} & 0.69 / 0.00 & 0.50 / $-$0.21 \\
+SIIM-ACR pneumothorax, chest X-ray (96) & 0.00 / $-$1.10 & 0.66 / \best{$-$0.06} & 0.28 / $-$0.68 & 0.29 / $-$0.62 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Standard medical VQA.} Accuracy on ordinary questions is kept (Table~\ref{tab:vqa}). MedScope-4B saw these benchmarks' training splits during replay, so this shows the absence of a regression, not a like-for-like comparison; against its own base model it gains on all three. With their own plain prompt most open models score higher than in the agent loop (Lingshu-7B: 0.552, 0.803, 0.573), so the loop is a harder format for open models on ordinary VQA.
+
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\caption{Standard medical VQA, same agent loop for every model: closed / open / all questions.}
 \label{tab:vqa}
 \begin{tabular}{lccc}
 \toprule
-Model & VQA-RAD (451) & SLAKE test (300) & PathVQA (300) \\
+Model & VQA-RAD (451) & SLAKE (300) & PathVQA (300) \\
 \midrule
-MedScope-4B (final) & 0.777 / 0.275 / 0.554 & 0.899 / 0.691 / 0.767 & 0.833 / 0.181 / 0.520 \\
-MedScope-4B-R (no replay) & 0.673 / 0.090 / 0.415 & 0.688 / 0.215 / 0.387 & 0.500 / 0.000 / 0.260 \\
-Lingshu-7B & 0.705 / 0.195 / 0.479 & 0.798 / 0.545 / 0.637 & 0.712 / 0.042 / 0.390 \\
+\textbf{MedScope-4B} & 0.741 / 0.230 / 0.514 & 0.881 / 0.644 / 0.730 & 0.801 / 0.125 / 0.477 \\
+gemini-4-argon & 0.884 / 0.410 / 0.674 & 0.927 / 0.696 / 0.780 & 0.712 / 0.097 / 0.417 \\
+Claude Opus 5.5 & 0.876 / 0.380 / 0.656 & 0.927 / 0.602 / 0.720 & 0.865 / 0.153 / 0.523 \\
+gpt-6-astra & 0.797 / 0.255 / 0.557 & 0.835 / 0.476 / 0.607 & 0.526 / 0.062 / 0.303 \\
 Qwen3.5-4B (base) & 0.657 / 0.260 / 0.481 & 0.826 / 0.424 / 0.570 & 0.545 / 0.021 / 0.293 \\
-HuatuoGPT-Vision-7B & 0.769 / 0.095 / 0.470 & 0.780 / 0.262 / 0.450 & 0.724 / 0.007 / 0.380 \\
-Qwen3-VL-8B & 0.641 / 0.215 / 0.452 & 0.780 / 0.304 / 0.477 & 0.462 / 0.021 / 0.250 \\
-MedGemma 1.5 4B & 0.649 / 0.195 / 0.448 & 0.679 / 0.304 / 0.440 & 0.506 / 0.028 / 0.277 \\
-Qwen2.5-VL-7B & 0.637 / 0.135 / 0.415 & 0.633 / 0.204 / 0.360 & 0.449 / 0.000 / 0.233 \\
+Lingshu-7B & 0.705 / 0.195 / 0.479 & 0.798 / 0.545 / 0.637 & 0.712 / 0.042 / 0.390 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{What did not help}\label{sec:negative}
-\textbf{On-policy RL.} GRPO from the stage-1 agent (150 steps, 4 episodes per image) left the model unchanged: only 20\% of sampled groups had any reward difference, so group-relative advantages vanished. Dynamic sampling (8 episodes, images drawn until 2 groups had signal) gained one validation case (net utility 0.844 $\to$ 0.878) as the policy grew more deterministic. Rejection sampling, which learns from any single success, was used instead; on the test set its gain over stage 1 is not significant (net 0.752 vs 0.760), and we report all three stages.
-\textbf{Adapter merging.} Merging a grounding-only adapter into the agent (linear SVD, concatenation, TIES, DARE-TIES) never beat the agent; the abstention gap fell from 0.900 to 0.000 as grounding weight rose, while grounded accuracy stayed at 0.85--0.93. Merging keeps perception and removes evidence sensitivity.
-\textbf{Grounding supervision alone.} An adapter trained only to answer with boxes reached 0.90 grounded accuracy but claimed the finding on every erased and every lesion-free image.
+%==============================================================================
+\section{Failure analysis: why is pneumothorax missed?}\label{sec:ptx}
+MedScope-4B answered a confident ``No'' on all 48 SIIM-ACR pneumothorax images of the fresh external test (answer-token probability about 1.0). Scoring and parsing were checked and are correct. The analysis below was made after the test results, is labelled post hoc in the pre-registration, and changes no model or confirmatory number. It trains nothing: every number comes from stored runs or from rebuilding each stage's exact training list with the training code.
 
+\begin{table}[t]
+\centering\small
+\caption{SIIM pneumothorax images called present (the 42 cases found in the original-resolution data).}
+\label{tab:ptx}
+\begin{tabular}{lcc}
+\toprule
+Model & 256-pixel copy & Original resolution \\
+\midrule
+Qwen3.5-4B (base) & 0\% & 12\% \\
+Stage 1 without counterfactual views & 0\% & 5\% \\
+Stage 1 with counterfactual views & 19\% & 40\% \\
+Stage 2 & \pend{--} & 40\% \\
+\textbf{MedScope-4B (stage 3)} & \textbf{0\%} & \textbf{0\%} \\
+gemini-4-argon & 69\% & 69\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Resolution is not the cause.} The fresh test used a 256-pixel copy of SIIM. Rebuilt from the original DICOMs, earlier checkpoints detect more pneumothoraxes, but the final model still detects none (Table~\ref{tab:ptx}).
+
+\textbf{Counterfactual training is not the cause.} The stage-1 model with counterfactual views is the most sensitive Qwen-based model at both resolutions; the arm without them detects almost none.
+
+\textbf{Training coverage is.} Questions naming pneumothorax were 54 of about 7,000 chest X-ray training views in stage 1 (35 in stage 2, 15 in stage 3), trained to ``No'' 80\%, 100\% and 87\% of the time. Stage 1 held only four pneumothorax lesion images, all large (lesion box median 37\% of the image, against 6.9\% for the SIIM cases). No validation or internal test set held a pneumothorax lesion image asked about pneumothorax (only 7, 7 and 4 lesion-free ones), so the selection rule could not see the problem.
+
+\textbf{Stage 3 turns weak detection into none.} Stage 3 shifts chest X-ray answers towards ``No'' in general: on validation, named findings detected fall from 63\% to 56\%, erased-lesion claims from 16\% to 9\% and healthy-image claims from 24\% to 10\%. With almost no positive pneumothorax examples, its weak detection drops to zero at every lesion size. The share of ``No'' targets alone does not explain this: stage 2 trained on 35 of 35 ``No'' targets and still detected 40\%.
+
+\textbf{The model registers something.} Asked ``Is there an abnormality?'', MedScope-4B says yes on 35 of 42 pneumothorax images and on 28 of 48 SIIM images without pneumothorax (Fisher $p=0.012$); the base model separates them more (38/42 vs 23/48, $p<0.001$). The final model sees that something is abnormal but does not name pneumothorax.
+
+\textbf{Lessons.} A rare critical finding needs positive examples in training and in validation, and the selection rule needs a per-finding sensitivity floor; otherwise a conservative final stage can remove it entirely while every aggregate metric improves. Coverage may not be the whole story: the gap to gemini-4-argon even at full resolution is consistent with the frozen vision encoder limiting subtle findings.
+
+%==============================================================================
+\section{Reader study}\label{sec:reader}
+The benchmark's labels come from datasets, and the erasures are checked only automatically. Physicians therefore read a blinded set of test images to check two assumptions: that an erased finding is no longer visible, and that erased images are not trivially recognisable as edited. \pend{Results pending; this section gives the design and the analysis fixed before any answer was seen.}
+
+\textbf{Images.} 96 images from the main test, each from a different case and stratified by source: 32 unmodified images with a lesion, 32 lesion-erased images (the LaMa erasures the models were tested on) and 32 unmodified lesion-free images. Lesion-free images are included so that ``no lesion'' is not a cue for ``edited''. Only yes/no presence questions are used. Every image is re-saved the same way (PNG, no metadata) under an opaque name.
+
+\textbf{Procedure.} Readers use a static web page that holds no answer key, in their own random order, with no time limit and no other information. For each image they answer (1) whether the image has been digitally edited (definitely real, probably real, probably edited, definitely edited) and (2) the case's clinical question (yes, no, cannot tell). They see no results, no paper and no image counts by kind until their answers are submitted.
+
+\textbf{Pre-specified analysis.} Per reader: the AUC for separating erased from unmodified images on the four-level rating, and the share of erased images rated probably or definitely edited; the share answering ``yes'' to the clinical question on each image kind; agreement between readers (Cohen's $\kappa$ on edited yes/no); and results by source. The benchmark's assumptions are supported if readers rarely see the erased finding, and if their AUC for recognising erasures is close to the zero-shot frontier models' (0.70--0.75) rather than near 1.
+
+\textbf{Readers.} \pend{Number, specialty, years of experience.} \quad \textbf{Results.} \pend{Pending.}
+
+%==============================================================================
 \section{Discussion}
-Seeing a lesion and reporting only what is seen are separable abilities. Nine frontier models see lesions as well as a 4B model but report them about half the time after they are gone, under the benchmark prompt, under a cautious prompt, and at external centres; open models do worse with their own prompts. A small model acquires the disposition from automatically built counterfactuals, and the ablation identifies those views as the active ingredient. Because the views come from public masks and automatic checks, the recipe extends to any dataset with segmentation labels.
-The result is a gain in \emph{evidence sensitivity}, not in perception and not a general reduction of false findings: at external centres the frontier models detect more real lesions, and their net utility there is not significantly different from MedScope's; on unedited healthy images the best frontier model reports fewer false findings than MedScope-4B (9.0\% vs 14.6\%). Combining frontier-scale perception with counterfactual training is the natural next step. We keep the pre-specified final model, MedScope-4B, as the headline model, and release MedScope-4B-R beside it as the specialist verification checkpoint: it has fewer false findings on healthy images (8.3\% vs 14.6\%) and no SLAKE regression, but without replay it loses open-question VQA ability (SLAKE open 0.215 vs 0.691).
 
-\paragraph{Limitations.}\label{sec:limits}
+\subsection{Principal findings}
+Seeing a lesion and reporting only what is seen are separable abilities. Nine frontier models see real lesions as well as a 4B model, yet claim about half of the lesions after they have been erased, under the benchmark prompt, under a cautious prompt, with solved examples in context, at their highest reasoning setting, and with reworded questions. A small model acquires the disposition to report only what is visible from automatically built counterfactual views, and the ablations identify those views --- not the data, the answer format or the share of ``No'' answers --- as the active ingredient. The effect holds on every seed, on a second base model, and on inpainting tools never used in training. Because the views come from public masks and automatic checks, the recipe extends to any dataset with segmentation labels.
+
+\subsection{What it is not}
+The gain is in evidence sensitivity, not in perception. At new centres the frontier models detect more real lesions (CCR 0.95--0.97 vs 0.73), and the two abilities pull net utility in opposite directions: frontier models behave as high-sensitivity, high-hallucination readers, MedScope-4B as an evidence-gated reader that misses more unfamiliar lesions but rarely reports absent ones. Which is preferable depends on the clinical cost of each error, which our cost matrix fixes only by assumption. The fresh external test shows the danger of the evidence-gated reader at its worst: where perception or training coverage is weak, conservatism becomes a complete miss of a critical finding.
+
+\subsection{Relation to prior work}
+Hallucination benchmarks and training-free detectors~\cite{pope,cares,medhallmark,medvh,medheval,coev,cvgu} measure or flag unsupported claims; we show that the same counterfactual idea, applied to the image with an edit-matched control, can train the behaviour into a model. Compared with natural-image counterfactual VQA~\cite{causalvqa}, the control edit with the same tool and shape closes the shortcut of reacting to edits, and our erasures-only arm shows that without it a model partly learns that shortcut. Compared with tool-using agents trained by reinforcement learning~\cite{deepeyes,pixelreasoner,mmedagent,mmedagentrl}, label-derived trajectories and rejection sampling were enough to teach tool use (first zoom on the lesion in 93\% of lesion views).
+
+\subsection{Implications}
+For developers, a model's answers to presupposing questions should be tested on images with the finding removed, not only on images where it is present. For evaluators, aggregate accuracy and even aggregate hallucination rates can hide a complete miss of one critical finding; per-finding sensitivity floors belong in model selection. For clinical use, MedScope-4B is a research model, not a medical device, and nothing here supports unsupervised use.
+
+\subsection{Limitations}\label{sec:limits}
 \begin{itemize}[leftmargin=*,nosep]
-\item \textbf{No clinician review.} Views are checked automatically and evaluation uses dataset labels as the reference standard; realism of the inpainting is argued through the matched control, unedited negatives and two edit-visibility tests, not human reading.
-\item \textbf{Edits are detectable.} A trained CNN finds random edits (AUC 0.83) and frontier models find erased lesions suspicious (0.70--0.75). MedScope's advantage persists on clean-looking erasures, but a residual contribution of edit traces cannot be excluded. \pend{notebook 20: result on erasures made by three inpainting tools never used in training}
-\item \textbf{Training and test views are built the same way.} MedScope trained on views from the same sources, questions and answer format as the test; frontier models saw none. The ablation, trained on the same data and format without counterfactual views, hallucinates at the frontier level, which isolates the counterfactual views as the cause. \pend{notebook 20: frontier models with four solved training examples in context}
-\item \textbf{Secondary signs.} Erasing a lesion can leave indirect signs (mass effect, oedema); for such views the expected ``absent'' answer is arguable for every model.
-\item \textbf{Single lesion per mask.} Target removal assumes the masked lesion is the only one; images with a second, unmasked lesion (Figure~\ref{fig:examples}, breast ultrasound) make the expected ``absent'' answer wrong for every model.
-\item \textbf{Diffuse findings and small lesions.} Erasing diffuse opacities is incomplete (QaTa-COV19 ESG 0.15), and the smallest lesions are hardest.
-\item \textbf{SLAKE regression} of the final model. Possible label noise in lesion-free images was examined with a model-consensus check (Section~\ref{sec:robust}), not by human review.
-\item \textbf{2D slices}, a \textbf{single base model} \pend{notebook 21: MedGemma 1.5 4B with the same recipe} and \textbf{training-seed variation}: on a second seed, stage-1 healthy-image claims were 16.3\% against 8.7\% \pend{notebook 18: three-seed mean $\pm$ sd}; frontier models with their default settings only.
+\item \textbf{Rare critical findings.} A finding almost absent from training and absent from validation was lost entirely by the most conservative stage (Section~\ref{sec:ptx}).
+\item \textbf{Perception.} The vision encoder is frozen; subtle findings and the smallest lesions (ESG 0.55 in the lowest quartile) remain weakest.
+\item \textbf{Erasure as ground truth.} Diffuse findings are erased less completely (QaTa-COV19 ESG 0.05), erasure can leave secondary signs such as mass effect or oedema, and a second, unmasked lesion (Figure~\ref{fig:examples}, breast ultrasound) makes the expected ``absent'' answer wrong for every model. The reader study tests how often an erased finding remains visible.
+\item \textbf{Edit traces.} A trained detector finds the edits (AUC 0.83). The advantage holds on clean-looking erasures and unseen tools, but a residual contribution of edit traces cannot be excluded.
+\item \textbf{Reference standard.} Labels and masks come from public datasets without re-reading; disputed lesion-free labels (26 of 288) do not change any comparison.
+\item \textbf{Same construction for training and test.} MedScope trained on views built like the test views; the frontier models saw none. The ablation trained on the same data without counterfactual views hallucinates at the frontier level, which isolates the views as the cause, and solved examples in context did not close the gap.
+\item \textbf{Frontier models} were evaluated through public APIs on fixed dates with default settings; their behaviour may change.
+\item \textbf{Scope.} Yes/no and short-answer questions on single 2D images; no report generation, no 3D volumes, no prospective or clinical evaluation, and limited demographic information in the source datasets.
+\item \textbf{No human annotation.} All checks are automated or model-based until the reader study is complete.
 \end{itemize}
 
+\subsection{Future work}
+Three directions follow directly: per-finding coverage and sensitivity floors in data and selection; unfreezing or replacing the vision encoder so that evidence sensitivity is combined with frontier-level perception; and extending the views to report generation, where a removed finding should disappear from the report while the rest stays.
+
+%==============================================================================
 \section{Conclusion}
-Counterfactual lesion erasure with an edit-matched control turns ``does the model report what the image shows?'' into a measurable and trainable property. Trained on such views without any human annotation, a 4B agent matches nine frontier models on real lesions and hallucinates erased findings three to four times less often, robustly to prompting and at four external centres, while keeping general medical VQA ability.
+Erasing the lesion, with an edit of the same shape elsewhere as the control, turns ``does the answer follow the image?'' into a property that can be measured and trained without human annotation. Trained on such views and selected by a pre-registered rule, a 4B agent matches nine frontier models on real lesions and claims erased findings four to six times less often, robustly to prompting, question wording and unseen inpainting tools, while keeping ordinary VQA ability. It is only as good as the findings its training data covers: a pre-registered fresh test exposed a complete miss of pneumothorax, and the fix belongs in data coverage and model selection, not in prompting.
 
-\paragraph{Data and code availability.} Code, view-building recipes, benchmark, per-view transcripts of every run and model weights: \url{https://github.com/bhaskargurram-ai/medscope}; adapters at \url{https://huggingface.co/bhaskar-ai/MedScope-4B} and \url{https://huggingface.co/bhaskar-ai/MedScope-4B-R}; benchmark manifests and all evaluation runs at \url{https://huggingface.co/datasets/bhaskar-ai/MedScope-Bench} (made public on submission). MedScope is a research model, not a medical device.
+\section*{Declarations}
+\textbf{Data and code availability.} Code, view-building recipes, notebooks, the pre-registration with its git history, and the results log: \url{https://github.com/bhaskargurram-ai/medscope}. LoRA adapters and MedScope-Bench (view manifests and per-view transcripts of every evaluation run) on Hugging Face (\texttt{bhaskar-ai/MedScope-4B}; \texttt{datasets/bhaskar-ai/MedScope-Bench}), public on acceptance. All images come from public de-identified datasets under their own licences and are not redistributed.
 
-\paragraph{Funding.} This research received no external funding.
-
-\paragraph{Competing interests.} The author declares no competing interests.
-
-\paragraph{Ethics.} Only public, de-identified datasets were used under their published licences; no new human data were collected, so no ethics approval was required.
+\textbf{Funding.} This research received no external funding.
+\textbf{Competing interests.} The author declares no competing interests.
+\textbf{Ethics.} The model study used only public, de-identified datasets under their published licences; no new patient data were collected. \pend{Reader study: participant consent and local ethics position.}
+\textbf{Author contributions (CRediT).} Bhaskar Gurram: conceptualisation, methodology, software, investigation, formal analysis, data curation, writing (original draft, review and editing), visualisation. \pend{Reader-study physicians: acknowledged or credited as agreed.}
+\textbf{Declaration of generative AI use.} \pend{To be completed according to the target journal's policy.}
 
 \begin{thebibliography}{99}\small
 \bibitem{llavamed} C.~Li et al. LLaVA-Med: Training a large language-and-vision assistant for biomedicine in one day. \emph{NeurIPS Datasets and Benchmarks}, 2023.
@@ -490,8 +617,6 @@ Counterfactual lesion erasure with an edit-matched control turns ``does the mode
 \bibitem{medgemma} A.~Sellergren et al. MedGemma technical report. arXiv:2507.05201, 2025.
 \bibitem{medgemma15} Google Research and Google DeepMind (A.~Sellergren, F.~Mahvar et al.). MedGemma 1.5 technical report. arXiv:2604.05081, 2026.
 \bibitem{lingshu} LASA Team, W.~Xu, H.~P.~Chan, L.~Li et al. Lingshu: A generalist foundation model for unified multimodal medical understanding and reasoning. arXiv:2506.07044, 2025.
-\bibitem{qwen25vl} S.~Bai et al. Qwen2.5-VL technical report. arXiv, 2025.
-\bibitem{qwen3vl} Qwen Team. Qwen3-VL technical report. arXiv, 2025.
 \bibitem{vqarad} J.~J.~Lau et al. A dataset of clinically generated visual questions and answers about radiology images. \emph{Scientific Data}, 2018.
 \bibitem{slake} B.~Liu et al. SLAKE: A semantically-labeled knowledge-enhanced dataset for medical visual question answering. \emph{ISBI}, 2021.
 \bibitem{pathvqa} X.~He et al. PathVQA: 30000+ questions for medical visual question answering. arXiv, 2020.
@@ -500,35 +625,48 @@ Counterfactual lesion erasure with an edit-matched control turns ``does the mode
 \bibitem{medhallmark} J.~Chen et al. Detecting and evaluating medical hallucinations in large vision language models (Med-HallMark). arXiv, 2024.
 \bibitem{medvh} Z.~Gu et al. MedVH: Towards systematic evaluation of hallucination for large vision language models in the medical context. arXiv, 2024.
 \bibitem{medheval} A.~Chang et al. MedHEval: Benchmarking hallucinations and mitigation strategies in medical large vision-language models. arXiv:2503.02157, 2025.
+\bibitem{lama} R.~Suvorov et al. Resolution-robust large mask inpainting with Fourier convolutions. \emph{WACV}, 2022.
 \bibitem{coev} N.~Zhou, K.~Zou, M.~Liu et al. Hallucination detection and correction in medical VLMs via counter-evidence verification. arXiv:2606.18609, 2026.
 \bibitem{cvgu} X.~Song, H.~Qin, Z.~Zhang et al. Detecting clinical hallucinations in LVLMs via counterfactual visual grounding uncertainty. arXiv:2606.28520, 2026.
 \bibitem{causalvqa} V.~Agarwal, R.~Shetty, M.~Fritz. Towards causal VQA: Revealing and reducing spurious correlations by invariant and covariant semantic editing. \emph{CVPR}, 2020.
-\bibitem{lama} R.~Suvorov et al. Resolution-robust large mask inpainting with Fourier convolutions. \emph{WACV}, 2022.
+\bibitem{telea} A.~Telea. An image inpainting technique based on the fast marching method. \emph{Journal of Graphics Tools}, 2004.
+\bibitem{poisson} P.~P\'erez, M.~Gangnet, A.~Blake. Poisson image editing. \emph{ACM SIGGRAPH}, 2003.
+\bibitem{ldm} R.~Rombach et al. High-resolution image synthesis with latent diffusion models. \emph{CVPR}, 2022.
 \bibitem{deepeyes} Z.~Zheng et al. DeepEyes: Incentivizing ``thinking with images'' via reinforcement learning. \emph{ICLR}, 2026.
 \bibitem{pixelreasoner} A.~Su et al. Pixel Reasoner: Incentivizing pixel-space reasoning with curiosity-driven reinforcement learning. arXiv:2505.15966, 2025.
 \bibitem{mmedagent} B.~Li et al. MMedAgent: Learning to use medical tools with multi-modal agent. \emph{Findings of EMNLP}, 2024.
 \bibitem{mmedagentrl} P.~Xia et al. MMedAgent-RL: Optimizing multi-agent collaboration for multimodal medical reasoning. arXiv:2506.00555, 2025.
-\bibitem{aurc} Y.~Geifman and R.~El-Yaniv. Selective classification for deep neural networks. \emph{NeurIPS}, 2017.
-\bibitem{star} E.~Zelikman et al. STaR: Bootstrapping reasoning with reasoning. \emph{NeurIPS}, 2022.
-\bibitem{rft} Z.~Yuan et al. Scaling relationship on learning mathematical reasoning with large language models. arXiv, 2023.
 \bibitem{grpo} Z.~Shao et al. DeepSeekMath: Pushing the limits of mathematical reasoning in open language models. arXiv, 2024.
 \bibitem{dapo} Q.~Yu et al. DAPO: An open-source LLM reinforcement learning system at scale. \emph{NeurIPS}, 2025.
+\bibitem{star} E.~Zelikman et al. STaR: Bootstrapping reasoning with reasoning. \emph{NeurIPS}, 2022.
+\bibitem{rft} Z.~Yuan et al. Scaling relationship on learning mathematical reasoning with large language models. arXiv, 2023.
+\bibitem{aurc} Y.~Geifman and R.~El-Yaniv. Selective classification for deep neural networks. \emph{NeurIPS}, 2017.
+\bibitem{claim} A.~S.~Tejani et al. Checklist for Artificial Intelligence in Medical Imaging (CLAIM): 2024 update. \emph{Radiology: Artificial Intelligence}, 2024.
+\bibitem{qwen35} Qwen Team. Qwen3.5 model card and technical report, 2026. \pend{verify}
 \bibitem{lora} E.~J.~Hu et al. LoRA: Low-rank adaptation of large language models. \emph{ICLR}, 2022.
+\bibitem{efron} B.~Efron and R.~J.~Tibshirani. \emph{An Introduction to the Bootstrap}. Chapman \& Hall, 1993.
 \bibitem{kvasir} D.~Jha et al. Kvasir-SEG: A segmented polyp dataset. \emph{MMM}, 2020.
 \bibitem{hyperkvasir} H.~Borgli et al. HyperKvasir, a comprehensive multi-class image and video dataset for gastrointestinal endoscopy. \emph{Scientific Data}, 2020.
-\bibitem{chestxdet} J.~Lian et al. A structure-aware relation network for thoracic diseases detection and segmentation. \emph{IEEE TMI}, 2021.
-\bibitem{lgg} M.~Buda, A.~Saha, M.~A.~Mazurowski. Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm. \emph{Computers in Biology and Medicine}, 2019.
+\bibitem{chestxdet} J.~Lian et al. A structure-aware relation network for thoracic diseases detection and segmentation. \emph{IEEE Transactions on Medical Imaging}, 2021.
+\bibitem{chestxray14} X.~Wang et al. ChestX-ray8: Hospital-scale chest X-ray database and benchmarks on weakly-supervised classification and localization of common thorax diseases. \emph{CVPR}, 2017.
 \bibitem{busi} W.~Al-Dhabyani et al. Dataset of breast ultrasound images. \emph{Data in Brief}, 2020.
+\bibitem{lgg} M.~Buda, A.~Saha, M.~A.~Mazurowski. Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm. \emph{Computers in Biology and Medicine}, 2019.
 \bibitem{cvc} J.~Bernal et al. WM-DOVA maps for accurate polyp highlighting in colonoscopy. \emph{Computerized Medical Imaging and Graphics}, 2015.
 \bibitem{qata} A.~Degerli et al. COVID-19 infection map generation and detection from chest X-ray images. \emph{Health Information Science and Systems}, 9:15, 2021.
 \bibitem{busbra} W.~G\'omez-Flores et al. BUS-BRA: A breast ultrasound dataset for assessing computer-aided diagnosis systems. \emph{Medical Physics}, 2024.
 \bibitem{bratsafrica} M.~Adewole et al. The Brain Tumor Segmentation (BraTS) Challenge 2023: Glioma segmentation in sub-Saharan Africa patient population (BraTS-Africa). arXiv:2305.19369, 2023.
 \bibitem{bratsafricaj} M.~Adewole et al. The BraTS-Africa dataset. \emph{Radiology: Artificial Intelligence}, 2025, doi:10.1148/ryai.240528.
+\bibitem{bratsmen} D.~LaBella et al. The ASNR-MICCAI Brain Tumor Segmentation (BraTS) Challenge 2023: Intracranial meningioma. arXiv:2305.07642, 2023.
+\bibitem{busuclm} N.~Vallez et al. BUS-UCLM: Breast ultrasound lesion segmentation dataset. \emph{Scientific Data}, 2025. \pend{verify}
+\bibitem{siim} A.~Zawacki et al. SIIM-ACR Pneumothorax Segmentation. Kaggle, 2019. \pend{verify citation form}
+\bibitem{etis} J.~Silva et al. Toward embedded detection of polyps in WCE images for early diagnosis of colorectal cancer. \emph{International Journal of Computer Assisted Radiology and Surgery}, 2014.
+\bibitem{qwen25vl} S.~Bai et al. Qwen2.5-VL technical report. arXiv, 2025.
+\bibitem{qwen3vl} Qwen Team. Qwen3-VL technical report. arXiv, 2025.
 \end{thebibliography}
 
 \appendix
 \section{Prompts}\label{app:prompt}
-\textbf{Agent prompt} (every model, main results):
+\textbf{Agent prompt} (every model, all main results):
 \begin{lstlisting}
 You are MedScope, a careful medical imaging assistant used for research. You look at a medical image and answer a question about it from what the image actually shows: you report a finding only when you can see it, and you say so when it is not there.
 On each turn, think briefly in plain text, then write exactly ONE action as a tagged JSON object and stop. After a tool call, stop and wait: you will be shown the result before you continue.
@@ -542,63 +680,39 @@ Final actions (exactly one, then stop):
 <final>{"action": "refer", "reason": "..."}</final>  when the image is usable but you cannot decide either way.
 Keep answers short, using the wording a radiologist would use. Never report a finding you cannot see.
 \end{lstlisting}
-\textbf{Plain prompt} (open models, Table~\ref{tab:robust}a): ``You are a medical imaging assistant. Look at the image and answer the question. Keep the answer short.'' One reply, no tools.
-\textbf{Cautious prompt} (Table~\ref{tab:robust}b): the agent prompt followed by ``Important: a question may name a finding that is not in the image. Do not assume the question is correct. Before answering, check carefully whether the finding is actually visible. If you cannot clearly see it, say it is not there (``No''). Reporting a finding that is not visible is a serious error.''
+\textbf{Plain prompt} (open models, own-prompt runs): ``You are a medical imaging assistant. Look at the image and answer the question. Keep the answer short.'' One reply, no tools.
+\textbf{Cautious prompt} (Table~\ref{tab:prompt}): the agent prompt followed by ``Important: a question may name a finding that is not in the image. Do not assume the question is correct. Before answering, check carefully whether the finding is actually visible. If you cannot clearly see it, say it is not there (``No''). Reporting a finding that is not visible is a serious error.''
+\textbf{Few-shot condition} (Table~\ref{tab:prompt}): the cautious prompt plus four solved training examples before each case (a lesion; the same image with it erased; an edit elsewhere with the lesion intact; a healthy image). Example images never appear in any test set.
 
 \section{Reproducibility}\label{app:repro}
-Every stage runs on one A100 40\,GB in Google Colab: stage-1 SFT about 4 hours, RFT about 4 hours, replay about 4 hours; one local model on the main test about 1 hour. Frontier models run on CPU. Measured API cost of the full main-test runs (provider token counts, list prices of 31 October 2026): gpt-6-sol \$2.63 (770 views; 345 run earlier), gpt-6-astra \$16.92, gpt-6.1-sol \$3.49, Claude Fable 5.1 \$57.12, Claude Opus 5.5 \$16.22, Claude Sonnet 5.5 \$13.03, gemini-4-argon \$6.44 (770 views), gemini-3.1-pro-preview \$12.40, gemini-3.8-flash \$9.13. All results are stored as per-view decisions and transcripts and rescored by a single script, so every number in this paper can be regenerated from the released files.
+\begin{itemize}[leftmargin=*,nosep]
+\item \textbf{Hardware.} One NVIDIA A100 40\,GB per training stage (about 4 hours each); one local model on the main test, about 1 hour. Frontier models run from a CPU runtime.
+\item \textbf{Determinism.} Greedy decoding for open models; the 16,000-view stage-1 draw is fixed across seeds; seeds change LoRA initialisation, data order and trajectory sampling.
+\item \textbf{Re-scoring.} Every table is regenerated from stored per-view transcripts by one script; the notebook behind each number is named in the results log.
+\item \textbf{Pre-registration.} \texttt{docs/PREREGISTRATION\_v4.md}, committed before any v4 data existed; its git history records the rule, both amendments and both post-hoc notes.
+\item \textbf{Negative results from development.} Plain GRPO from a stage-1 agent gave reward differences in only 20\% of sampled groups, so group-relative advantages vanished; dynamic sampling gained one validation case. Merging a grounding-only adapter into the agent removed evidence sensitivity (abstention gap 0.90 $\to$ 0.00) while keeping grounding. An adapter trained only to answer with boxes claimed the finding on every erased and every lesion-free image.
+\end{itemize}
 
-\section{CLAIM 2024 checklist}\label{app:claim}
-{\footnotesize
-\begin{longtable}{p{0.5cm}p{2.3cm}p{4.2cm}p{8.0cm}}
+\section{CLAIM 2024 checklist (summary)}\label{app:claim}
+\begin{center}\footnotesize
+\begin{tabular}{p{7.5cm}p{6.5cm}}
 \toprule
-Item & Section & Requirement & Where addressed \\
+Item & Where addressed \\
 \midrule
-\endhead
-1 & Title/abstract & Identification as AI methodology & Title; Abstract (vision--language agent, LoRA fine-tuning) \\
-2 & Abstract & Structured summary of design, methods, results, conclusions & Abstract (retrospective public data, patient/group-level splits, paired bootstrap, code/model availability) \\
-3 & Introduction & Background, intended use, role of the AI approach & Sec.~1; research use only, not a medical device \\
-4 & Introduction & Aims, objectives, hypotheses & Sec.~1 (hypothesis: counterfactual training reduces presupposition hallucination; contributions) \\
-5 & Study design & Prospective or retrospective & Sec.~4.1: retrospective, public de-identified datasets \\
-6 & Study design & Study goal & Sec.~4.1: model creation and benchmark; intended use: evidence-gated image question answering (research) \\
-7 & Data & Data sources & Table~\ref{tab:data}; Sec.~4.1; public datasets with citations \\
-8 & Data & Inclusion and exclusion criteria & Sec.~3.2 (lesion 20 px to 20\% of image), Table~\ref{tab:data} notes (diffuse findings, oversized lesions, slices with little brain) \\
-9 & Data & Preprocessing & Sec.~3.2--3.3; images as RGB, long side $\le$768 px for API models; LaMa inpainting, 5-px mask dilation \\
-10 & Data & Selection of data subsets & Sec.~3.3 automated quality control and adversarial filtering; no manual selection \\
-11 & Data & De-identification & Public datasets de-identified by their providers; no new patient data \\
-12 & Data & Missing data & SLAKE masks with undocumented grey levels skipped (Sec.~4.1); no imputation \\
-13 & Data & Image acquisition protocol & As documented by each source dataset (cited); not altered \\
-14 & Reference standard & Method to obtain the reference standard & Expert segmentation masks and labels of each dataset; expected answers derived by rule (Sec.~3.2) \\
-15 & Reference standard & Rationale for the reference standard & Sec.~3.2; limitations of mask-derived labels in Sec.~6 (single lesion per mask, secondary signs) \\
-16 & Reference standard & Source of annotations & Original dataset annotations (cited); no new annotators \\
-17 & Reference standard & Annotation of test set & Same automated derivation as training; model-consensus check of lesion-free labels (Sec.~5.5) \\
-18 & Reference standard & Inter/intrarater variability & Not applicable (no new annotation); source-dataset variability noted as a limitation \\
-19 & Data partitions & Assignment to partitions & Table~\ref{tab:data}; group/patient-level splits with planned sizes \\
-20 & Data partitions & Level of disjointness & Patient or near-duplicate group level; perceptual-hash deduplication across splits (Sec.~3.3) \\
-21 & Testing data & Intended sample size & Determined by available annotated cases; precision reported by 95\% bootstrap CIs \\
-22 & Model & Detailed model description & Sec.~3.1, 3.5; base Qwen3.5-4B (cited) with LoRA $r=16$; agent protocol and prompts (Appendix~\ref{app:prompt}) \\
-23 & Model & Software and versions & PyTorch 2.11, Transformers 5.22.1, PEFT 0.21.2, bitsandbytes 0.50.2; A100 40\,GB (Appendix~\ref{app:repro}) \\
-24 & Model & Initialisation & Pretrained base weights; LoRA initialised by PEFT defaults; vision encoder frozen \\
-25 & Training & Training details and hyperparameters & Sec.~3.5 (learning rates, steps, accumulation, epochs, data mixtures, augmentation by trajectory jitter) \\
-26 & Training & Selection of final model & Sec.~3.5: rule fixed before testing (validation net utility within 0.02) \\
-27 & Training & Ensembling & Not used \\
-28 & Evaluation & Performance metrics & Sec.~3.6 (CCR, ESG, hallucination rates, grounding, net utility, AURC); comparison with 15 published models \\
-29 & Evaluation & Uncertainty and significance & 95\% bootstrap CIs over cases; paired bootstrap tests with two-sided $p$ (Sec.~3.6); NumPy implementation in released code \\
-30 & Evaluation & Robustness or sensitivity analysis & Sec.~5.5--5.6: prompts, tools off, cost matrices, lesion size, edit visibility; training seeds (notebook 18) \\
-31 & Evaluation & Explainability & Evidence boxes and grounded accuracy; tool-use analysis (Sec.~5.5) \\
-32 & Evaluation & Evaluation on internal data & Sec.~5.1--5.3 (internal test, by imaging type) \\
-33 & Evaluation & Testing on external data & Sec.~5.4: four external centres, never used for training \\
-34 & Evaluation & Clinical trial registration & Not applicable \\
-35 & Results & Numbers included and excluded & Sec.~4.1, Table~\ref{tab:data}, exclusion counts in the released results log \\
-36 & Results & Demographic and clinical characteristics & Not available in most source datasets; reported where the source provides it in the released log; limitation \\
-37 & Results & Performance with uncertainty & Tables~\ref{tab:main}, \ref{tab:paired}, \ref{tab:ext} \\
-38 & Results & Diagnostic performance estimates & Per-view-kind decision rates, CIs, by imaging type and lesion size (Tables~\ref{tab:types}, \ref{tab:size}) \\
-39 & Results & Failure analysis & Sec.~5.3 (small lesions, chest X-ray, SLAKE regression), external QaTa-COV19, example failures in released reports \\
-40 & Discussion & Limitations & Sec.~6 \\
-41 & Discussion & Implications for practice & Sec.~6; research model, not for clinical use \\
-42 & Other & Protocol / technical details & Released notebooks, code and results log \\
-43 & Other & Availability of software, model, data & Data and code availability statement; Hugging Face adapters and MedScope-Bench \\
-44 & Other & Funding & No external funding; the author performed all work independently \\
+Study design (retrospective); intended use (research) & Sections 1, \ref{sec:data}; Discussion \\
+Data sources, inclusion and exclusion & Section~\ref{sec:data}, Tables~\ref{tab:data}--\ref{tab:tests} \\
+De-identification & Public de-identified sources; no new patient data \\
+Reference standard and its limits & Sections~\ref{sec:views}, \ref{sec:limits}; reader study (Section~\ref{sec:reader}) \\
+Partitions and disjointness & Patient or near-copy-group splits; test protection (Section~\ref{sec:data}) \\
+Model, initialisation, training details & Section~\ref{sec:training}; Appendix~\ref{app:repro} \\
+Selection of the final model & Section~\ref{sec:select} (pre-registered) \\
+Metrics, uncertainty, statistical tests & Sections~\ref{sec:metrics}, \ref{sec:stats} \\
+Robustness and sensitivity analyses & Sections~\ref{sec:ablation}--\ref{sec:robust} \\
+Internal and external testing & Sections~\ref{sec:main}, \ref{sec:gen} \\
+Failure analysis & Section~\ref{sec:ptx} \\
+Availability of code, model, data & Declarations \\
 \bottomrule
-\end{longtable}}
+\end{tabular}
+\end{center}
+
 \end{document}
