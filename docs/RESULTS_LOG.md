@@ -822,3 +822,21 @@ notebook 26 SIIM cases: found 33% (v4 0%). Main test: net 0.770 (v4 0.732), ESG 
 (9.6%), healthy claimed 8.3% (7.6%), CCR 0.861 (0.849). v4 stays the reported model; v4.1 is an exploratory remedy that
 recovers part of the missed finding without harming the main test. Even with SIIM training cases detection stays far
 below gemini-4-argon (69%), consistent with the frozen vision encoder limiting subtle findings (future work).
+
+## 2026-11-05 — review checks (notebook 29): factorial ablation, encoder probe, patient-level bootstrap
+
+Factorial of the two training-only components at stage 1, seed 0, main test (CCR / ESG / erased claimed / healthy
+claimed / denies intact lesion after a Telea edit elsewhere): erasures only 0.788 / 0.708 / 6.8% / 5.9% / 43%; insertions
+only 0.806 / 0.735 / 7.3% / 11.1% / 43%; control edits only 0.897 / 0.744 / 15.1% / 11.8% / 16%; both (the recipe)
+0.847 / 0.735 / 11.9% / 9.4% / 23%. ESG is the same in every arm; the control edit raises CCR (+0.109 without insertions,
++0.041 with; p <= 0.018) and removes the "edited means absent" shortcut on the unseen tool; insertions add nothing on the
+main test or the held-out tools. Fresh external net: recipe 0.061 vs control-only -0.083 (p 0.002, fewer healthy-image
+claims). Decision: keep the pre-registered recipe, report that insertions are unneeded.
+
+Linear probe on the frozen Qwen3.5-4B vision encoder (mean-pooled features, 1,200 training views, 438 test views):
+random vs original AUC 0.603 [0.584, 0.626] (ResNet-18: 0.83); target vs original 0.866; target vs random 0.860.
+
+Patient-level bootstrap: main test 507 cases from 416 patients/groups (39 groups > 1 case, largest 8); external 169 from
+155; fresh internal 76 from 75; fresh external 316 from 230 (largest 8). Intervals widen by <= 0.01 (main) and <= 0.03
+(fresh external); all 27 primary comparisons stay p < 0.001; one comparison crosses 0.05: fresh-external ESG vs Claude
+Opus 5.5, p 0.037 -> 0.060. Paper v0.9 carries all three (Tables 7, 9; Sections 5.3-5.5, 8.5).
