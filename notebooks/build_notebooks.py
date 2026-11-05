@@ -2810,7 +2810,7 @@ with zipfile.ZipFile(zpath, 'w', zipfile.ZIP_DEFLATED) as z:
                 z.write(f'{run}/{sub}', f'results/{os.path.basename(run)}/{sub}')
         n_runs += bool(kept)
     # 4. the reader-study key stays out (it would unblind the readers); say so
-    z.writestr('README_AUDIT.txt', f"""MedScope audit package, repository commit {commit}.
+    z.writestr('README_AUDIT.txt', f'''MedScope audit package, repository commit {commit}.
 repo/       the repository at this commit (code, notebooks, docs, paper/method_paper.tex and .pdf)
 history/    git log of every commit; the full patch history of docs/PREREGISTRATION_v4.md
 results/    every evaluation run: summary.json (metrics, 95% bootstrap CIs), report.md, scored.jsonl (one rescored
@@ -2819,7 +2819,7 @@ Not included: per-view transcripts and model adapters (in Drive), and the reader
 Run names: v4_final_* = the selected model; v2_<model>_<set> = comparators; v4q_<arm>_s<seed>_<set> = stage-1 arms;
 v4mg_* = MedGemma arms; *_inp_<tool>_* = held-out inpainting tools. Sets: test (main), ext (external centres),
 fresh (fresh internal), ext2 (fresh external), vqa, notools.
-""")
+''')
 print(f'{zpath}: {os.path.getsize(zpath) / 2**20:.0f} MB, {n_runs} runs')
 """),
     ]
