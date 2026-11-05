@@ -45,15 +45,15 @@
 <main>
   <section id="start" class="card">
     <h1>Image reading study</h1>
-    <p>You will see about 100 medical images (CT, MRI, X-ray, ultrasound, colonoscopy). Some are unmodified, some have been
+    <p>You will see about 130 medical images (CT, MRI, X-ray, ultrasound, colonoscopy). Some are unmodified, some have been
        digitally edited. For each image, answer two questions:</p>
     <ol>
       <li>Has the image been digitally edited?</li>
       <li>The clinical question shown under the image (for example, "Is there a polyp?").</li>
     </ol>
     <p>Answer from the image alone, without other information. Tap the image to enlarge it. There is no time limit
-       (about 1 hour in total). Your progress is saved on this device, so you can stop and come back in the same browser.
-       At the end you download a small answer file and send it to the study team.</p>
+       (about 1.5 to 2 hours in total). Your progress is saved on this device, so you can stop and come back in the same
+       browser. At the end you download a small answer file and send it to the study team.</p>
     <h2>Your initials or reader code</h2>
     <input id="reader" type="text" autocomplete="off" placeholder="e.g. AB" maxlength="20">
     <div class="bar"><span class="meta" id="resume-note"></span><button class="primary" id="go" disabled>Start</button></div>
@@ -93,12 +93,12 @@
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  let items = [], order = [], answers = {}, pos = 0, reader = '', shownAt = 0;
+  let items = [], order = [], answers = {}, pos = 0, reader = '', shownAt = 0, pack = '';
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   };
-  const key = () => 'reader-study:' + reader.toLowerCase();
+  const key = () => 'reader-study:' + pack + ':' + reader.toLowerCase();   // progress is per pack: a new pack starts afresh
 
   function seeded(str) {           // deterministic shuffle per reader: each reader sees their own order
     let h = 2166136261;
@@ -142,7 +142,7 @@
   }
 
   function payload() {
-    return JSON.stringify({ reader, finished: new Date().toISOString(), n_items: order.length,
+    return JSON.stringify({ reader, pack, finished: new Date().toISOString(), n_items: order.length,
                             user_agent: navigator.userAgent, answers: order.map(id => ({ id, ...answers[id] })) }, null, 1);
   }
 
@@ -177,7 +177,7 @@
     catch (e) { $('copied').textContent = 'Copy not allowed here: use Download answers.'; }
   });
 
-  fetch('items.json').then(r => r.json()).then(d => { items = d.items; })
+  fetch('items.json').then(r => r.json()).then(d => { items = d.items; pack = d.pack || ''; })
     .catch(() => { $('start').insertAdjacentHTML('beforeend', '<p>Could not load the study images.</p>'); });
 })();
 </script>

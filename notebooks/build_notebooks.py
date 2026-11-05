@@ -2606,9 +2606,12 @@ def nb28_reader_study() -> list[dict]:
 # MedScope 28: reader study (physicians)
 
 Two questions per image, answered by physician readers on a web page: has the image been digitally edited, and is the
-finding there? The page mixes, in equal numbers and from different cases, unmodified lesion images, lesion-erased
-images (the LaMa erasures the models were tested on) and unmodified lesion-free images, so "no lesion" is not a cue for
-"edited". The page holds no answer key; the key stays in Drive.
+finding there? The page mixes, in equal numbers (32 each, 128 in all) and from different cases: unmodified lesion
+images, lesion-erased images (the LaMa erasures the models were tested on), control-edited images (the same shape
+erased elsewhere with the same tool, lesion intact) and unmodified lesion-free images. Lesion-free images mean "no
+lesion" is not a cue for "edited"; control-edited images let readers rate the control edit as well as the erasure.
+The page holds no answer key; the key stays in Drive. This is pack 2 (the first pack had no control-edited images);
+every answer file names its pack, and files from the first pack are not scored against this key.
 
 **Before you start (once):**
 1. On GitHub create an empty **public** repository named `medscope-reader` (no README).
@@ -2617,22 +2620,25 @@ images (the LaMa erasures the models were tested on) and unmodified lesion-free 
 3. After section 1 has run: in `medscope-reader` -> Settings -> Pages, choose *Deploy from a branch*, branch `main`,
    folder `/ (root)`, Save. The page appears at `https://bhaskargurram-ai.github.io/medscope-reader/` within a minute.
 
-**Runtime:** CPU is fine. Section 1 takes about 5 minutes. Run section 2 after the readers have sent their answer files:
-put them (`reader_XX.json`) in `MyDrive/medscope/reader/answers/`.
+**Runtime:** CPU is fine. Section 1 takes about 5 minutes and republishes the page (readers who had started the
+first pack start again; their saved progress is kept apart). Run section 2 after the readers have sent their answer
+files: put them (`reader_XX.json`) in `MyDrive/medscope/reader/answers/`.
 """),
         code(SETUP), code(RESTORE_ALL),
         md("## 1. Build the page and publish it"),
         code(r"""
 RS = f'{DRIVE}/reader'
 os.makedirs(f'{RS}/answers', exist_ok=True)
-PACK = f'{WORK}/reader_pack'
-if not os.path.exists(f'{RS}/key.json'):
+PACK = f'{WORK}/reader_pack2'
+KEY = f'{RS}/key_v2.json'            # pack 2: four kinds; the first pack's key.json and site.tar stay as they are
+if not os.path.exists(KEY):
     !python scripts/make_reader_study.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {PACK} --per-kind 32 --seed 0
-    !cp {PACK}/key.json {RS}/key.json
-    !cd {PACK}/site && tar -cf {RS}/site.tar .
+    !cp {PACK}/key.json {KEY}
+    !cd {PACK}/site && tar -cf {RS}/site_v2.tar .
 elif not os.path.exists(f'{PACK}/site/index.html'):
     os.makedirs(f'{PACK}/site', exist_ok=True)
-    !tar -C {PACK}/site -xf {RS}/site.tar
+    !tar -C {PACK}/site -xf {RS}/site_v2.tar
+    !cp reader/index.html {PACK}/site/index.html
 tok = (secret('GITHUB_TOKEN') or '').strip()
 if not tok:
     raise SystemExit('Add the Colab secret GITHUB_TOKEN (write access to medscope-reader), then rerun this cell.')
@@ -2651,7 +2657,102 @@ import glob
 answers = sorted(glob.glob(f'{RS}/answers/*.json'))
 print(len(answers), 'answer file(s):', [os.path.basename(a) for a in answers])
 if answers:
-    !python scripts/make_reader_study.py --score --key {RS}/key.json --answers {' '.join(answers)} --out {RESULTS}/reader_study.md
+    !python scripts/make_reader_study.py --score --key {KEY} --answers {' '.join(answers)} --out {RESULTS}/reader_study.md
+"""),
+    ]
+
+
+def nb29_review() -> list[dict]:
+    """Three checks asked for by the independent review: a factorial ablation that separates the control edit from
+    lesion insertion, a linear probe on the frozen vision encoder, and patient-level bootstrap intervals."""
+    c = nb25_v4_recipe()
+    ctrl = ("--views {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl --negatives {TRAIN_NEG_V4} "
+            "--kinds original target_removal random_removal natural_negative degraded --epochs 3 --max-steps {S1_STEPS} "
+            "--schedule-steps {S1_TOTAL} --mode agentic --window-prob 0.3 --small-zoom --oversample-small 2 --paraphrase-prob 0.5")
+    ins = ("--views {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl {V4}/inserted/views.jsonl --negatives {TRAIN_NEG_V4} "
+           "--kinds original target_removal natural_negative degraded --epochs 3 --max-steps {S1_STEPS} "
+           "--schedule-steps {S1_TOTAL} --mode agentic --window-prob 0.3 --small-zoom --oversample-small 2 --paraphrase-prob 0.5")
+    frontier = [r for r, _, _ in FRONTIER]
+    return [
+        md("""
+# MedScope 29: review checks (factorial ablation, encoder probe, patient-level bootstrap)
+
+Three analyses the independent review of the manuscript asked for. Nothing here changes the selected model or any
+confirmatory number; every result goes into the paper's robustness and limitations sections.
+
+| Part | What | Why | GPU time |
+| --- | --- | --- | --- |
+| 1 | Two more stage-1 arms, like-for-like with notebook 25: **control edits without insertions** and **insertions without control edits** | notebook 25's erasures-only arm removed both at once; this separates them (2 x 2 with the recipe and erasures-only arms) | about 6.5 h each, run at the same time on one A100 |
+| 2 | **Linear probe on the frozen vision encoder**: can the features the adapter receives tell edited from unedited images? | the paper argued the frozen encoder limits edit detection; this measures it | about 15 min |
+| 3 | **Patient-level bootstrap** of the paper's main comparisons | several images can come from one patient; the case-level intervals may be too narrow | CPU, about 20 min |
+
+Open it on an **A100** runtime and choose **Run all**. Nothing to set. Every step resumes: a second run skips what is
+done. The report is published to Drive at the end (`results/29_review_checks_report.md`).
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        c[7],                                   # S1_STEPS, test_all, BATCH
+        md("## 1. Factorial ablation: the two missing arms, trained together on one GPU"),
+        code(f"""
+ARGS = {{'ctrl': f'{ctrl}', 'ins': f'{ins}'}}
+import threading, subprocess, time, shutil, sys
+def train_and_test(arm):
+    name = f'v4q_{{arm}}_s0'
+    out = f'{{ADAPTERS}}/{{name}}'
+    if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+        a = ARGS[arm]
+        !python scripts/train_sft.py --model {BASE} {{a}} --seed 0 --out {{out}}
+    done = json.load(open(f'{{out}}/state.json'))['opt_step']
+    if abs(done - S1_STEPS) > 0.02 * S1_STEPS:
+        raise SystemExit(f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like, stop and report this')
+    test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+os.environ['OMP_NUM_THREADS'] = str(max(2, (os.cpu_count() or 8) // 2))
+errors = []
+def guarded(arm):
+    try:
+        train_and_test(arm)
+    except BaseException as e:      # noqa: BLE001 - reported after both arms have finished
+        errors.append(f'{{arm}}: {{str(e)[:300]}}')
+threads = [threading.Thread(target=guarded, args=(arm,)) for arm in ('ctrl', 'ins')]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+if errors:
+    raise SystemExit(' | '.join(errors))
+print('both arms trained and tested')
+"""),
+        md("## 2. Linear probe on the frozen vision encoder"),
+        code(f"""
+PROBE = f'{{RESULTS}}/encoder_probe'
+if not os.path.exists(f'{{PROBE}}/probe.md'):
+    REF = 'For comparison, a ResNet-18 fine-tuned on the same task separates random-removal from original views with test AUC 0.83 [0.80, 0.87] (paper, Section 5.4).'
+    !python scripts/encoder_probe.py --model {BASE} --train {{TRAIN_V4_BASE}} --test {{TEST_VIEWS}} --out {{PROBE}} --per-kind 600 --reference '{{REF}}'
+print(open(f'{{PROBE}}/probe.md').read())
+"""),
+        md("## 3. Patient-level bootstrap of the paper's comparisons (CPU)"),
+        code(f"""
+sets = [
+    f"Main test, MedScope-4B vs nine frontier models=v4_final_test:{','.join(frontier)}:{{TEST_VIEWS}} {{TEST_NEG}}",
+    f"Main test, recipe vs ablation arms=v4q_cf_s0_test:v4q_nocf_s0_test,v4q_nocfabs_s0_test,v4q_tgt_s0_test,v4q_ctrl_s0_test,v4q_ins_s0_test:{{TEST_VIEWS}} {{TEST_NEG}}",
+    f"External centres, MedScope-4B vs flagships=v4_final_ext:v2_gpt6astra_ext,v2_claudeopus_ext,v2_gemini_ext:{{EXT_VIEWS}}",
+    f"Fresh internal, MedScope-4B vs flagships=v4_final_fresh:v2_gpt6astra_fresh,v2_claudeopus_fresh,v2_gemini_fresh:{{FRESH}}",
+    f"Fresh external, MedScope-4B vs flagships=v4_final_ext2:v2_gpt6astra_ext2,v2_claudeopus_ext2,v2_gemini_ext2:{{EXT2}}",
+]
+import shlex
+!python scripts/cluster_bootstrap.py --results {{RESULTS}} {{' '.join('--set ' + shlex.quote(x) for x in sets)}} --out {{RESULTS}}/patient_bootstrap.md
+"""),
+        md("## 4. Summaries and report"),
+        code(r"""
+!python scripts/inpainter_summary.py --results {RESULTS} --inpainters telea transplant diffusion --model 'Recipe (control edits + insertions)=v4q_cf_s0_test' --model 'Control edits, no insertions=v4q_ctrl_s0_test' --model 'Insertions, no control edits=v4q_ins_s0_test' --model 'Erasures only=v4q_tgt_s0_test' --model 'Without CF=v4q_nocf_s0_test' --ref 'Recipe (control edits + insertions)' --training-tools lama transplant --out {RESULTS}/inpainters_factorial.md
+"""),
+        publish("MedScope report - 29 review checks", f"""
+    ('Factorial ablation, main test: recipe vs each arm (paired)', significance_table(RESULTS, 'v4q_cf_s0_test', ['v4q_ctrl_s0_test', 'v4q_ins_s0_test', 'v4q_tgt_s0_test', 'v4q_nocf_s0_test'])),
+    ('Factorial ablation, main test: control edits vs insertions (paired)', significance_table(RESULTS, 'v4q_ctrl_s0_test', ['v4q_ins_s0_test', 'v4q_tgt_s0_test'])),
+    ('Factorial ablation, external centres: recipe vs each arm', significance_table(RESULTS, 'v4q_cf_s0_ext', ['v4q_ctrl_s0_ext', 'v4q_ins_s0_ext', 'v4q_tgt_s0_ext'])),
+    ('Factorial ablation, fresh external: recipe vs each arm', significance_table(RESULTS, 'v4q_cf_s0_ext2', ['v4q_ctrl_s0_ext2', 'v4q_ins_s0_ext2', 'v4q_tgt_s0_ext2'])),
+    ('Held-out inpainting tools, all five arms', read_text(f'{{RESULTS}}/inpainters_factorial.md')),
+    ('Linear probe on the frozen vision encoder', read_text(f'{{RESULTS}}/encoder_probe/probe.md')),
+    ('Patient-level bootstrap', read_text(f'{{RESULTS}}/patient_bootstrap.md')),
 """),
     ]
 
@@ -2745,6 +2846,7 @@ NOTEBOOKS = {
     "26b_pneumothorax_diagnosis.ipynb": nb26b_diagnosis,
     "27_v41_pneumothorax_fix.ipynb": nb27_v41,
     "28_reader_study.ipynb": nb28_reader_study,
+    "29_review_checks.ipynb": nb29_review,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

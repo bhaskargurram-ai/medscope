@@ -58,6 +58,8 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `26_siim_fullres` | Post hoc (exploratory): the fresh-external SIIM pneumothorax cases rebuilt at original resolution, same models | A100 or L4 | ~1 h |
 | `26b_pneumothorax_diagnosis` | Post hoc: why pneumothorax is missed (training targets per stage, detection by stage, lesion size, question swap) | A100 or L4 | ~20 min |
 | `27_v41_pneumothorax_fix` | Post hoc: v4.1, stage 3 redone with SIIM pneumothorax training patients; tested on new SIIM patients and every earlier test | A100 | ~4-5 h |
+| `28_reader_study` | Reader study: builds and publishes the blinded page (128 images: unmodified, lesion-erased, control-edited, lesion-free), later scores the readers' answer files | CPU | ~5 min + scoring |
+| `29_review_checks` | Review checks: factorial ablation (control edits vs insertions), linear probe on the frozen vision encoder, patient-level bootstrap | A100 | ~9 h |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.

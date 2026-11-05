@@ -335,11 +335,11 @@ class ReaderStudyTest(unittest.TestCase):
         for src in ("chestxdet", "busi"):
             for i in range(8):
                 cid = f"{src}{i:03d}_finding"
-                for kind in ("original", "target_removal"):
+                for kind in ("original", "target_removal", "random_removal"):
                     p = t / f"{cid}_{kind}.png"
                     Image.fromarray(np.full((20, 20), i, np.uint8)).save(p)
                     views.append({"view_id": f"{cid}__{kind}", "case_id": cid, "patient_id": "p", "kind": kind,
-                                  "image_path": str(p), "question": "Is there a lesion?", "answer": "Yes" if kind == "original" else "No",
+                                  "image_path": str(p), "question": "Is there a lesion?", "answer": "No" if kind == "target_removal" else "Yes",
                                   "answer_aliases": [], "lesion_box": [1, 1, 5, 5], "critical": False, "meta": {}})
                 n = t / f"{src}{i:03d}neg.png"
                 Image.fromarray(np.full((20, 20), 9, np.uint8)).save(n)
@@ -351,20 +351,75 @@ class ReaderStudyTest(unittest.TestCase):
         script = Path(__file__).resolve().parent.parent / "scripts" / "make_reader_study.py"
         subprocess.run([sys.executable, str(script), "--views", str(t / "v.jsonl"), "--negatives", str(t / "n.jsonl"),
                         "--out", str(t / "pack"), "--per-kind", "4"], check=True, capture_output=True)
-        items = json.loads((t / "pack" / "site" / "items.json").read_text())["items"]
-        key = json.loads((t / "pack" / "key.json").read_text())
-        self.assertEqual(len(items), 12)
-        self.assertEqual(sorted(k["kind"] for k in key).count("target_removal"), 4)
-        self.assertEqual(len({k["case_id"] for k in key}), 12)                    # every image from a different case
+        site = json.loads((t / "pack" / "site" / "items.json").read_text())
+        items, pack = site["items"], site["pack"]
+        key_file = json.loads((t / "pack" / "key.json").read_text())
+        key = key_file["items"]
+        self.assertEqual(key_file["pack"], pack)
+        self.assertEqual(len(items), 16)
+        kinds = [k["kind"] for k in key]
+        self.assertEqual([kinds.count(k) for k in ("original", "target_removal", "random_removal", "natural_negative")], [4, 4, 4, 4])
+        self.assertEqual(len({k["case_id"] for k in key}), 16)                    # every image from a different case
+        self.assertTrue(all(k["edited"] == (k["kind"] in ("target_removal", "random_removal")) for k in key))
+        self.assertTrue(all(k["finding_present"] == (k["kind"] in ("original", "random_removal")) for k in key))
         page = json.dumps(items) + (t / "pack" / "site" / "index.html").read_text()
-        self.assertNotIn("target_removal", page)                                  # no answer key in what readers see
-        self.assertNotIn("natural_negative", page)
+        for word in ("target_removal", "random_removal", "natural_negative"):
+            self.assertNotIn(word, page)                                          # no answer key in what readers see
         answers = [{"id": k["id"], "edited": "4" if k["edited"] else "1", "finding": "yes" if k["finding_present"] else "no"}
                    for k in key]
         for name in ("AB", "CD"):
-            (t / f"{name}.json").write_text(json.dumps({"reader": name, "answers": answers}))
-        subprocess.run([sys.executable, str(script), "--score", "--key", str(t / "pack" / "key.json"), "--answers",
-                        str(t / "AB.json"), str(t / "CD.json"), "--out", str(t / "r.md")], check=True, capture_output=True)
+            (t / f"{name}.json").write_text(json.dumps({"reader": name, "pack": pack, "answers": answers}))
+        (t / "OLD.json").write_text(json.dumps({"reader": "OLD", "pack": "000000000000", "answers": answers}))   # another pack
+        r = subprocess.run([sys.executable, str(script), "--score", "--key", str(t / "pack" / "key.json"), "--answers",
+                            str(t / "AB.json"), str(t / "CD.json"), str(t / "OLD.json"), "--out", str(t / "r.md")],
+                           check=True, capture_output=True, text=True)
         report = (t / "r.md").read_text()
-        self.assertIn("| AB | 12 | 4/4 | 0/8 | 1.00 | 100% |", report)
-        self.assertIn("AB vs CD: Cohen's kappa 1.00 on 12 images", report)
+        self.assertIn("skipping", r.stdout)                                      # the other pack's file is not scored
+        self.assertIn("2 reader(s)", report)
+        self.assertIn("| AB | 16 | 4/4 | 4/4 | 0/8 | 1.00 | 0.50 | 100% |", report)    # erasure and control equally "edited"
+        self.assertIn("Residual finding on lesion-erased images, all readers pooled: 0/8 = 0.0%, exact 95% CI [0.0%, 36.9%]", report)
+        self.assertIn("AB vs CD: Cohen's kappa 1.00 on 16 images", report)
+
+
+class PatientBootstrapTest(unittest.TestCase):
+    def test_groups_are_resampled_together(self):
+        import numpy as np
+        from medscope.eval.compare import paired_bootstrap
+        from medscope.rewards import Outcome
+
+        def outcome(case, reward):
+            return Outcome(view_id=f"{case}__original", case_id=case, kind="original", action="answer", correct=True,
+                           iou=0.0, confidence=None, tool_calls=0, malformed=False, reward=reward, breakdown={})
+        # 20 cases, two per patient; a's reward exceeds b's by 1 on every case of half the patients
+        a, b = [], []
+        for i in range(20):
+            a.append(outcome(f"c{i}", 1.0 if (i // 2) % 2 == 0 else 0.0))
+            b.append(outcome(f"c{i}", 0.0))
+        groups = {f"c{i}": f"p{i // 2}" for i in range(20)}
+        case_level = paired_bootstrap(a, b, "net_utility", n=400)
+        patient_level = paired_bootstrap(a, b, "net_utility", n=400, groups=groups)
+        self.assertEqual(case_level["n_units"], 20)
+        self.assertEqual(patient_level["n_units"], 10)
+        self.assertAlmostEqual(case_level["diff"], patient_level["diff"])
+        width = lambda r: r["ci_high"] - r["ci_low"]  # noqa: E731
+        self.assertGreater(width(patient_level), width(case_level) * 1.1)         # fewer independent units: wider interval
+
+
+class EncoderProbeTest(unittest.TestCase):
+    def test_probe_finds_a_separable_pair_and_not_an_inseparable_one(self):
+        import numpy as np
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import encoder_probe
+        rng = np.random.default_rng(0)
+        kinds = np.array(["original", "random_removal", "target_removal"] * 100)
+        cases = np.array([f"c{i // 3}" for i in range(300)])
+        x = rng.normal(size=(300, 8))
+        x[kinds == "target_removal", 0] += 3.0                 # erasure leaves a trace; the random edit leaves none
+        rows = encoder_probe.probe(x[:210], kinds[:210], x[210:], kinds[210:], cases[210:], seed=0)
+        by = {(r["positive"], r["negative"]): r["auc"] for r in rows}
+        self.assertLess(by[("random_removal", "original")], 0.65)
+        self.assertGreater(by[("target_removal", "original")], 0.9)
+        self.assertGreater(by[("target_removal", "random_removal")], 0.9)
+
