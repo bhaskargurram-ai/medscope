@@ -1,6 +1,6 @@
 # Response to the independent review of MedScope
 
-Current draft: v0.11 (5 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
+Current draft: v0.12 (5 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
 
 Review rounds: v0.7 from the PDF alone (54/100); package `7b15d59` (64/100); package `d029d26` (67/100). The
 third round rescored 134,309 outcome rows from the transcripts with the repository's own code and found zero
@@ -26,6 +26,7 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 | F09 | Linear probe on the frozen encoder's output | random-removal vs original AUC 0.60 [0.58, 0.63] (ResNet-18 0.83); target vs random 0.86, which reflects the lesion and any anatomy-dependent trace | Section 5.4 |
 | F10 | Every comparison rerun resampling patients or near-copy groups | Main test 507 cases from 416 groups; all 27 primary comparisons survive Bonferroni with p ≤ 0.001 (one at 0.001); one secondary comparison crosses 0.05 (fresh-external ESG vs Claude Opus 5.5, 0.037 → 0.060) | Sections 3.8, 5.5, 5.6 |
 | F15 | Reader pack rebuilt with a control-edited arm: 128 images, 32 per kind, pack id in every answer file | Readers in progress | Section 7 |
+| F18 | Pixel-level crosswalk (notebook 31): every unedited image of every split and cohort hashed, pairs within 8 bits confirmed by pixel correlation; two tiers (identical, near copy); id overlap per pair of sets | Running; result goes into Section 4.1 | Section 4.1, limitations |
 
 ## 3. Findings by ID
 
@@ -48,7 +49,7 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 | F15 | Done | Reader pack 2 |
 | F16 | Fixed | Cost matrix described as an assumption |
 | F17 | Fixed | Pneumothorax: "most plausible explanation", post-hoc, repair not demonstrated |
-| F18 | Partly | Identifier-level disjointness verified by the auditor; cross-dataset patient crosswalk (SIIM/ChestX-Det/ChestX-ray14, TCGA/BraTS) not done |
+| F18 | Mostly | Identifier-level disjointness verified by the auditor; pixel-level crosswalk across all six sets added (notebook 31, result pending); BraTS 2023 meningioma vs TCGA-LGG disjoint by cohort design; same-patient different-image overlap between SIIM-ACR and ChestX-Det stated as not excludable without NIH ids, and as a limitation that would bias the pneumothorax result optimistically if present |
 | F19 | Fixed | He et al. (NAACL 2025) added; positioning against causal VQA sharpened |
 | F20 | Mostly | QC criterion, prompt examples and main-test API cost filled; draft-status box corrected; AI-use declaration and reader ethics still bracketed |
 | F21 | Fixed | "Comparator-model consensus panel, not a clinical reference standard" |
@@ -77,7 +78,7 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 
 - Reader-study results, reader qualifications, consent and ethics statement (readers in progress; more than
   32 erased images would be needed to bound the residual rate below 10%).
-- Cross-dataset patient crosswalk (F18) and a focused comparator sensitivity analysis on instructions, settings and
-  input resolution against the strongest comparators (F13, F14).
+- The crosswalk count (F18, notebook 31 running) and a focused comparator sensitivity analysis on instructions,
+  settings and input resolution against the strongest comparators (F13, F14).
 - Figure 2 provenance and licences (F29); generative-AI-use declaration; two references to verify (F20, F27).
 - The 22 manifests missing from the package.

@@ -2847,6 +2847,39 @@ print(f'{zpath}: {os.path.getsize(zpath) / 2**20:.0f} MB, {n_runs} runs, {n_man}
     ]
 
 
+def nb31_crosswalk() -> list[dict]:
+    """Do any two sets share an image? Pixel-level crosswalk across every split and cohort (CPU)."""
+    return [
+        md("""
+# MedScope 31: cross-set crosswalk
+
+The audit confirmed that no case id or patient/group id is shared between training, validation and the four
+evaluation cohorts. Ids do not cross datasets, though, and some sources share an origin: SIIM-ACR (fresh external)
+and ChestX-Det (training and main test) both draw on NIH ChestX-ray14. This notebook compares the images themselves:
+a 64-bit difference hash of every unedited image (originals and lesion-free images) in every set, every hash
+within 8 bits of a hash in another set confirmed by pixel correlation at 64 px, reported at two tiers (same image:
+within 4 bits and correlation >= 0.98, the repository's near-copy test; near: within 8 bits and >= 0.90), plus the
+case-id and patient/group-id overlap between every pair of sets.
+
+Sets: training (base, transplant and insertion pools, lesion-free training images), validation, main test, external
+centres, fresh internal, fresh external.
+
+**Runtime:** CPU only. About 10-20 minutes (hashing about 15,000 images). Writes `results/crosswalk.md` and
+publishes a report.
+""" + SECRETS_NOTE),
+        code(SETUP), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(r"""
+import shlex
+sets = [f'Training={TRAIN_V4} {TRAIN_NEG_V4}', f'Validation={VAL_V4} {VAL_NEG_V4}', f'Main test={TEST_VIEWS} {TEST_NEG}',
+        f'External centres={EXT_VIEWS}', f'Fresh internal={FRESH}', f'Fresh external={EXT2}']
+!python scripts/crosswalk.py {' '.join('--set ' + shlex.quote(x) for x in sets)} --out {RESULTS}/crosswalk.md
+"""),
+        publish("MedScope report - 31 crosswalk", f"""
+    ('Cross-set crosswalk', read_text(f'{{RESULTS}}/crosswalk.md')),
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -2938,6 +2971,7 @@ NOTEBOOKS = {
     "28_reader_study.ipynb": nb28_reader_study,
     "29_review_checks.ipynb": nb29_review,
     "30_audit_package.ipynb": nb30_audit,
+    "31_crosswalk.ipynb": nb31_crosswalk,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

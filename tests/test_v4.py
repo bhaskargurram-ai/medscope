@@ -423,3 +423,46 @@ class EncoderProbeTest(unittest.TestCase):
         self.assertGreater(by[("target_removal", "original")], 0.9)
         self.assertGreater(by[("target_removal", "random_removal")], 0.9)
 
+
+
+class CrosswalkTest(unittest.TestCase):
+    def test_finds_the_shared_image_and_the_resized_copy_only(self):
+        import json
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+        import numpy as np
+        from PIL import Image
+        t = Path(tempfile.mkdtemp())
+        rng = np.random.default_rng(0)
+        pics = [rng.integers(0, 255, (64, 64), np.uint8) for _ in range(4)]
+        pics = [np.asarray(Image.fromarray(p).resize((128, 128), Image.BILINEAR)) for p in pics]   # smooth, so hashes are stable
+        def row(cid, pid, kind, path):
+            return {"view_id": f"{cid}__{kind}", "case_id": cid, "patient_id": pid, "kind": kind, "image_path": str(path),
+                    "question": "Is there a lesion?", "answer": "Yes", "answer_aliases": [], "lesion_box": [1, 1, 5, 5],
+                    "critical": False, "meta": {}}
+        a, b = [], []
+        for i, p in enumerate(pics[:3]):                                   # set A: three distinct images
+            Image.fromarray(p).save(t / f"a{i}.png")
+            a.append(row(f"a{i}", f"pa{i}", "original", t / f"a{i}.png"))
+        Image.fromarray(pics[0]).save(t / "b0.png")                                                   # same image as a0
+        Image.fromarray(pics[1]).resize((96, 96), Image.BILINEAR).save(t / "b1.png")                  # a1 resized
+        Image.fromarray(pics[3]).save(t / "b2.png")                                                   # unrelated
+        b = [row("b0", "pb0", "original", t / "b0.png"), row("b1", "pa1", "original", t / "b1.png"),
+             row("b2", "pb2", "natural_negative", t / "b2.png")]
+        (t / "a.jsonl").write_text("".join(json.dumps(x) + "\n" for x in a))
+        (t / "b.jsonl").write_text("".join(json.dumps(x) + "\n" for x in b))
+        script = Path(__file__).resolve().parent.parent / "scripts" / "crosswalk.py"
+        subprocess.run([sys.executable, str(script), "--set", f"A={t / 'a.jsonl'}", "--set", f"B={t / 'b.jsonl'}",
+                        "--out", str(t / "cw.md")], check=True, capture_output=True)
+        md = (t / "cw.md").read_text()
+        rows = [l for l in md.splitlines() if l.startswith("| A | B |")]
+        self.assertEqual(len(rows), 3, md)                                   # summary row + two match rows
+        summary = [c.strip() for c in rows[0].split("|")[1:-1]]
+        self.assertEqual(summary[2], "1", md)                                # one identical image
+        self.assertEqual(summary[3], "1", md)                                # one near copy (resized)
+        self.assertEqual(summary[4], "0", md)                                # no shared case ids
+        self.assertEqual(summary[5], "1", md)                                # pa1 appears in both sets
+        self.assertIn("| a0 (pa0) | b0 (pb0) |", md)
+        self.assertIn("| a1 (pa1) | b1 (pa1) |", md)
