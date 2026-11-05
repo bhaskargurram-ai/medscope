@@ -2771,13 +2771,20 @@ Builds one ZIP that lets a reviewer without access to GitHub or Drive trace ever
 - the reports behind the tables: notebooks 23, 24, 25, 26, 26b, 27, 29 and the seed, inpainter, probe and
   patient-bootstrap summaries;
 - every evaluation run under `results/`: `summary.json` (metrics with bootstrap CIs), `report.md`, `scored.jsonl`
-  (one rescored row per view: action, correctness, reward, claims) and `outcomes.jsonl`. Transcripts and adapters are
-  left out to keep the ZIP small; they stay in Drive.
+  (one rescored row per view: action, correctness, reward, claims), `outcomes.jsonl` and `transcripts.jsonl` (every
+  model reply, so answers can be re-parsed);
+- the view manifests of every split (`views*.jsonl`, `negatives*.jsonl`: view ids, case ids, patient or near-copy
+  group ids, questions, answers, lesion boxes; image paths but no images), so splits, patient mapping and the
+  patient-level bootstrap can be rerun;
+- the encoder probe's cached features (`features_*.npz`), so the probe can be refitted without a GPU.
 
-**Runtime:** CPU. About 5 minutes. The ZIP is written to `MyDrive/medscope/audit/`; download it from Drive and send
+Model adapters and images are left out (in Drive and the public datasets). The reader-study answer key is left out
+while readers are blinded.
+
+**Runtime:** CPU. About 10 minutes. The ZIP is written to `MyDrive/medscope/audit/`; download it from Drive and send
 it to the reviewer with `docs/reviews/RESPONSE_v09.md`.
 """ + SECRETS_NOTE),
-        code(SETUP),
+        code(SETUP), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
         code(r"""
 import glob, zipfile, time
 commit = git('rev-parse', '--short', 'HEAD', cwd='/content/medscope').stdout.strip()
@@ -2802,25 +2809,40 @@ with zipfile.ZipFile(zpath, 'w', zipfile.ZIP_DEFLATED) as z:
         z.write(f, 'results/' + os.path.basename(f))
     # 3. every run: metrics, report, rescored rows, raw outcomes
     for run in sorted(d for d in glob.glob(f'{RESULTS}/*') if os.path.isdir(d)):
-        kept = [f for f in ('summary.json', 'report.md', 'scored.jsonl', 'outcomes.jsonl') if os.path.exists(f'{run}/{f}')]
+        kept = [f for f in ('summary.json', 'report.md', 'scored.jsonl', 'outcomes.jsonl', 'transcripts.jsonl')
+                if os.path.exists(f'{run}/{f}')]
         for f in kept:
             z.write(f'{run}/{f}', f'results/{os.path.basename(run)}/{f}')
-        for sub in ('probe.md', 'probe.json'):                    # the encoder probe folder
+        for sub in ('probe.md', 'probe.json', 'features_train.npz', 'features_test.npz'):   # the encoder probe folder
             if os.path.exists(f'{run}/{sub}'):
                 z.write(f'{run}/{sub}', f'results/{os.path.basename(run)}/{sub}')
         n_runs += bool(kept)
+    # 3b. view manifests of every split: ids, patient/group ids, questions, answers, boxes (image paths, no images)
+    n_man = 0
+    for f in sorted(set(glob.glob(f'{WORK}/**/views*.jsonl', recursive=True) + glob.glob(f'{WORK}/**/negatives*.jsonl', recursive=True)
+                        + glob.glob(f'{WORK}/**/views_negatives*.jsonl', recursive=True) + glob.glob(f'{DRIVE}/slake/negatives/*.jsonl'))):
+        z.write(f, 'manifests/' + os.path.relpath(f, '/content').replace('drive/MyDrive/medscope/', 'drive_'))
+        n_man += 1
+    for f in glob.glob(f'{DRIVE}/inpaint_test/*/views.jsonl'):
+        z.write(f, 'manifests/inpaint_test/' + f.split('/')[-2] + '/views.jsonl')
+        n_man += 1
     # 4. the reader-study key stays out (it would unblind the readers); say so
     z.writestr('README_AUDIT.txt', f'''MedScope audit package, repository commit {commit}.
 repo/       the repository at this commit (code, notebooks, docs, paper/method_paper.tex and .pdf)
 history/    git log of every commit; the full patch history of docs/PREREGISTRATION_v4.md
 results/    every evaluation run: summary.json (metrics, 95% bootstrap CIs), report.md, scored.jsonl (one rescored
-            row per view), outcomes.jsonl (raw); and the reports of notebooks 23-29 at the top level
-Not included: per-view transcripts and model adapters (in Drive), and the reader-study answer key (would unblind readers).
+            row per view), outcomes.jsonl (raw), transcripts.jsonl (every model reply); the reports of notebooks
+            23-29 at the top level; results/encoder_probe/features_*.npz = the probe's cached encoder features
+manifests/  the view manifests of every split (view id, case id, patient or near-copy group id, kind, question,
+            answer, lesion box, image path). Images are not included: they are the public datasets' own files.
+Not included: model adapters (in Drive) and the reader-study answer key (would unblind readers).
+Historical runs: the four neg_* runs (notebook 02b, October 2026) were summarised on an earlier 181-view version of
+the natural-negative set; their outcomes.jsonl holds 218 rows from the later set. They are not used in the paper.
 Run names: v4_final_* = the selected model; v2_<model>_<set> = comparators; v4q_<arm>_s<seed>_<set> = stage-1 arms;
 v4mg_* = MedGemma arms; *_inp_<tool>_* = held-out inpainting tools. Sets: test (main), ext (external centres),
 fresh (fresh internal), ext2 (fresh external), vqa, notools.
 ''')
-print(f'{zpath}: {os.path.getsize(zpath) / 2**20:.0f} MB, {n_runs} runs')
+print(f'{zpath}: {os.path.getsize(zpath) / 2**20:.0f} MB, {n_runs} runs, {n_man} manifests')
 """),
     ]
 

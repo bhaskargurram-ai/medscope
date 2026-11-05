@@ -81,8 +81,10 @@ def random_denial_rate(outs: list[Outcome]) -> float:
 def evidence_sensitivity_gap(outs: list[Outcome]) -> float:
     """Treats the erased lesion as absent, minus doing so when an equal edit left it intact.
 
-    Always answering "Yes", always "No" and always referring all score 0; an edit detector
-    scores 0 too, since both views are edited. Only reading the lesion itself scores high."""
+    Always answering "Yes", always "No" and always referring all score 0, and so does a policy that
+    responds to the two edits alike (both views are edited with the same tool and shape). A high value
+    is consistent with reading the lesion; anatomy-dependent traces of the erasure can also contribute,
+    which the held-out tools, the clean-erasure split and the encoder probe bound but do not exclude."""
     return target_safe_rate(outs) - random_denial_rate(outs)
 
 

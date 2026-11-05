@@ -80,3 +80,23 @@ The main-test frontier runs (31 October) predate the v4 pre-registration (1 Nove
 
 Request to the reviewer: re-score against v0.9 with the repository and the Drive results folder, and say which of
 the open items above would change the recommendation.
+
+## 5. Update after the audit of package `7b15d59` (v0.10)
+
+The audit recomputed every main-test number, the 27 primary comparisons and the selection rule from the package and
+withdrew "untraceable" (score 64/100). Changes made in response:
+
+- Section 3.8: the 27-comparison family and the Bonferroni check are described as a post-review check, not as
+  pre-specified; Section 3.6 describes the pre-registration as a versioned plan whose data and split rules were
+  revised in commits on 1 November before any data was built.
+- Section 5.1: Qwen3-VL-8B's 12.8% is above MedScope's 9.6%; the sentence now says so.
+- Section 5.3 and limitations: insertions described as having endpoint-dependent, interacting effects (no benefit
+  on the main test, a benefit on the fresh external set), not as "adding nothing"; the single-seed factorial no
+  longer claims equal ESG.
+- Section 5.4: the 0.86 probe AUC described as lesion plus any anatomy-dependent trace; a linear probe on pooled
+  features stated to bound linear, not nonlinear, extraction.
+- Limitations: comparator configuration (model-specific instructions, settings, input resolution not tuned).
+- `medscope/eval/metrics.py`: the ESG docstring no longer claims an edit detector scores zero.
+- Audit package (notebook 30): now includes every run's `transcripts.jsonl`, the view manifests of every split
+  (patient and near-copy group ids), and the encoder probe's cached features; the README labels the four `neg_*`
+  runs as historical (summarised on an earlier 181-view negative set, not used in the paper).
