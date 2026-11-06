@@ -1,6 +1,6 @@
 # Response to the independent review of MedScope
 
-Current draft: v0.12 (5 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
+Current draft: v0.13 (5 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
 
 Review rounds: v0.7 from the PDF alone (54/100); package `7b15d59` (64/100); package `d029d26` (67/100). The
 third round rescored 134,309 outcome rows from the transcripts with the repository's own code and found zero
@@ -27,6 +27,7 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 | F10 | Every comparison rerun resampling patients or near-copy groups | Main test 507 cases from 416 groups; all 27 primary comparisons survive Bonferroni with p ≤ 0.001 (one at 0.001); one secondary comparison crosses 0.05 (fresh-external ESG vs Claude Opus 5.5, 0.037 → 0.060) | Sections 3.8, 5.5, 5.6 |
 | F15 | Reader pack rebuilt with a control-edited arm: 128 images, 32 per kind, pack id in every answer file | Readers in progress | Section 7 |
 | F18 | Pixel-level crosswalk (notebook 31): every unedited image of every split and cohort hashed, pairs within 8 bits confirmed by pixel correlation; two tiers (identical, near copy); id overlap per pair of sets | 6,849 images, no shared ids. One identical image: a validation lesion-free ChestX-Det image is the same NIH image as a fresh-external SIIM pneumothorax case (never in training; 1 of 316 cases; SIIM result unaffected). 1,834 near-tier pairs, all within the correlation range of pairs that cannot share a patient | Section 4.1, limitations; `results/crosswalk.md` |
+| F13, F14 | Flagships at their highest image-processing setting (OpenAI detail high, Gemini media resolution high) and with their own free reply to the plain prompt, same 150 cases (notebook 32) | Highest image setting: no measurable change (ESG +0.06 and +0.04, p ≥ 0.18). Plain prompt: both flagships worse than under the agent prompt (gpt-6-astra erased claims 53 → 66%, net utility 0.33 → −0.05; gemini 41 → 53%, 0.55 → 0.28; p ≤ 0.023), so the agent loop helps rather than handicaps them. Claude Opus 5.5 plain run pending | Table 10, Section 5.5, limitations |
 
 ## 3. Findings by ID
 
@@ -44,8 +45,8 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 | F10 | Done | Patient-level bootstrap (above); wording "p ≤ 0.001" |
 | F11 | Fixed | The 27-comparison family and Bonferroni check are stated to be a post-review check, not pre-specified; p-value formula and 0.001 floor given |
 | F12 | Mostly | MedScope CIs in Table 4 and the text; denominators in the caption; per-model CIs in the released reports |
-| F13 | Partly | "Generic plain prompt" with its limits; chat templates applied by each processor; model-specific instructions, settings and resolution not tuned (now a stated limitation); the plain-prompt placeholder removed and the per-model rates given |
-| F14 | Not done | Resolution-matched API inputs not run |
+| F13 | Mostly | Plain-prompt runs now cover the flagships too (worse than the agent prompt); highest image-processing setting tried; model-specific instruction tuning remains a stated limitation |
+| F14 | Done | Inputs were already resolution-matched (every model receives the same ≤ 768-px PNG, the stored size); the providers' highest image-processing settings tried and reported (no change) |
 | F15 | Done | Reader pack 2 |
 | F16 | Fixed | Cost matrix described as an assumption |
 | F17 | Fixed | Pneumothorax: "most plausible explanation", post-hoc, repair not demonstrated |
@@ -78,7 +79,7 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 
 - Reader-study results, reader qualifications, consent and ethics statement (readers in progress; more than
   32 erased images would be needed to bound the residual rate below 10%).
-- A focused comparator sensitivity analysis on instructions, settings and input resolution against the strongest
-  comparators (F13, F14).
+- Claude Opus 5.5 plain-prompt run (notebook 32, needs the Anthropic key); model-specific instruction tuning is
+  left as a limitation (F13).
 - Figure 2 provenance and licences (F29); generative-AI-use declaration; two references to verify (F20, F27).
 - The 22 manifests missing from the package.

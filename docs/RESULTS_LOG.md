@@ -856,3 +856,16 @@ that cannot share a patient (ChestX-Det across patient-split folds up to r = 0.9
 0.966), so at 64 px this tier reflects shared anatomy, not shared studies, and cannot tell a neighbouring slice of
 one SLAKE volume from another patient's similar slice. Report: results/crosswalk.md. Paper v0.12, Section 4.1 and
 limitations.
+
+## 2026-11-05 — comparator sensitivity (notebook 32), same 150 main-test cases
+
+Highest image-processing setting (OpenAI detail high, Gemini media resolution high; Anthropic has none): gpt-6-astra
+ESG 0.338 -> 0.397 (p 0.18), erased claims 52.9 -> 51.5%, net utility 0.328 -> 0.316; gemini-4-argon ESG 0.441 ->
+0.485 (p 0.34), erased claims 41.2 -> 38.2%, net utility 0.545 -> 0.562. No significant change. MedScope-4B vs these
+arms: ESG +0.353 and +0.265 (p < 0.001), net utility +0.413 (p < 0.001) and +0.167 (p 0.012).
+Plain prompt (one free reply, no tools): gpt-6-astra ESG 0.250, erased claims 66.2% (vs 52.9, p 0.023), healthy-image
+claims 54.9% (vs 32.9, p < 0.001), net utility -0.054 (vs 0.328, p < 0.001); gemini-4-argon ESG 0.338, erased claims
+52.9% (vs 41.2, p 0.083), net utility 0.281 (vs 0.545, p < 0.001). The agent prompt helps the flagships, not hinders
+them. Claude Opus 5.5 plain-prompt run not yet done (ANTHROPIC_API_KEY was not available in that session). Runs:
+v2_detail_{gpt6astra,gemini}_test, v2_plain_{gpt6astra,gemini}_test; report 32_comparator_sensitivity_report.md.
+Paper v0.13, Table 10 and Section 5.5.
