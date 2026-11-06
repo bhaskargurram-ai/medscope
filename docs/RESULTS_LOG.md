@@ -879,3 +879,19 @@ Committed before the unmatched-control arm (v4q_unm_s0) or the removal-based DPO
 C1: matched vs unmatched control, primary endpoint random-removal denial on the fresh external set and the pooled
 held-out tools, 5-point minimum effect, claim and CCR constraints. C2: recipe vs DPO, ESG and net utility on the
 fresh external set decisive, 0.05 minimum effects. Rules applied by scripts/v5_confirm.py. Results: pending.
+
+## 2026-11-06 — v5 results (notebooks 33a/33b), and v6 pre-registered (docs/PREREGISTRATION_v6.md)
+
+C1 (matched vs unmatched control): inconclusive by the pre-registered rule; substantively, matching is not
+demonstrated to matter: within seed noise on the main test (denial 0.105 vs 0.091), the pooled held-out tools
+(0.137 vs 0.129) and BraTS-Africa, ETIS and BUS-UCLM. The fresh-external difference (denial 0.512 vs 0.315, net
+utility -0.083 vs 0.165) comes entirely from SIIM pneumothorax, where the unmatched arm answers "present" on 60% of
+unedited, 67% of erased and 19% of healthy films (a response bias on a finding it does not see: ESG ~ 0) while the
+matched arm, the recipe and DPO answer "No" on nearly all of them.
+C2 (recipe vs removal-based DPO, single seed): not shown to beat DPO on new data by the rule (fresh-external ESG
++0.012 [-0.053, +0.077]); recipe better on fresh-external net utility (+0.148 [+0.054, +0.247], driven by BraTS
+sensitivity 0.625 vs 0.438) and on the main test (ESG +0.078, net utility +0.090, erased claims 12% vs 24%); DPO
+better on sensitivity (main test CCR 0.900 vs 0.847; held-out tools 0.895 vs 0.810) and random-removal denial.
+Departure: 7,590 usable pairs rather than the 8,000 named in the plan (open-question lesion-free images have no
+yes/no pair). Reports: results/v5_confirmation.md, 33_v5_checks_report.md.
+v6 pre-registered before any run: C3 recipe + DPO vs recipe; C2 over three seeds; stage-4 selection rule.

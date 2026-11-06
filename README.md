@@ -66,6 +66,9 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `33a_v5_unmatched` | Pre-registered v5 check C1: the unmatched-control arm (different shape and tool), trained and tested everywhere | A100 | ~7 h |
 | `33b_v5_dpo` | Pre-registered v5 check C2: removal-based DPO baseline from the no-CF adapter, trained and tested everywhere | A100 | ~7 h |
 | `33r_v5_report` | Applies the pre-registered decision rules (`scripts/v5_confirm.py`) and publishes the report | CPU | ~5 min |
+| `34a_v6_recipe_dpo` | Pre-registered v6 check C3: preference training on top of the stage-1 recipe, tested everywhere | A100 | ~6 h |
+| `34b_v6_dpo_seed1`, `34c_v6_dpo_seed2` | The DPO baseline at seeds 1 and 2 (C2 over three seeds) | A100 | ~6 h each |
+| `34r_v6_report` | Applies the v6 rules (`scripts/v6_confirm.py`) and publishes the report | CPU | ~5 min |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.

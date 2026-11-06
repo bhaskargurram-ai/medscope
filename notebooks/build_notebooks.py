@@ -3043,6 +3043,79 @@ runtime.unassign()
     return build
 
 
+def nb34_v6(part: str):
+    """Notebook 34: the pre-registered v6 checks. 'cfdpo' = preference training on top of the stage-1 recipe (C3);
+    'dpo_s1' / 'dpo_s2' = the DPO baseline at seeds 1 and 2 (C2 over seeds); 'report' = the rules (CPU)."""
+    what = {"cfdpo": "recipe + DPO (C3)", "dpo_s1": "DPO baseline, seed 1", "dpo_s2": "DPO baseline, seed 2", "report": "report"}[part]
+    letter = {"cfdpo": "a", "dpo_s1": "b", "dpo_s2": "c", "report": "r"}[part]
+    def build() -> list[dict]:
+        c = nb25_v4_recipe()
+        cells = [md(f"""
+# MedScope 34{letter}: pre-registered v6 checks: {what}
+
+`docs/PREREGISTRATION_v6.md` (committed before any of this ran) fixes:
+
+- **C3, does preference training add to the recipe?** The stage-1 recipe adapter continued with removal-based DPO on
+  the recipe's own pools, against the recipe alone. Pass rule: sensitivity on unedited lesions up by >= 0.03 with the
+  interval excluding zero, erased-lesion claims not up by more than 0.03, on the fresh external set and the pooled
+  held-out tools; ESG and net utility must not fall by more than 0.03.
+- **C2 over seeds.** The DPO baseline at seeds 1 and 2 (from the no-CF stage-1 adapters of those seeds), so the
+  recipe-vs-DPO comparison is three seeds against three; the verdict changes only if all three seed pairs agree.
+- **Stage 4** (notebook 35, only if C3 passes): the same preference pass on the selected stage-3 model, adopted only
+  by the validation rule written in the plan.
+
+**This notebook ({what}):** {'A100, about 6 hours (reference pass about 45 minutes, DPO about 3.5 hours, tests about 1.5 hours).' if part != 'report' else 'CPU, a few minutes; run after 34a, 34b and 34c.'}
+Run all; nothing to set. Every step resumes. The runtime frees itself on failure and at the end.
+""" + SECRETS_NOTE)]
+        if part == "report":
+            cells += [code(SETUP)]
+        else:
+            cells += [code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7]]
+        cells.append(code(r"""
+plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/PREREGISTRATION_v6.md', cwd='/content/medscope').stdout.strip()
+assert plan, 'docs/PREREGISTRATION_v6.md is not in the repository: do not train without the pre-registration'
+print('pre-registration committed:', plan)
+"""))
+        if part == "cfdpo":
+            cells += [md("## 1. Preference training on top of the stage-1 recipe, then test everywhere"),
+                      code(f"""
+assert os.path.exists(f'{{ADAPTERS}}/v4q_cf_s0/final/adapter_config.json'), 'the stage-1 recipe adapter is missing'
+name, out = 'v4q_cfdpo_s0', f'{{ADAPTERS}}/v4q_cfdpo_s0'
+if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+    !python scripts/train_dpo.py --model {BASE} --init {{ADAPTERS}}/v4q_cf_s0/final --views {{TRAIN_V4}} --negatives {{TRAIN_NEG_V4}} --beta 0.1 --lr 2e-5 --grad-accum 8 --seed 0 --out {{out}}
+print(open(f'{{out}}/state.json').read())
+test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+""")]
+        if part in ("dpo_s1", "dpo_s2"):
+            seed = part[-1]
+            cells += [md(f"## 1. DPO baseline, seed {seed}, then test everywhere"),
+                      code(f"""
+assert os.path.exists(f'{{ADAPTERS}}/v4q_nocf_s{seed}/final/adapter_config.json'), 'the no-CF stage-1 adapter for seed {seed} (notebook 25) is missing'
+name, out = 'v4q_dpo_s{seed}', f'{{ADAPTERS}}/v4q_dpo_s{seed}'
+if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+    !python scripts/train_dpo.py --model {BASE} --init {{ADAPTERS}}/v4q_nocf_s{seed}/final --views {{TRAIN_V4_BASE}} {{V4}}/train_tp/views.jsonl --negatives {{TRAIN_NEG_V4}} --beta 0.1 --lr 2e-5 --grad-accum 8 --seed {seed} --out {{out}}
+print(open(f'{{out}}/state.json').read())
+test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+""")]
+        cells += [md("## Pre-registered rules applied to whatever has finished"),
+                  code(r"""
+!python scripts/v6_confirm.py --results {RESULTS} --out {RESULTS}/v6_confirmation.md
+"""),
+                  publish("MedScope report - 34 v6 checks", """
+    ('Pre-registered confirmation (C3 recipe + DPO, C2 over seeds, stage-4 rule)', read_text(f'{RESULTS}/v6_confirmation.md')),
+    ('Recipe + DPO vs recipe and vs DPO, main test', significance_table(RESULTS, 'v4q_cfdpo_s0_test', ['v4q_cf_s0_test', 'v4q_dpo_s0_test'])),
+    ('Recipe + DPO vs recipe and vs DPO, fresh external', significance_table(RESULTS, 'v4q_cfdpo_s0_ext2', ['v4q_cf_s0_ext2', 'v4q_dpo_s0_ext2'])),
+""")]
+        if part != "report":
+            cells.append(code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""))
+        return cells
+    return build
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3139,6 +3212,10 @@ NOTEBOOKS = {
     "33a_v5_unmatched.ipynb": nb33_v5("unm"),
     "33b_v5_dpo.ipynb": nb33_v5("dpo"),
     "33r_v5_report.ipynb": nb33_v5("report"),
+    "34a_v6_recipe_dpo.ipynb": nb34_v6("cfdpo"),
+    "34b_v6_dpo_seed1.ipynb": nb34_v6("dpo_s1"),
+    "34c_v6_dpo_seed2.ipynb": nb34_v6("dpo_s2"),
+    "34r_v6_report.ipynb": nb34_v6("report"),
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
