@@ -2940,6 +2940,20 @@ for tag, p, m in DETAIL:
     ]
 
 
+AUTO_RELEASE = r"""
+# unattended run: on any error, or when the last cell finishes, release the GPU so it does not sit idle
+import traceback
+from google.colab import runtime
+def _release_on_error(shell, etype, value, tb, tb_offset=None):
+    shell.showtraceback((etype, value, tb), tb_offset=tb_offset)
+    print('\n*** This step failed; releasing the GPU runtime. The outputs above stay in the notebook. ***', flush=True)
+    import time; time.sleep(5)
+    runtime.unassign()
+get_ipython().set_custom_exc((BaseException,), _release_on_error)
+print('auto-release armed: the runtime frees itself on failure and at the end')
+"""
+
+
 def nb33_v5(part: str):
     """Notebook 33: the pre-registered v5 checks. part 'unm' trains the unmatched-control arm, 'dpo' the removal-based
     DPO baseline (one GPU each, run in parallel), 'report' evaluates the pre-registered rules on a CPU."""
@@ -2970,7 +2984,7 @@ Run all; nothing to set. Every step resumes.
         if part == "report":
             cells += [code(SETUP)]
         else:
-            cells += [code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7]]
+            cells += [code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7]]
         cells.append(code(r"""
 # the plan must predate the arms: print the commit that introduced it and stop if it is missing
 plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/PREREGISTRATION_v5.md', cwd='/content/medscope').stdout.strip()
@@ -3019,6 +3033,12 @@ print('DPO baseline trained and tested')
     ('All five stage-1 arms, main test (paired with the recipe)', significance_table(RESULTS, 'v4q_cf_s0_test', ['v4q_ctrl_s0_test', 'v4q_unm_s0_test', 'v4q_tgt_s0_test', 'v4q_dpo_s0_test', 'v4q_nocf_s0_test'])),
     ('All five stage-1 arms, fresh external (paired with the recipe)', significance_table(RESULTS, 'v4q_cf_s0_ext2', ['v4q_ctrl_s0_ext2', 'v4q_unm_s0_ext2', 'v4q_tgt_s0_ext2', 'v4q_dpo_s0_ext2', 'v4q_nocf_s0_ext2'])),
 """)]
+        if part != "report":
+            cells.append(code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""))
         return cells
     return build
 
