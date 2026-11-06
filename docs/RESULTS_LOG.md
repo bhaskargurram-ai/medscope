@@ -866,6 +866,9 @@ arms: ESG +0.353 and +0.265 (p < 0.001), net utility +0.413 (p < 0.001) and +0.1
 Plain prompt (one free reply, no tools): gpt-6-astra ESG 0.250, erased claims 66.2% (vs 52.9, p 0.023), healthy-image
 claims 54.9% (vs 32.9, p < 0.001), net utility -0.054 (vs 0.328, p < 0.001); gemini-4-argon ESG 0.338, erased claims
 52.9% (vs 41.2, p 0.083), net utility 0.281 (vs 0.545, p < 0.001). The agent prompt helps the flagships, not hinders
-them. Claude Opus 5.5 plain-prompt run not yet done (ANTHROPIC_API_KEY was not available in that session). Runs:
-v2_detail_{gpt6astra,gemini}_test, v2_plain_{gpt6astra,gemini}_test; report 32_comparator_sensitivity_report.md.
+them on net utility. Claude Opus 5.5 plain prompt (run later the same night): ESG 0.412, erased claims 38.2% (vs 54.4,
+p 0.002), healthy-image claims 17.1% (vs 25.6, p 0.011), CCR 0.846 (vs 0.890), net utility 0.260 (vs 0.387, p 0.061):
+fewer claims of both kinds, fewer correct answers, no net gain. MedScope-4B vs plain-prompt flagships: ESG +0.34 to
++0.50, net utility +0.45 to +0.78 (p < 0.001). Runs: v2_detail_{gpt6astra,gemini}_test, v2_plain_{gpt6astra,claudeopus,
+gemini}_test; report 32_comparator_sensitivity_report.md.
 Paper v0.13, Table 10 and Section 5.5.

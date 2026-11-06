@@ -27,7 +27,7 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 | F10 | Every comparison rerun resampling patients or near-copy groups | Main test 507 cases from 416 groups; all 27 primary comparisons survive Bonferroni with p ≤ 0.001 (one at 0.001); one secondary comparison crosses 0.05 (fresh-external ESG vs Claude Opus 5.5, 0.037 → 0.060) | Sections 3.8, 5.5, 5.6 |
 | F15 | Reader pack rebuilt with a control-edited arm: 128 images, 32 per kind, pack id in every answer file | Readers in progress | Section 7 |
 | F18 | Pixel-level crosswalk (notebook 31): every unedited image of every split and cohort hashed, pairs within 8 bits confirmed by pixel correlation; two tiers (identical, near copy); id overlap per pair of sets | 6,849 images, no shared ids. One identical image: a validation lesion-free ChestX-Det image is the same NIH image as a fresh-external SIIM pneumothorax case (never in training; 1 of 316 cases; SIIM result unaffected). 1,834 near-tier pairs, all within the correlation range of pairs that cannot share a patient | Section 4.1, limitations; `results/crosswalk.md` |
-| F13, F14 | Flagships at their highest image-processing setting (OpenAI detail high, Gemini media resolution high) and with their own free reply to the plain prompt, same 150 cases (notebook 32) | Highest image setting: no measurable change (ESG +0.06 and +0.04, p ≥ 0.18). Plain prompt: both flagships worse than under the agent prompt (gpt-6-astra erased claims 53 → 66%, net utility 0.33 → −0.05; gemini 41 → 53%, 0.55 → 0.28; p ≤ 0.023), so the agent loop helps rather than handicaps them. Claude Opus 5.5 plain run pending | Table 10, Section 5.5, limitations |
+| F13, F14 | Flagships at their highest image-processing setting (OpenAI detail high, Gemini media resolution high) and with their own free reply to the plain prompt, same 150 cases (notebook 32) | Highest image setting: no measurable change (ESG +0.06 and +0.04, p ≥ 0.18). Plain prompt: no flagship gains net utility (gpt-6-astra 0.33 → −0.05, gemini 0.55 → 0.28, p < 0.001; Claude Opus 5.5 0.39 → 0.26, p = 0.061); erased-lesion claims rise for gpt-6-astra and gemini (53 → 66%, 41 → 53%) and fall for Claude (54 → 38%) with fewer correct answers. MedScope-4B leads every plain-prompt flagship by 0.34–0.50 ESG and 0.45–0.78 net utility (p < 0.001) | Table 10, Section 5.5, limitations |
 
 ## 3. Findings by ID
 
@@ -79,7 +79,6 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 
 - Reader-study results, reader qualifications, consent and ethics statement (readers in progress; more than
   32 erased images would be needed to bound the residual rate below 10%).
-- Claude Opus 5.5 plain-prompt run (notebook 32, needs the Anthropic key); model-specific instruction tuning is
-  left as a limitation (F13).
+- Model-specific instruction tuning is left as a limitation (F13).
 - Figure 2 provenance and licences (F29); generative-AI-use declaration; two references to verify (F20, F27).
 - The 22 manifests missing from the package.
