@@ -901,3 +901,14 @@ v6 pre-registered before any run: C3 recipe + DPO vs recipe; C2 over three seeds
 34a stopped before training: it looked for the seed-0 recipe adapter at adapters/v4q_cf_s0, but that arm is notebook
 23's stage 1 and is stored as adapters/v4_s1 (its test runs carry the run name v4q_cf_s0, as in notebooks 25 and 26).
 Same model as the plan names; nothing was trained or evaluated before the fix.
+
+## 2026-11-06 — C3 (notebook 34a): recipe + DPO vs recipe — fails; no stage 4
+
+v4q_cfdpo_s0 = the seed-0 recipe (v4_s1) continued with removal-based DPO on the recipe's pools. Fresh external:
+CCR 0.542 vs 0.560 (-0.018 [-0.068, +0.040]), erased claims 15.5% vs 16.7%, ESG 0.381 vs 0.381, net utility 0.057 vs
+0.061. Pooled held-out tools: CCR 0.837 vs 0.810 (+0.027 [-0.002, +0.059], p 0.106), erased claims 24.4% vs 16.3%
+(+0.080 [+0.046, +0.118], p < 0.001), ESG 0.595 vs 0.649 (p 0.027). Main test: CCR 0.872 vs 0.847 (p 0.079), erased
+11.4% vs 11.9%, ESG 0.753 vs 0.735. By the rule C3 fails; the conditional stage 4 is not trained; stage 3 stays the
+final model. Exploratory reading: the preference pass keeps training-tool performance and loses on unseen tools
+(erased claims 11.4% main test -> 24.4% held-out tools, vs 11.9% -> 16.3% for the recipe).
+Total measured API spend over all 48 API runs: US$373.48 (results/api_cost.md).
