@@ -1,6 +1,6 @@
 # Response to the independent review of MedScope
 
-Current draft: v0.13 (5 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
+Current draft: v0.14 (6 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
 
 Review rounds: v0.7 from the PDF alone (54/100); package `7b15d59` (64/100); package `d029d26` (67/100). The
 third round rescored 134,309 outcome rows from the transcripts with the repository's own code and found zero
@@ -75,17 +75,28 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 | Audit 2.7 | Fixed | This letter |
 | `neg_*` runs | Labelled | Historical October runs summarised on a 181-view negative set; not used in the paper; README says so |
 
-## 4. Pre-registered v5 checks (in progress)
+## 4. Pre-registered v5 checks (done) and v6 (running)
 
-The audit's "what would earn 5/5" section asks whether matching the control edit matters and whether the recipe
-beats the closest established method. `docs/PREREGISTRATION_v5.md` (committed before either arm was built) fixes
-both comparisons, their endpoints, margins and decision rules: C1 matched vs unmatched control (an ellipse of half or
-twice the erasure's area, other training tool; `scripts/unmatched_views.py`), C2 recipe vs removal-based DPO
-(`medscope/train/dpo.py`, from the no-CF stage-1 adapter, 8,000 pairs). Notebooks 33a/33b train and test the two
-arms; `scripts/v5_confirm.py` applies the rules verbatim. For the reader study, `scripts/adjudicate.py` reports
-confirmed / disputed / indeterminate labels per modality, recomputes every comparison on reader-confirmed cases
-and under both assignments of indeterminate cases, and lists unedited lesion sensitivity by finding next to
-erased-lesion claims.
+The audit's "what would earn 5/5" section asked whether matching the control edit matters and whether the recipe
+beats the closest established method. `docs/PREREGISTRATION_v5.md` (committed before either arm was built) fixed
+both comparisons; `scripts/v5_confirm.py` applied the rules verbatim; `results/v5_confirmation.md` is the output.
+
+| Check | Verdict by the rule | Substance | Where |
+| --- | --- | --- | --- |
+| C1 matched vs unmatched control | Inconclusive | Within seed noise on the main test, the pooled held-out tools and three of four fresh-external sources; the SIIM difference is a response bias of the unmatched arm (answers "present" on 60% of unedited, 67% of erased, 19% of healthy films). Claim narrowed to "training with control edits" | Section 5.3, Table 9 |
+| C2 recipe vs removal-based DPO | Not shown to beat DPO on new data (fresh-external ESG +0.012 [−0.053, +0.077]) | Recipe: higher net utility on fresh external (+0.148) and main test, half the erased-lesion claims. DPO: higher sensitivity (CCR 0.90 vs 0.85), fewer denials. Complementary error profiles | Section 5.3, Table 9; abstract, discussion, conclusion rewritten |
+
+The novelty claim now reads: a small model can be taught, from automatically built erased and edited images and
+without annotation, to stop reporting what it does not see; the contribution is the measurement (ESG with a built-in
+control, cost-matrix utility), the medical construction and its validation, and the characterisation of what each
+training method gets wrong, not a unique training principle (Table 2 places the closest methods side by side).
+
+`docs/PREREGISTRATION_v6.md` (committed after the v5 results, before any new arm): C3 preference training on top of
+the recipe; C2 over three seeds; a validation-only stage-4 adoption rule. Notebooks 34a-34c are running.
+
+For the reader study, `scripts/adjudicate.py` reports confirmed / disputed / indeterminate labels per modality,
+recomputes every comparison on reader-confirmed cases and under both assignments of indeterminate cases, and lists
+unedited lesion sensitivity by finding next to erased-lesion claims.
 
 ## 4. Open
 

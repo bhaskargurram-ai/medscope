@@ -6,8 +6,9 @@ below was trained. The git history of this file is the record.
 ## What the v5 results showed
 
 - C1: matching the control edit's shape and tool is not demonstrated to matter (matched and unmatched arms within
-  seed noise on the main test, the held-out tools and three of four fresh-external sources; the fourth, SIIM
-  pneumothorax, differs only through a response bias on a finding neither arm detects).
+  seed noise on the main test, the held-out tools and three of four fresh-external sources (BraTS 2023 meningioma,
+  ETIS, BUS-UCLM); the fourth, SIIM pneumothorax, differs only through a response bias on a finding neither arm
+  detects).
 - C2: removal-based DPO reaches the recipe's ESG on new data. The two methods fail differently: the recipe claims
   fewer erased lesions (main test 12% vs 24%; held-out tools 16% vs 23%), DPO keeps more sensitivity (CCR 0.90 vs
   0.85 on the main test; 0.90 vs 0.81 on held-out tools) and denies fewer intact lesions after a control edit.
