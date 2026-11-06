@@ -3117,10 +3117,11 @@ print('pre-registration committed:', plan)
         if part == "cfdpo":
             cells += [md("## 1. Preference training on top of the stage-1 recipe, then test everywhere"),
                       code(f"""
-assert os.path.exists(f'{{ADAPTERS}}/v4q_cf_s0/final/adapter_config.json'), 'the stage-1 recipe adapter is missing'
+RECIPE = f'{{ADAPTERS}}/v4_s1/final'     # the seed-0 recipe arm (run name v4q_cf_s0) is notebook 23's stage 1, stored as v4_s1
+assert os.path.exists(f'{{RECIPE}}/adapter_config.json'), f'the stage-1 recipe adapter is missing: {{RECIPE}}'
 name, out = 'v4q_cfdpo_s0', f'{{ADAPTERS}}/v4q_cfdpo_s0'
 if not os.path.exists(f'{{out}}/final/adapter_config.json'):
-    !python scripts/train_dpo.py --model {BASE} --init {{ADAPTERS}}/v4q_cf_s0/final --views {{TRAIN_V4}} --negatives {{TRAIN_NEG_V4}} --beta 0.1 --lr 2e-5 --grad-accum 8 --seed 0 --out {{out}}
+    !python scripts/train_dpo.py --model {BASE} --init {{RECIPE}} --views {{TRAIN_V4}} --negatives {{TRAIN_NEG_V4}} --beta 0.1 --lr 2e-5 --grad-accum 8 --seed 0 --out {{out}}
 print(open(f'{{out}}/state.json').read())
 test_all('{BASE}', f'{{out}}/final', name, heldout=True)
 """)]

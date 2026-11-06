@@ -895,3 +895,9 @@ better on sensitivity (main test CCR 0.900 vs 0.847; held-out tools 0.895 vs 0.8
 Departure: 7,590 usable pairs rather than the 8,000 named in the plan (open-question lesion-free images have no
 yes/no pair). Reports: results/v5_confirmation.md, 33_v5_checks_report.md.
 v6 pre-registered before any run: C3 recipe + DPO vs recipe; C2 over three seeds; stage-4 selection rule.
+
+## 2026-11-06 — notebook 34a path fix (no departure from the v6 plan)
+
+34a stopped before training: it looked for the seed-0 recipe adapter at adapters/v4q_cf_s0, but that arm is notebook
+23's stage 1 and is stored as adapters/v4_s1 (its test runs carry the run name v4q_cf_s0, as in notebooks 25 and 26).
+Same model as the plan names; nothing was trained or evaluated before the fix.
