@@ -3138,9 +3138,11 @@ test_all('{BASE}', f'{{out}}/final', name, heldout=True)
         cells += [md("## Pre-registered rules applied to whatever has finished"),
                   code(r"""
 !python scripts/v6_confirm.py --results {RESULTS} --out {RESULTS}/v6_confirmation.md
+!python scripts/api_cost.py --results {RESULTS} --out {RESULTS}/api_cost.md
 """),
                   publish("MedScope report - 34 v6 checks", """
     ('Pre-registered confirmation (C3 recipe + DPO, C2 over seeds, stage-4 rule)', read_text(f'{RESULTS}/v6_confirmation.md')),
+    ('Measured API spend, all runs', read_text(f'{RESULTS}/api_cost.md')),
     ('Recipe + DPO vs recipe and vs DPO, main test', significance_table(RESULTS, 'v4q_cfdpo_s0_test', ['v4q_cf_s0_test', 'v4q_dpo_s0_test'])),
     ('Recipe + DPO vs recipe and vs DPO, fresh external', significance_table(RESULTS, 'v4q_cfdpo_s0_ext2', ['v4q_cf_s0_ext2', 'v4q_dpo_s0_ext2'])),
 """)]
