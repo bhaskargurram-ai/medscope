@@ -2659,6 +2659,14 @@ print(len(answers), 'answer file(s):', [os.path.basename(a) for a in answers])
 if answers:
     !python scripts/make_reader_study.py --score --key {KEY} --answers {' '.join(answers)} --out {RESULTS}/reader_study.md
 """),
+        md("## 3. What adjudication changes: labels confirmed / disputed / indeterminate, comparisons on reader-confirmed cases, sensitivity by finding"),
+        code(f"""
+if answers:
+    frontier = {[r for r, _, _ in FRONTIER]!r}
+    labels = ' '.join(f"'{{r}}={{n}}'" for r, n in {[(r, m) for r, _, m in FRONTIER]!r})
+    !python scripts/adjudicate.py --key {{KEY}} --answers {{' '.join(answers)}} --results {{RESULTS}} --views {{TEST_VIEWS}} {{TEST_NEG}} --ref v4_final_test --runs {{' '.join(frontier)}} --labels {{labels}} 'v4_final_test=MedScope-4B' --out {{RESULTS}}/reader_adjudication.md
+    print(open(f'{{RESULTS}}/reader_adjudication.md').read()[:4000])
+"""),
     ]
 
 
