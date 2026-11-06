@@ -2790,9 +2790,34 @@ Model adapters and images are left out (in Drive and the public datasets). The r
 while readers are blinded.
 
 **Runtime:** CPU. About 10 minutes. The ZIP is written to `MyDrive/medscope/audit/`; download it from Drive and send
-it to the reviewer with `docs/reviews/RESPONSE_v09.md`.
+it to the reviewer with `docs/reviews/RESPONSE.md`. Manifests that only ever existed in a Colab session (the test-only
+paraphrases, the SIIM original-resolution and v4.1 sets) are rebuilt where that is deterministic (paraphrases) and
+otherwise reconstructed from the runs' own transcripts (view id, case id, kind, question, gold answer; no lesion box
+or patient id), so every run can at least be re-judged.
 """ + SECRETS_NOTE),
         code(SETUP), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(r"""
+# manifests that lived only in a session: rebuild the paraphrases (deterministic), reconstruct the rest from transcripts
+import glob
+PARA = f'{V4}/paraphrase/views.jsonl'
+if not os.path.exists(PARA):
+    !python scripts/paraphrase_views.py --views {TEST_VIEWS} {TEST_NEG} --out {PARA}
+from medscope.eval.runner import read_jsonl
+REC = f'{WORK}/reconstructed'
+known = {json.loads(l)['view_id'] for f in glob.glob(f'{WORK}/**/views*.jsonl', recursive=True) + glob.glob(f'{WORK}/**/negatives*.jsonl', recursive=True) + glob.glob(f'{DRIVE}/slake/negatives/*.jsonl') + glob.glob(f'{DRIVE}/inpaint_test/*/views.jsonl') for l in open(f) if l.strip()}
+n_rec = 0
+for run in sorted(d for d in glob.glob(f'{RESULTS}/*') if os.path.isdir(d)):
+    tr = read_jsonl(f'{run}/transcripts.jsonl') if os.path.exists(f'{run}/transcripts.jsonl') else []
+    missing = [t for t in tr if t['view_id'] not in known]
+    if tr and len(missing) > 0.5 * len(tr):
+        cases = {o['view_id']: o['case_id'] for o in read_jsonl(f'{run}/scored.jsonl' if os.path.exists(f'{run}/scored.jsonl') else f'{run}/outcomes.jsonl')}
+        os.makedirs(f'{REC}/{os.path.basename(run)}', exist_ok=True)
+        with open(f'{REC}/{os.path.basename(run)}/views.jsonl', 'w') as f:
+            for t in tr:
+                f.write(json.dumps({'view_id': t['view_id'], 'case_id': cases.get(t['view_id']), 'kind': t['kind'], 'question': t['question'], 'answer': t['gold'], 'reconstructed_from': 'transcripts.jsonl'}) + '\n')
+        n_rec += 1
+print(f'{n_rec} runs with session-only manifests reconstructed under {REC}')
+"""),
         code(r"""
 import glob, zipfile, time
 commit = git('rev-parse', '--short', 'HEAD', cwd='/content/medscope').stdout.strip()
@@ -2840,9 +2865,14 @@ repo/       the repository at this commit (code, notebooks, docs, paper/method_p
 history/    git log of every commit; the full patch history of docs/PREREGISTRATION_v4.md
 results/    every evaluation run: summary.json (metrics, 95% bootstrap CIs), report.md, scored.jsonl (one rescored
             row per view), outcomes.jsonl (raw), transcripts.jsonl (every model reply); the reports of notebooks
-            23-29 at the top level; results/encoder_probe/features_*.npz = the probe's cached encoder features
+            23-34 at the top level (crosswalk.md, v5_confirmation.md, v6_confirmation.md included);
+            results/encoder_probe/features_*.npz = the probe's cached encoder features
 manifests/  the view manifests of every split (view id, case id, patient or near-copy group id, kind, question,
             answer, lesion box, image path). Images are not included: they are the public datasets' own files.
+            manifests/work/reconstructed/<run>/views.jsonl: runs whose manifests existed only in a Colab session (SIIM
+            original-resolution and v4.1 sets), rebuilt from the run's transcripts (no lesion box, no patient id):
+            enough to re-judge answers, not boxes. Paraphrase manifests are rebuilt deterministically.
+Pre-registrations: repo/docs/PREREGISTRATION_v4.md, _v5.md, _v6.md with their git history in history/git_log.txt.
 Not included: model adapters (in Drive) and the reader-study answer key (would unblind readers).
 Historical runs: the four neg_* runs (notebook 02b, October 2026) were summarised on an earlier 181-view version of
 the natural-negative set; their outcomes.jsonl holds 218 rows from the later set. They are not used in the paper.
