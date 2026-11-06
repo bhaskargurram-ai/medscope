@@ -2900,7 +2900,8 @@ checks, for the three flagships:
 Each arm is compared with the same model's standard run on the same cases, and with MedScope-4B on the same cases.
 
 **Runtime:** CPU; about 1-2 hours; about $30-50 in API fees. Colab secrets `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
-`GEMINI_API_KEY`. Every run resumes; finished runs are skipped.
+`GEMINI_API_KEY`, all three with Notebook access switched on (the notebook stops if one is missing). Every run resumes;
+finished runs are skipped.
 """ + SECRETS_NOTE),
         code(SETUP), code(RESTORE_ALL),
         code(r"""
@@ -2909,7 +2910,8 @@ for name in ('OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY'):
         os.environ[name] = secret(name)
 FLAGSHIPS = [('gpt6astra', 'openai', 'gpt-6-astra'), ('claudeopus', 'anthropic', 'claude-opus-5-5'),
              ('gemini', 'gemini', 'gemini-4-argon')]
-FLAGSHIPS = [f for f in FLAGSHIPS if os.environ.get({'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}[f[1]])]
+missing = [k for k in ('OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY') if not os.environ.get(k)]
+assert not missing, f'add these Colab secrets (key icon in the sidebar) and switch on Notebook access, then rerun: {missing}'
 DETAIL = [f for f in FLAGSHIPS if f[1] != 'anthropic']
 print('models:', [m for _, _, m in FLAGSHIPS])
 """),
@@ -2918,10 +2920,15 @@ print('models:', [m for _, _, m in FLAGSHIPS])
 for tag, p, m in DETAIL:
     !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --image-detail high --out {RESULTS}/v2_detail_{tag}_test --name {p}-{m}-detail --split test --batch-size 8 | tail -4
 """),
-        md("## 2. Plain prompt: the model's own free reply, no tools"),
+        md("## 2. Plain prompt: the model's own free reply, no tools (one cell per model; a finished run is skipped)"),
         code(r"""
-for tag, p, m in FLAGSHIPS:
-    !python scripts/evaluate.py --api {p} --model {m} --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --prompt plain --out {RESULTS}/v2_plain_{tag}_test --name {p}-{m}-plain --split test --batch-size 8 | tail -4
+!python scripts/evaluate.py --api openai --model gpt-6-astra --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --prompt plain --out {RESULTS}/v2_plain_gpt6astra_test --name openai-gpt-6-astra-plain --split test --batch-size 8 | tail -4
+"""),
+        code(r"""
+!python scripts/evaluate.py --api anthropic --model claude-opus-5-5 --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --prompt plain --out {RESULTS}/v2_plain_claudeopus_test --name anthropic-claude-opus-5-5-plain --split test --batch-size 8 | tail -4
+"""),
+        code(r"""
+!python scripts/evaluate.py --api gemini --model gemini-4-argon --views {TEST_VIEWS} {TEST_NEG} --limit-cases 150 --prompt plain --out {RESULTS}/v2_plain_gemini_test --name gemini-gemini-4-argon-plain --split test --batch-size 8 | tail -4
 """),
         md("## 3. Report"),
         publish("MedScope report - 32 comparator sensitivity", """
