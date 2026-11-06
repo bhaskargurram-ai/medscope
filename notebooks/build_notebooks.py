@@ -2940,6 +2940,89 @@ for tag, p, m in DETAIL:
     ]
 
 
+def nb33_v5(part: str):
+    """Notebook 33: the pre-registered v5 checks. part 'unm' trains the unmatched-control arm, 'dpo' the removal-based
+    DPO baseline (one GPU each, run in parallel), 'report' evaluates the pre-registered rules on a CPU."""
+    unm = ("--views {V4}/unmatched/views.jsonl --negatives {TRAIN_NEG_V4} "
+           "--kinds original target_removal random_removal natural_negative degraded --epochs 3 --max-steps {S1_STEPS} "
+           "--schedule-steps {S1_TOTAL} --mode agentic --window-prob 0.3 --small-zoom --oversample-small 2 --paraphrase-prob 0.5")
+    def build() -> list[dict]:
+        c = nb25_v4_recipe()
+        what = {"unm": "unmatched-control arm", "dpo": "removal-based DPO baseline", "report": "report"}[part]
+        cells = [md(f"""
+# MedScope 33{'a' if part == 'unm' else 'b' if part == 'dpo' else 'r'}: pre-registered v5 checks: {what}
+
+`docs/PREREGISTRATION_v5.md` (committed before any of this ran) fixes two confirmatory comparisons:
+
+- **C1, does matching matter?** The matched-control arm (`v4q_ctrl_s0`, notebook 29) against a new arm whose control
+  edit is *unmatched*: an ellipse of half or twice the erasure's area, elsewhere, filled with the other training tool.
+  Same cases, same other views, same steps and schedule; only the control differs.
+- **C2, does the recipe beat the closest method?** The recipe (`v4q_cf_s0`) against removal-based preference training:
+  the no-counterfactual stage-1 adapter (`v4q_nocf_s0`) continued with DPO on 8,000 erased / unedited / lesion-free
+  pairs (chosen "absent" vs rejected "present" and the reverse). No control edits, no tools.
+
+Primary endpoints, margins and decision rules are in the pre-registration; `scripts/v5_confirm.py` applies them
+verbatim. Nothing changes the selected model.
+
+**This notebook ({what}):** {'A100 runtime, about 7 hours (view building about 20 minutes, training about 4 hours, tests about 2.5 hours).' if part == 'unm' else 'A100 runtime, about 7 hours (reference pass about 40 minutes, DPO about 3.5 hours, tests about 2.5 hours).' if part == 'dpo' else 'CPU, a few minutes; run after 33a and 33b have finished.'}
+Run all; nothing to set. Every step resumes.
+""" + SECRETS_NOTE)]
+        if part == "report":
+            cells += [code(SETUP)]
+        else:
+            cells += [code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7]]
+        cells.append(code(r"""
+# the plan must predate the arms: print the commit that introduced it and stop if it is missing
+plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/PREREGISTRATION_v5.md', cwd='/content/medscope').stdout.strip()
+assert plan, 'docs/PREREGISTRATION_v5.md is not in the repository: do not train without the pre-registration'
+print('pre-registration committed:', plan)
+"""))
+        if part == "unm":
+            cells += [code(LAMA_CELL), md("## 1. Unmatched control views (cached on Drive after the first build)"),
+                      code(r"""
+UNM = f'{V4}/unmatched'
+if not os.path.exists(f'{UNM}/views.jsonl') and os.path.exists(f'{DRIVE}/v4/unmatched.tar'):
+    !tar -C {WORK} -xf {DRIVE}/v4/unmatched.tar
+if not os.path.exists(f'{UNM}/views.jsonl'):
+    !python scripts/unmatched_views.py --views {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl --out {UNM}
+    !tar -C {WORK} -cf {DRIVE}/v4/unmatched.tar v4/unmatched
+print(open(f'{UNM}/summary.json').read())
+"""),
+                      md("## 2. Train the unmatched-control arm and test it everywhere (held-out tools included)"),
+                      code(f"""
+name, out = 'v4q_unm_s0', f'{{ADAPTERS}}/v4q_unm_s0'
+if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+    !python scripts/train_sft.py --model {BASE} {unm} --seed 0 --out {{out}}
+done = json.load(open(f'{{out}}/state.json'))['opt_step']
+if abs(done - S1_STEPS) > 0.02 * S1_STEPS:
+    raise SystemExit(f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like, stop and report this')
+test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+print('unmatched arm trained and tested')
+""")]
+        if part == "dpo":
+            cells += [md("## 1. Removal-based DPO from the no-counterfactual stage-1 adapter, then test everywhere"),
+                      code(f"""
+assert os.path.exists(f'{{ADAPTERS}}/v4q_nocf_s0/final/adapter_config.json'), 'the no-CF stage-1 adapter (notebook 25) is missing'
+name, out = 'v4q_dpo_s0', f'{{ADAPTERS}}/v4q_dpo_s0'
+if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+    !python scripts/train_dpo.py --model {BASE} --init {{ADAPTERS}}/v4q_nocf_s0/final --views {{TRAIN_V4_BASE}} {{V4}}/train_tp/views.jsonl --negatives {{TRAIN_NEG_V4}} --pairs 8000 --beta 0.1 --lr 2e-5 --grad-accum 8 --seed 0 --out {{out}}
+print(open(f'{{out}}/state.json').read())
+test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+print('DPO baseline trained and tested')
+""")]
+        cells += [md("## Pre-registered rules applied to whatever has finished"),
+                  code(r"""
+!python scripts/v5_confirm.py --results {RESULTS} --out {RESULTS}/v5_confirmation.md
+"""),
+                  publish("MedScope report - 33 v5 checks", """
+    ('Pre-registered confirmation (C1 matching, C2 recipe vs removal-based DPO)', read_text(f'{RESULTS}/v5_confirmation.md')),
+    ('All five stage-1 arms, main test (paired with the recipe)', significance_table(RESULTS, 'v4q_cf_s0_test', ['v4q_ctrl_s0_test', 'v4q_unm_s0_test', 'v4q_tgt_s0_test', 'v4q_dpo_s0_test', 'v4q_nocf_s0_test'])),
+    ('All five stage-1 arms, fresh external (paired with the recipe)', significance_table(RESULTS, 'v4q_cf_s0_ext2', ['v4q_ctrl_s0_ext2', 'v4q_unm_s0_ext2', 'v4q_tgt_s0_ext2', 'v4q_dpo_s0_ext2', 'v4q_nocf_s0_ext2'])),
+""")]
+        return cells
+    return build
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3033,6 +3116,9 @@ NOTEBOOKS = {
     "30_audit_package.ipynb": nb30_audit,
     "31_crosswalk.ipynb": nb31_crosswalk,
     "32_comparator_sensitivity.ipynb": nb32_comparators,
+    "33a_v5_unmatched.ipynb": nb33_v5("unm"),
+    "33b_v5_dpo.ipynb": nb33_v5("dpo"),
+    "33r_v5_report.ipynb": nb33_v5("report"),
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

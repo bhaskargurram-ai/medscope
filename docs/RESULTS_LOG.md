@@ -872,3 +872,10 @@ fewer claims of both kinds, fewer correct answers, no net gain. MedScope-4B vs p
 +0.50, net utility +0.45 to +0.78 (p < 0.001). Runs: v2_detail_{gpt6astra,gemini}_test, v2_plain_{gpt6astra,claudeopus,
 gemini}_test; report 32_comparator_sensitivity_report.md.
 Paper v0.13, Table 10 and Section 5.5.
+
+## 2026-11-06 — v5 checks pre-registered (docs/PREREGISTRATION_v5.md), notebooks 33a/33b/33r
+
+Committed before the unmatched-control arm (v4q_unm_s0) or the removal-based DPO baseline (v4q_dpo_s0) existed.
+C1: matched vs unmatched control, primary endpoint random-removal denial on the fresh external set and the pooled
+held-out tools, 5-point minimum effect, claim and CCR constraints. C2: recipe vs DPO, ESG and net utility on the
+fresh external set decisive, 0.05 minimum effects. Rules applied by scripts/v5_confirm.py. Results: pending.

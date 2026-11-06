@@ -75,6 +75,18 @@ SIIM full-resolution and v4.1 runs), which will be added to the next package.
 | Audit 2.7 | Fixed | This letter |
 | `neg_*` runs | Labelled | Historical October runs summarised on a 181-view negative set; not used in the paper; README says so |
 
+## 4. Pre-registered v5 checks (in progress)
+
+The audit's "what would earn 5/5" section asks whether matching the control edit matters and whether the recipe
+beats the closest established method. `docs/PREREGISTRATION_v5.md` (committed before either arm was built) fixes
+both comparisons, their endpoints, margins and decision rules: C1 matched vs unmatched control (an ellipse of half or
+twice the erasure's area, other training tool; `scripts/unmatched_views.py`), C2 recipe vs removal-based DPO
+(`medscope/train/dpo.py`, from the no-CF stage-1 adapter, 8,000 pairs). Notebooks 33a/33b train and test the two
+arms; `scripts/v5_confirm.py` applies the rules verbatim. For the reader study, `scripts/adjudicate.py` reports
+confirmed / disputed / indeterminate labels per modality, recomputes every comparison on reader-confirmed cases
+and under both assignments of indeterminate cases, and lists unedited lesion sensitivity by finding next to
+erased-lesion claims.
+
 ## 4. Open
 
 - Reader-study results, reader qualifications, consent and ethics statement (readers in progress; more than

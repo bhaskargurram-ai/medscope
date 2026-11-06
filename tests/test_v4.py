@@ -466,3 +466,203 @@ class CrosswalkTest(unittest.TestCase):
         self.assertEqual(summary[5], "1", md)                                # pa1 appears in both sets
         self.assertIn("| a0 (pa0) | b0 (pb0) |", md)
         self.assertIn("| a1 (pa1) | b1 (pa1) |", md)
+
+
+class UnmatchedViewsTest(unittest.TestCase):
+    def test_unmatched_control_has_a_different_size_and_tool_and_spares_the_lesion(self):
+        import json
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+        import numpy as np
+        from PIL import Image
+        t = Path(tempfile.mkdtemp())
+        rng = np.random.default_rng(0)
+        img = np.clip(rng.normal(120, 20, (160, 200, 3)), 0, 255).astype(np.uint8)   # tissue everywhere
+        lesion = np.zeros((160, 200), bool)
+        lesion[60:80, 90:110] = True
+        Image.fromarray(img).save(t / "original.png")
+        Image.fromarray(lesion.astype(np.uint8) * 255).save(t / "lesion_mask.png")
+        Image.fromarray(img).save(t / "random.png")
+        rows = []
+        for kind in ("original", "target_removal", "random_removal"):
+            rows.append({"view_id": f"c1__{kind}", "case_id": "c1", "patient_id": "p1", "kind": kind,
+                         "image_path": str(t / ("random.png" if kind == "random_removal" else "original.png")),
+                         "question": "Is there a lesion?", "answer": "No" if kind == "target_removal" else "Yes",
+                         "answer_aliases": [], "lesion_box": [450, 375, 550, 500], "critical": False,
+                         "meta": {"original_image": str(t / "original.png"), "lesion_mask": str(t / "lesion_mask.png")}})
+        (t / "v.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+        script = Path(__file__).resolve().parent.parent / "scripts" / "unmatched_views.py"
+        subprocess.run([sys.executable, str(script), "--views", str(t / "v.jsonl"), "--out", str(t / "unm")],
+                       check=True, capture_output=True)
+        out = [json.loads(l) for l in (t / "unm" / "views.jsonl").read_text().splitlines()]
+        self.assertEqual([r["kind"] for r in out], ["original", "target_removal", "random_removal"])
+        ctrl = out[2]
+        self.assertEqual(ctrl["meta"]["control"], "unmatched")
+        self.assertEqual(ctrl["meta"]["inpainter"], "transplant")            # the erasure (no tag) was LaMa
+        self.assertIn(ctrl["meta"]["area_factor"], (0.5, 2.0))
+        hole = np.asarray(Image.open(ctrl["meta"]["edit_mask"]).convert("L")) > 127
+        from medscope.data.counterfactual import dilate
+        base = dilate(lesion, 5).sum()
+        self.assertAlmostEqual(hole.sum() / base, ctrl["meta"]["area_factor"], delta=0.15)
+        self.assertFalse((hole & dilate(lesion, 5)).any())
+        edited = np.asarray(Image.open(ctrl["image_path"]).convert("RGB"))
+        self.assertTrue(np.array_equal(edited[lesion], img[lesion]))         # lesion pixels untouched
+        self.assertFalse(np.array_equal(edited[hole], img[hole]))             # the hole was filled
+
+
+class AdjudicationTest(unittest.TestCase):
+    def test_statuses_and_rescoring_on_confirmed_cases(self):
+        import json
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+        from medscope.rewards import Outcome
+        t = Path(tempfile.mkdtemp())
+        # pack: four erased images (cases c0..c3) + one control; readers confirm c0, c1, dispute c2, split on c3
+        key = {"pack": "p", "items": [
+            *[{"id": f"e{i}", "kind": "target_removal", "case_id": f"c{i}", "view_id": f"c{i}__target_removal",
+               "source": "busi", "question": "Is there a mass?"} for i in range(4)],
+            {"id": "r0", "kind": "random_removal", "case_id": "c0", "view_id": "c0__random_removal", "source": "busi",
+             "question": "Is there a mass?"}]}
+        (t / "key.json").write_text(json.dumps(key))
+        votes = {"A": {"e0": "no", "e1": "no", "e2": "yes", "e3": "yes", "r0": "yes"},
+                 "B": {"e0": "no", "e1": "no", "e2": "yes", "e3": "no", "r0": "yes"}}
+        for name, v in votes.items():
+            (t / f"{name}.json").write_text(json.dumps({"reader": name, "pack": "p",
+                                                        "answers": [{"id": i, "finding": f, "edited": 2} for i, f in v.items()]}))
+        views = [{"view_id": f"c{i}__{k}", "case_id": f"c{i}", "patient_id": f"c{i}", "kind": k, "image_path": "x.png",
+                  "question": "Is there a mass?", "answer": "No" if k == "target_removal" else "Yes", "answer_aliases": [],
+                  "lesion_box": [1, 1, 5, 5], "critical": False, "meta": {}}
+                 for i in range(4) for k in ("original", "target_removal", "random_removal")]
+        (t / "v.jsonl").write_text("".join(json.dumps(v) + "\n" for v in views))
+
+        def run(name, claims):      # claims: which cases the model claims the erased mass on
+            d = t / name
+            d.mkdir()
+            rows = []
+            for i in range(4):
+                for k in ("original", "target_removal", "random_removal"):
+                    absent = k == "target_removal" and f"c{i}" not in claims
+                    rows.append(Outcome(view_id=f"c{i}__{k}", case_id=f"c{i}", kind=k, action="answer",
+                                        correct=(absent if k == "target_removal" else True), iou=0.5, confidence=None,
+                                        tool_calls=0, malformed=False, reward=1.0 if (absent or k != "target_removal") else -1.0,
+                                        breakdown={}, claims_absent=absent).to_dict())
+            (d / "scored.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+        run("ref", claims=set())                  # never claims an erased mass
+        run("other", claims={"c2", "c3"})         # claims it exactly on the disputed and the split case
+        script = Path(__file__).resolve().parent.parent / "scripts" / "adjudicate.py"
+        subprocess.run([sys.executable, str(script), "--key", str(t / "key.json"), "--answers", str(t / "A.json"),
+                        str(t / "B.json"), "--results", str(t), "--views", str(t / "v.jsonl"), "--ref", "ref",
+                        "--runs", "other", "--out", str(t / "adj.md")], check=True, capture_output=True)
+        md = (t / "adj.md").read_text()
+        self.assertIn("| target_removal | all | 4 | 2 | 1 | 1 | 0 |", md)
+        self.assertIn("| random_removal | all | 1 | 1 | 0 | 0 | 0 |", md)
+        self.assertIn("**all pack cases** (4 cases)", md)
+        self.assertIn("**reader-confirmed erasures only** (2 cases)", md)
+        self.assertIn("**confirmed + indeterminate** (3 cases)", md)
+        # on confirmed cases alone the two models agree (difference 0); on all cases they differ by 0.5 in erased claims
+        conf = md.split("**reader-confirmed erasures only**")[1].split("**confirmed + indeterminate**")[0]
+        self.assertIn("+0.000", conf)
+        self.assertIn("| mass | 4/4 (100%) | 2/4 (50%) |", md)
+
+
+class DPOTest(unittest.TestCase):
+    def _views(self, t):
+        import numpy as np
+        from PIL import Image
+        from medscope.data.schema import View, ViewKind
+        Image.fromarray(np.zeros((16, 16, 3), np.uint8)).save(t / "i.png")
+        common = dict(patient_id="p", answer_aliases=[], critical=False, meta={})
+        return [
+            View(view_id="c1__original", case_id="c1", kind=ViewKind.ORIGINAL, image_path=str(t / "i.png"),
+                 question="Is there a polyp?", answer="Yes", lesion_box=[100, 100, 300, 300], **common),
+            View(view_id="c1__target_removal", case_id="c1", kind=ViewKind.TARGET_REMOVAL, image_path=str(t / "i.png"),
+                 question="Is there a polyp?", answer="Yes", lesion_box=[100, 100, 300, 300], **common),   # views carry the case answer
+            View(view_id="c1__random_removal", case_id="c1", kind=ViewKind.RANDOM_REMOVAL, image_path=str(t / "i.png"),
+                 question="Is there a polyp?", answer="Yes", lesion_box=[100, 100, 300, 300], **common),
+            View(view_id="n1__natural_negative", case_id="n1", kind=ViewKind.NATURAL_NEGATIVE, image_path=str(t / "i.png"),
+                 question="Is there a polyp?", answer="No", lesion_box=None, **common),
+            View(view_id="n2__natural_negative", case_id="n2", kind=ViewKind.NATURAL_NEGATIVE, image_path=str(t / "i.png"),
+                 question="What is abnormal?", answer="Nothing", lesion_box=None, **common),
+        ]
+
+    def test_pairs_cover_removal_cases_only_and_contradict_each_other(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from medscope.train.dpo import build_pairs
+        t = Path(tempfile.mkdtemp())
+        pairs = {p.view_id: p for p in build_pairs(self._views(t))}
+        self.assertEqual(set(pairs), {"c1__original", "c1__target_removal", "n1__natural_negative"})   # no control, no open negative
+        fin = lambda s: json.loads(s.split("<final>")[1].split("</final>")[0])  # noqa: E731
+        self.assertEqual((fin(pairs["c1__original"].chosen)["answer"], fin(pairs["c1__original"].rejected)["answer"]), ("Yes", "No"))
+        self.assertEqual(fin(pairs["c1__original"].chosen)["box"], [100, 100, 300, 300])
+        erased = pairs["c1__target_removal"]
+        self.assertEqual((fin(erased.chosen)["answer"], fin(erased.rejected)["answer"]), ("No", "Yes"))
+        self.assertEqual(fin(erased.rejected)["box"], [100, 100, 300, 300])       # the hallucination keeps the old box
+        self.assertNotIn("box", fin(erased.chosen))
+        self.assertEqual((fin(pairs["n1__natural_negative"].chosen)["answer"], fin(pairs["n1__natural_negative"].rejected)["answer"]), ("No", "Yes"))
+
+    def test_loss_rewards_a_positive_margin(self):
+        import math
+        import types
+        from medscope.train.dpo import dpo_loss
+        shim = types.SimpleNamespace(nn=types.SimpleNamespace(functional=types.SimpleNamespace(
+            logsigmoid=lambda x: -math.log1p(math.exp(-x)))))
+        better, margin = dpo_loss(shim, pc=-1.0, pr=-3.0, rc=-2.0, rr=-2.0, beta=0.5)     # chosen rose, rejected fell
+        self.assertAlmostEqual(margin, 0.5 * ((-1.0 + 2.0) - (-3.0 + 2.0)))
+        worse, _ = dpo_loss(shim, pc=-3.0, pr=-1.0, rc=-2.0, rr=-2.0, beta=0.5)
+        same, m0 = dpo_loss(shim, pc=-2.0, pr=-2.0, rc=-2.0, rr=-2.0, beta=0.5)
+        self.assertEqual(m0, 0.0)
+        self.assertAlmostEqual(same, math.log(2))
+        self.assertLess(better, same)
+        self.assertGreater(worse, same)
+
+    @unittest.skipUnless(__import__("importlib").util.find_spec("torch"), "needs torch")
+    def test_training_loop_moves_the_margin_and_resumes(self):
+        import tempfile
+        from pathlib import Path
+        import torch
+        from medscope.train.dpo import build_pairs, train_dpo
+
+        class Policy:
+            """A 'model' whose log-prob of a reply is a learnable scalar per (view, side)."""
+            def __init__(self):
+                self.table = torch.nn.Parameter(torch.zeros(8))
+                self.model = torch.nn.Linear(1, 1)      # stands in for the PEFT model
+                self.model.table = self.table
+                self.saved = []
+            def encode_cpu(self, messages):
+                return {}
+            def target_ids(self, text):
+                return text
+            def token_logprobs(self, messages, target, inputs=None):
+                vid = messages[-1]["content"][-1]["text"]
+                i = (hash(vid) % 4) * 2 + ("No" in target.split("<final>")[1])
+                return self.table[i:i + 1]
+            def save_adapter(self, path):
+                self.saved.append(path)
+                Path(path).mkdir(parents=True, exist_ok=True)
+                (Path(path) / "adapter_model.bin").write_bytes(b"")
+        t = Path(tempfile.mkdtemp())
+        pairs = build_pairs(self._views(t))
+        import medscope.train.dpo as dpo
+        dpo.load_adapter_weights = lambda model, path: None
+        dpo.load_optimizer = lambda opt, out: False
+        dpo.save_optimizer = lambda opt, out: None
+        pol = Policy()
+        final = train_dpo(pol, pairs * 4, t / "run", reference=None, beta=1.0, lr=0.5, grad_accum=2, save_every=1,
+                          log=lambda s: None)
+        self.assertTrue((t / "run" / "reference_logps.json").exists())
+        self.assertTrue((t / "run" / "state.json").exists())
+        self.assertEqual(final, t / "run" / "final")
+        # the preference margin became positive for every pair: chosen log-prob rose above rejected
+        for p in pairs:
+            pc = pol.token_logprobs([{"content": [{"text": p.view_id}]}], p.chosen).item()
+            pr = pol.token_logprobs([{"content": [{"text": p.view_id}]}], p.rejected).item()
+            self.assertGreater(pc, pr, p.view_id)
+        again = train_dpo(pol, pairs * 4, t / "run", reference=None, log=lambda s: None)
+        self.assertEqual(again, final)                                           # finished runs are skipped
