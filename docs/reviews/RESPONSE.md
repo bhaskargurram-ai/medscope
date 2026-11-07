@@ -1,6 +1,6 @@
 # Response to the independent review of MedScope
 
-Current draft: v0.14 (6 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
+Current draft: v0.15 (7 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
 
 Review rounds: v0.7 from the PDF alone (54/100); package `7b15d59` (64/100); package `d029d26` (67/100). The
 third round rescored 134,309 outcome rows from the transcripts with the repository's own code and found zero
@@ -92,7 +92,10 @@ control, cost-matrix utility), the medical construction and its validation, and 
 training method gets wrong, not a unique training principle (Table 2 places the closest methods side by side).
 
 `docs/PREREGISTRATION_v6.md` (committed after the v5 results, before any new arm): C3 preference training on top of
-the recipe; C2 over three seeds; a validation-only stage-4 adoption rule. Notebooks 34a-34c are running.
+the recipe fails by the rule (no sensitivity gain on new data; more erased-lesion claims with unseen tools), so the
+conditional stage 4 was not trained and stage 3 stays the final model. C2 over three seeds: no difference shown on
+new-data ESG (recipe higher on every seed, no single interval excluding zero); recipe net utility higher on every seed
+(two of three significant); the two methods err in different directions (Section 5.3, `results/v6_confirmation.md`).
 
 For the reader study, `scripts/adjudicate.py` reports confirmed / disputed / indeterminate labels per modality,
 recomputes every comparison on reader-confirmed cases and under both assignments of indeterminate cases, and lists

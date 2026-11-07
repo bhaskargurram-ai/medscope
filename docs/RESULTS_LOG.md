@@ -912,3 +912,17 @@ CCR 0.542 vs 0.560 (-0.018 [-0.068, +0.040]), erased claims 15.5% vs 16.7%, ESG 
 final model. Exploratory reading: the preference pass keeps training-tool performance and loses on unseen tools
 (erased claims 11.4% main test -> 24.4% held-out tools, vs 11.9% -> 16.3% for the recipe).
 Total measured API spend over all 48 API runs: US$373.48 (results/api_cost.md).
+
+## 2026-11-07 — C2 over three seeds (notebooks 34b/34c): no difference shown on new data; error profiles differ
+
+34b/34c stopped once at 17:46 on 6 Nov (both runtimes at the same time, during testing) and were restarted; training
+had finished, so testing resumed. DPO baseline seeds 1/2: main test ESG 0.626 / 0.699, net utility 0.640 / 0.669,
+erased claims 29.7% / 19.2%, healthy claims 17.7% / 16.3%. Three seeds, recipe vs DPO:
+fresh external ESG 0.381 +- 0.018 vs 0.355 +- 0.015 (per seed +0.012, +0.006, +0.060, all CIs include 0) -> by the
+rule "no difference shown"; net utility 0.070 +- 0.008 vs -0.069 +- 0.078 (per seed +0.148 p<0.001, +0.060 p 0.318,
++0.209 p<0.001); CCR 0.587 vs 0.485; erased claims 20.0% vs 12.9%; denial 41.9% vs 51.6% (DPO more conservative on
+new data). Main test: ESG 0.741 +- 0.019 vs 0.661 +- 0.037; erased 13.2% vs 24.2%; CCR 0.871 vs 0.903; denial 12.6%
+vs 9.6%; net utility 0.684 vs 0.637.
+Correction to paper v0.14: abstract, contributions and discussion said DPO had more erased-lesion claims and more
+sensitivity "on new data"; that holds on the internal test only (on the fresh external set it already had fewer of
+both at seed 0). Fixed in v0.15.
