@@ -3178,8 +3178,10 @@ The signature that would justify a pre-registered v7 (three seeds, a noise-inste
 erase/sham probe): fewer erased-lesion claims on the held-out tools than the recipe (16.3%) and than C3 (24.4%),
 fewer denials of control edits, and ESG at or above the recipe. If it is not there, the result is reported as such.
 
-**This notebook:** A100, about 5-6 hours (training about 4 hours, tests about 1.5 hours). Run all; nothing to set.
-Every step resumes. The runtime frees itself on failure and at the end.
+**This notebook:** A100, about 6 hours (training about 4.5 hours at roughly 5 s per case, tests about 1.5 hours).
+The trainer replays one trajectory view per case, scores both candidate replies in one pass and prepares the next case
+on the CPU while the GPU works; a checkpoint left by the earlier, slower trainer is discarded automatically. Run all;
+nothing to set. Every step resumes. The runtime frees itself on failure and at the end.
 """ + SECRETS_NOTE),
             code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7],
             md("## 1. Paired-view continuation of the stage-1 recipe adapter, then test everywhere"),

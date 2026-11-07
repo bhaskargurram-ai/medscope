@@ -937,3 +937,11 @@ present/absent replies; L = L_sft(O, E, C) + 0.5·softplus(2 − (s(C) − s(E))
 log-prob | O − | C)². Notebook 35a continues the seed-0 recipe adapter for 3,000 triplet cases (`v4q_cmcc_s0`) and tests
 everywhere; matched-compute comparison is the C3 arm. Go signature for a pre-registered v7: held-out-tool erased claims
 below the recipe (16.3%) and C3 (24.4%), fewer control denials, ESG at or above the recipe. Not run yet.
+
+**2026-11-07, 35a first attempt stopped.** The v1 trainer ran at 11.6 s per case (80 cases in 932 s: thirteen full
+forward/backward passes per triplet at batch size 1), i.e. about 10 h for 3,000 cases; stopped after ~30 min. The
+first log record showed the objective behaving as intended on the recipe adapter: s(O) −10.8, s(C) −11.3, s(E) −23.7,
+margin term 0.51 (active on a minority of cases), invariance term 3.08, first-action term ≈ 0. Trainer v2 (`cmcc-v2`)
+replays one trajectory view per case, scores the two candidate replies of a view in one batch-of-2 pass
+(`HFPolicy.token_logprobs_pair`) and prepares the next case on the CPU while the GPU works; a v1 checkpoint is
+discarded automatically. Expected ≈ 5 s per case.

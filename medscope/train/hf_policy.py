@@ -309,6 +309,44 @@ class HFPolicy:
         logp = torch.log_softmax(logits.float(), dim=-1)
         return logp.gather(-1, target.unsqueeze(-1)).squeeze(-1).squeeze(0)
 
+    def token_logprobs_pair(self, messages: list[dict], target_a, target_b, inputs=None):
+        """Per-token log-probs of two candidate replies to the same conversation, in one forward pass of batch 2
+        (the prompt, image included, is encoded once and repeated). Returns (logp_a, logp_b), each 1-D."""
+        torch = self.torch
+        inputs = self.encode(messages) if inputs is None else inputs.to(self.model.device)
+        prompt = inputs["input_ids"]
+        n_prompt = prompt.shape[1]
+        n = max(target_a.shape[0], target_b.shape[0])
+        pad = self.tokenizer.pad_token_id or 0
+        tgt = torch.full((2, n), pad, dtype=torch.long, device=prompt.device)
+        mask = torch.zeros((2, n), dtype=torch.long, device=prompt.device)
+        for r, t in enumerate((target_a, target_b)):
+            tgt[r, :t.shape[0]] = t.to(prompt.device)
+            mask[r, :t.shape[0]] = 1
+        batch = {}
+        for k, v in inputs.items():
+            if torch.is_tensor(v) and v.dim() >= 2 and v.shape[:2] == prompt.shape:      # per-token tensors
+                extra = torch.full((1, n, *v.shape[2:]), 0, dtype=v.dtype, device=v.device)
+                row = torch.cat([v, extra], dim=1)
+                if k == "attention_mask":
+                    row = torch.cat([v, mask[:1]], dim=1)
+                    batch[k] = torch.cat([row, torch.cat([v, mask[1:]], dim=1)], dim=0)
+                else:
+                    batch[k] = row.repeat(2, *([1] * (row.dim() - 1)))
+            elif torch.is_tensor(v) and v.dim() >= 1 and v.shape[0] != prompt.shape[0]:   # image patches, grids
+                batch[k] = torch.cat([v, v], dim=0)
+            elif torch.is_tensor(v):
+                batch[k] = v.repeat(2, *([1] * (v.dim() - 1)))
+            else:
+                batch[k] = v
+        batch["input_ids"] = torch.cat([prompt.repeat(2, 1), tgt], dim=1)
+        try:
+            logits = self.model(**batch, use_cache=False, logits_to_keep=n + 1).logits[:, :n]
+        except TypeError:
+            logits = self.model(**batch, use_cache=False).logits[:, n_prompt - 1:n_prompt - 1 + n]
+        logp = torch.log_softmax(logits.float(), dim=-1).gather(-1, tgt.unsqueeze(-1)).squeeze(-1)
+        return logp[0, :target_a.shape[0]], logp[1, :target_b.shape[0]]
+
     def target_ids(self, text: str):
         ids = self.tokenizer(text, add_special_tokens=False)["input_ids"] + [self.end_of_turn_id]
         return self.torch.tensor(ids, dtype=self.torch.long)

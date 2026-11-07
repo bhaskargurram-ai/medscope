@@ -15,6 +15,9 @@ objective puts the three views in one loss:
           (where the agent looks) must not be drawn to the control patch
   L     = L_sft(trajectories of O, E, C) + l_did * L_did + l_inv * L_inv + l_act * L_act
 
+The trajectory term replays one of the three views per case (round-robin), so it costs a third of supervised training
+on the same cases; the two candidate replies of a view are scored in one forward pass of batch 2.
+
 The difference-in-differences term rewards only lesion-specific sensitivity: any drop that an edited image produces
 regardless of where the edit is cancels out. The trajectory loss is the same as supervised training, so a run with
 all three weights at zero is plain SFT on the same cases.
@@ -38,6 +41,7 @@ from .common import append_log, checkpoint_path, load_adapter_weights, load_opti
 from .sft import samples_for
 
 PREFIX = "From the image:"      # one neutral lead-in for both candidate replies, so only the decision differs
+TRAINER = "cmcc-v2"              # batched candidates, one-view replay, prefetch; state.json records it
 
 
 @dataclass
@@ -90,25 +94,74 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=lr, weight_decay=0.0)
     start, step = state.get("cases_done", 0), state.get("opt_step", 0)
+    if start and state.get("trainer") != TRAINER:
+        log(f"checkpoint from trainer {state.get('trainer', 'v1')!r} discarded; starting over with {TRAINER}")
+        start, step = 0, 0
+        (out / "train_log.jsonl").unlink(missing_ok=True)
     if start and checkpoint_path(out).exists():
         load_adapter_weights(model, checkpoint_path(out))
         load_optimizer(opt, out)
         log(f"resuming from case {start}, optimizer step {step}")
 
-    def logodds(view: View, img):
-        """s(x) and the two candidate log-probs, single-turn prompt."""
-        msgs = start_messages(img, view.question)
-        inputs = policy.encode_cpu(msgs)
-        present, absent = candidates(view)
-        lp_p = policy.token_logprobs(msgs, policy.target_ids(present), inputs=inputs).sum()
-        lp_a = policy.token_logprobs(msgs, policy.target_ids(absent), inputs=inputs).sum()
-        return lp_p - lp_a
+    def prepare(i: int):
+        """Everything the CPU can do for case i: images, the trajectory replay for one view (round-robin over the
+        three, so the replay costs a third of plain SFT on the same cases), the three single-turn prompts with their
+        candidate replies, and the first-action prompts on the original and the control view."""
+        t = order[i]
+        views = (t.original, t.erased, t.control)
+        imgs = [load_image(v.image_path) for v in views]
+        replay_view = views[i % 3]
+        kw = dict(window_prob=0.3, small_zoom=True) if replay_view is t.original else {}
+        replay = [(policy.target_ids(smp.target), policy.encode_cpu(smp.messages))
+                  for smp in samples_for(replay_view, "agentic", seed, i, **kw)]
+        prompts = []
+        for v, img in zip(views, imgs):
+            present, absent = candidates(v)
+            prompts.append((policy.encode_cpu(start_messages(img, v.question)), policy.target_ids(present), policy.target_ids(absent)))
+        first = samples_for(t.original, "agentic", seed, i, window_prob=0.3, small_zoom=True)[0]
+        act_inputs = []
+        for img in (imgs[0], imgs[2]):
+            msgs = list(first.messages)
+            msgs[-1] = start_messages(img, t.original.question)[-1]
+            act_inputs.append(policy.encode_cpu(msgs))
+        return replay, prompts, (policy.target_ids(first.target), act_inputs)
 
-    def first_action_logp(view: View, img, sample):
-        """Mean token log-prob of the trajectory's first turn (the tool call, or the direct answer) given `img`."""
-        msgs = [m for m in sample.messages]
-        msgs[-1] = start_messages(img, view.question)[-1]        # same conversation, this image
-        return policy.token_logprobs(msgs, policy.target_ids(sample.target)).mean()
+    def prepared(start_i: int):
+        import os, queue, threading
+        if os.environ.get("MEDSCOPE_PREFETCH", "1") == "0":
+            for i in range(start_i, len(order)):
+                yield i, prepare(i)
+            return
+        q: queue.Queue = queue.Queue(maxsize=3)
+        stop = threading.Event()
+
+        def producer():
+            try:
+                for i in range(start_i, len(order)):
+                    item = (i, prepare(i))
+                    while not stop.is_set():
+                        try:
+                            q.put(item, timeout=1)
+                            break
+                        except queue.Full:
+                            pass
+                    if stop.is_set():
+                        return
+                q.put(None)
+            except BaseException as e:          # surface the error in the training thread
+                q.put(e)
+        th = threading.Thread(target=producer, daemon=True)
+        th.start()
+        try:
+            while True:
+                item = q.get()
+                if item is None:
+                    return
+                if isinstance(item, BaseException):
+                    raise item
+                yield item
+        finally:
+            stop.set()
 
     def optimizer_step():
         nonlocal step
@@ -120,30 +173,30 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
         step += 1
 
     running, t0 = {"sft": [], "did": [], "inv": [], "act": [], "s_o": [], "s_e": [], "s_c": []}, time.time()
-    for i in range(start, len(order)):
-        t = order[i]
-        imgs = {k: load_image(v.image_path) for k, v in (("o", t.original), ("e", t.erased), ("c", t.control))}
-        # The three terms are backpropagated separately (same gradient, smaller peak memory): the trajectory
-        # samples one at a time, then the six log-odds passes together, then the two first-action passes.
-        # 1. trajectory loss on the three views, as in supervised training (same jitter rules)
-        samples_o = samples_for(t.original, "agentic", seed, i, window_prob=0.3, small_zoom=True)
-        all_samples = samples_o + samples_for(t.erased, "agentic", seed, i) + samples_for(t.control, "agentic", seed, i)
+    # Per case: ~1.6 trajectory passes (one view), 3 batch-of-2 log-odds passes, 2 first-action passes; each term is
+    # backpropagated on its own (same gradient as the summed loss, smaller peak memory).
+    for i, (replay, prompts, (act_target, act_inputs)) in prepared(start):
+        # 1. trajectory replay on one view, as in supervised training
         sft_vals = []
-        for s in all_samples:
-            lp = policy.token_logprobs(s.messages, policy.target_ids(s.target))
-            l = -lp.mean()
-            (l / (len(all_samples) * grad_accum)).backward()
+        for target, inputs in replay:
+            l = -policy.token_logprobs(None, target, inputs=inputs).mean()
+            (l / (len(replay) * grad_accum)).backward()
             sft_vals.append(float(l))
         l_sft = float(np.mean(sft_vals))
-        # 2. decision log-odds on the three views
-        s_o, s_e, s_c = logodds(t.original, imgs["o"]), logodds(t.erased, imgs["e"]), logodds(t.control, imgs["c"])
+        # 2. decision log-odds on the three views: present and absent reply in one pass each
+        s = []
+        for inputs, present, absent in prompts:
+            lp_p, lp_a = policy.token_logprobs_pair(None, present, absent, inputs=inputs)
+            s.append(lp_p.sum() - lp_a.sum())
+        s_o, s_e, s_c = s
         did = torch.nn.functional.softplus(tau - (s_c - s_e))
         inv = (s_o - s_c) ** 2
         if l_did or l_inv:
             ((l_did * did + l_inv * inv) / grad_accum).backward()
         # 3. the first action of the original's trajectory must be as likely on the control view
-        first = samples_o[0]
-        act = (first_action_logp(t.original, imgs["o"], first) - first_action_logp(t.control, imgs["c"], first)) ** 2
+        lp_o = policy.token_logprobs(None, act_target, inputs=act_inputs[0]).mean()
+        lp_c = policy.token_logprobs(None, act_target, inputs=act_inputs[1]).mean()
+        act = (lp_o - lp_c) ** 2
         if l_act:
             (l_act * act / grad_accum).backward()
         for k, v in (("sft", l_sft), ("did", did), ("inv", inv), ("act", act), ("s_o", s_o), ("s_e", s_e), ("s_c", s_c)):
@@ -160,13 +213,13 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
             if step % save_every == 0:
                 policy.save_adapter(str(checkpoint_path(out)))
                 save_optimizer(opt, out)
-                write_state(out, {"cases_done": i + 1, "opt_step": step, "total_steps": total_steps})
+                write_state(out, {"cases_done": i + 1, "opt_step": step, "total_steps": total_steps, "trainer": TRAINER})
             if max_steps and step >= max_steps:
                 break
     if (len(order) - start) % grad_accum and not (max_steps and step >= max_steps):
         optimizer_step()
     policy.save_adapter(str(final))
     write_state(out, {"cases_done": len(order), "opt_step": step, "total_steps": total_steps, "finished": True,
-                      "tau": tau, "l_did": l_did, "l_inv": l_inv, "l_act": l_act})
+                      "trainer": TRAINER, "tau": tau, "l_did": l_did, "l_inv": l_inv, "l_act": l_act})
     log(f"saved final adapter to {final}")
     return final
