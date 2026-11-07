@@ -666,3 +666,22 @@ class DPOTest(unittest.TestCase):
             self.assertGreater(pc, pr, p.view_id)
         again = train_dpo(pol, pairs * 4, t / "run", reference=None, log=lambda s: None)
         self.assertEqual(again, final)                                           # finished runs are skipped
+
+
+class CMCCTest(unittest.TestCase):
+    def test_triplets_and_candidates(self):
+        import json
+        from medscope.data.schema import View, ViewKind
+        from medscope.train.cmcc import build_triplets, candidates
+        common = dict(patient_id="p", answer_aliases=[], critical=False, meta={}, image_path="x.png")
+        mk = lambda cid, kind, q, a, box: View(view_id=f"{cid}__{kind.value}", case_id=cid, kind=kind, question=q, answer=a, lesion_box=box, **common)  # noqa: E731
+        views = [mk("c1", k, "Is there a polyp?", "Yes", [100, 100, 300, 300]) for k in (ViewKind.ORIGINAL, ViewKind.TARGET_REMOVAL, ViewKind.RANDOM_REMOVAL)]
+        views += [mk("c2", k, "Is there a polyp?", "Yes", [1, 1, 5, 5]) for k in (ViewKind.ORIGINAL, ViewKind.TARGET_REMOVAL)]   # no control
+        views += [mk("c3", k, "What abnormality is visible?", "Polyp", [1, 1, 5, 5]) for k in (ViewKind.ORIGINAL, ViewKind.TARGET_REMOVAL, ViewKind.RANDOM_REMOVAL)]  # open
+        trip = build_triplets(views)
+        self.assertEqual([t.case_id for t in trip], ["c1"])
+        present, absent = candidates(trip[0].original)
+        fin = lambda s: json.loads(s.split("<final>")[1].split("</final>")[0])  # noqa: E731
+        self.assertEqual(fin(present)["answer"], "Yes"); self.assertEqual(fin(present)["box"], [100, 100, 300, 300])
+        self.assertEqual(fin(absent)["answer"], "No"); self.assertNotIn("box", fin(absent))
+        self.assertEqual(present.split(" <final>")[0], absent.split(" <final>")[0])     # identical lead-in

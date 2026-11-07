@@ -3157,6 +3157,64 @@ runtime.unassign()
     return build
 
 
+def nb35_cmcc_smoke() -> list[dict]:
+    """Notebook 35a: smoke test of control-matched counterfactual consistency (CMCC), the control edit as a constraint."""
+    c = nb25_v4_recipe()
+    return [md("""
+# MedScope 35a: smoke test of the paired-view objective (CMCC)
+
+Supervised training sees the original, the erasure and the control edit as three independent samples; nothing in the
+loss stops a model from reading "edited image" as a cue. `medscope/train/cmcc.py` puts the three views of a case into
+one objective: the decision log-odds s(x) = log p(present reply | x) - log p(absent reply | x) must drop from the
+control edit to the erasure by a margin (difference in differences, so an "edited" cue cancels), must not differ between
+the original and the control edit (invariance), and the first tool action must be as likely on the control edit as on
+the original (the agent must not look where the edit is). The trajectory loss is unchanged, so weights at zero is
+plain SFT on the same cases.
+
+**Smoke test, not a confirmation.** One arm, seed 0: the stage-1 recipe adapter (`v4_s1`) continued for about 3,000
+triplet cases with the paired objective, then tested on every set including the held-out inpainting tools. The
+matched-compute comparison is the C3 arm (the same adapter continued with removal-based DPO) and the recipe itself.
+The signature that would justify a pre-registered v7 (three seeds, a noise-instead-of-inpaint arm, an inference-time
+erase/sham probe): fewer erased-lesion claims on the held-out tools than the recipe (16.3%) and than C3 (24.4%),
+fewer denials of control edits, and ESG at or above the recipe. If it is not there, the result is reported as such.
+
+**This notebook:** A100, about 5-6 hours (training about 4 hours, tests about 1.5 hours). Run all; nothing to set.
+Every step resumes. The runtime frees itself on failure and at the end.
+""" + SECRETS_NOTE),
+            code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7],
+            md("## 1. Paired-view continuation of the stage-1 recipe adapter, then test everywhere"),
+            code(f"""
+RECIPE = f'{{ADAPTERS}}/v4_s1/final'
+assert os.path.exists(f'{{RECIPE}}/adapter_config.json'), f'the stage-1 recipe adapter is missing: {{RECIPE}}'
+name, out = 'v4q_cmcc_s0', f'{{ADAPTERS}}/v4q_cmcc_s0'
+if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+    !python scripts/train_cmcc.py --model {BASE} --init {{RECIPE}} --views {{TRAIN_V4_BASE}} {{V4}}/train_tp/views.jsonl --cases 3000 --tau 2.0 --l-did 0.5 --l-inv 0.5 --l-act 0.5 --lr 2e-5 --grad-accum 8 --seed 0 --out {{out}}
+print(open(f'{{out}}/state.json').read())
+import json as _json
+rows = [_json.loads(l) for l in open(f'{{out}}/train_log.jsonl')]
+print('first/last logged step:', {{k: (round(rows[0][k], 2), round(rows[-1][k], 2)) for k in ('sft', 'did', 'inv', 'act', 's_o', 's_e', 's_c')}})
+test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+"""),
+            md("## 2. Against the recipe and the matched-compute arms"),
+            code(r"""
+!python scripts/api_cost.py --results {RESULTS} --out {RESULTS}/api_cost.md
+"""),
+            publish("MedScope report - 35a CMCC smoke test", """
+    ('CMCC vs recipe, recipe + DPO (C3) and DPO, main test', significance_table(RESULTS, 'v4q_cmcc_s0_test', ['v4q_cf_s0_test', 'v4q_cfdpo_s0_test', 'v4q_dpo_s0_test'])),
+    ('CMCC vs recipe, recipe + DPO (C3) and DPO, fresh external', significance_table(RESULTS, 'v4q_cmcc_s0_ext2', ['v4q_cf_s0_ext2', 'v4q_cfdpo_s0_ext2', 'v4q_dpo_s0_ext2'])),
+    ('CMCC vs recipe and recipe + DPO (C3), held-out tool TELEA', significance_table(RESULTS, 'v4q_inp_telea_cmcc_s0_test', ['v4q_inp_telea_cf_s0_test', 'v4q_inp_telea_cfdpo_s0_test'])),
+    ('CMCC vs recipe and recipe + DPO (C3), held-out tool transplant', significance_table(RESULTS, 'v4q_inp_transplant_cmcc_s0_test', ['v4q_inp_transplant_cf_s0_test', 'v4q_inp_transplant_cfdpo_s0_test'])),
+    ('CMCC vs recipe and recipe + DPO (C3), held-out tool diffusion', significance_table(RESULTS, 'v4q_inp_diffusion_cmcc_s0_test', ['v4q_inp_diffusion_cf_s0_test', 'v4q_inp_diffusion_cfdpo_s0_test'])),
+    ('Training log (CMCC)', read_text(f'{ADAPTERS}/v4q_cmcc_s0/train_log.jsonl')),
+"""),
+            code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3257,6 +3315,7 @@ NOTEBOOKS = {
     "34b_v6_dpo_seed1.ipynb": nb34_v6("dpo_s1"),
     "34c_v6_dpo_seed2.ipynb": nb34_v6("dpo_s2"),
     "34r_v6_report.ipynb": nb34_v6("report"),
+    "35a_cmcc_smoke.ipynb": nb35_cmcc_smoke,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

@@ -926,3 +926,14 @@ vs 9.6%; net utility 0.684 vs 0.637.
 Correction to paper v0.14: abstract, contributions and discussion said DPO had more erased-lesion claims and more
 sensitivity "on new data"; that holds on the internal test only (on the fresh external set it already had fewer of
 both at seed 0). Fixed in v0.15.
+
+## 2026-11-07 — CMCC smoke test built (notebook 35a)
+
+Three literature sweeps found no training method that uses a matched control edit at pixel level inside the objective
+(closest: Evidence-RL's token-space area-matched controls, DeFacto's random-mask triplet under GRPO, Agarwal 2020's
+invariant edits as data only, the original-vs-degraded preference family, CoEV's post-hoc erase-and-recheck).
+`medscope/train/cmcc.py` adds control-matched counterfactual consistency: decision log-odds s(x) on the single-turn
+present/absent replies; L = L_sft(O, E, C) + 0.5·softplus(2 − (s(C) − s(E))) + 0.5·(s(O) − s(C))² + 0.5·(first-action
+log-prob | O − | C)². Notebook 35a continues the seed-0 recipe adapter for 3,000 triplet cases (`v4q_cmcc_s0`) and tests
+everywhere; matched-compute comparison is the C3 arm. Go signature for a pre-registered v7: held-out-tool erased claims
+below the recipe (16.3%) and C3 (24.4%), fewer control denials, ESG at or above the recipe. Not run yet.
