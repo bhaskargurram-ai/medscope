@@ -58,7 +58,7 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `26_siim_fullres` | Post hoc (exploratory): the fresh-external SIIM pneumothorax cases rebuilt at original resolution, same models | A100 or L4 | ~1 h |
 | `26b_pneumothorax_diagnosis` | Post hoc: why pneumothorax is missed (training targets per stage, detection by stage, lesion size, question swap) | A100 or L4 | ~20 min |
 | `27_v41_pneumothorax_fix` | Post hoc: v4.1, stage 3 redone with SIIM pneumothorax training patients; tested on new SIIM patients and every earlier test | A100 | ~4-5 h |
-| `28_reader_study` | Reader study: builds and publishes the blinded page (pack 3: 192 images, 48 each unmodified, lesion-erased, control-edited, lesion-free; diffuse findings tagged as stress tests), later scores the readers' answer files | CPU | ~5 min + scoring |
+| `28_reader_study` | Reader study: keeps the live page (pack 2, 128 images) untouched, adds a 96-image supplement for the same readers under `/pack3/` (cases not in pack 2; diffuse findings tagged as stress tests), later scores both packs together | CPU | ~5 min + scoring |
 | `29_review_checks` | Review checks: factorial ablation (control edits vs insertions), linear probe on the frozen vision encoder, patient-level bootstrap | A100 | ~9 h |
 | `30_audit_package` | One ZIP for an auditor: repository snapshot, git history, every report and every run's metrics and rescored outcomes | CPU | ~5 min |
 | `31_crosswalk` | Cross-set crosswalk: pixel-level search for the same image or a near-copy between any two splits or cohorts, plus id overlap | CPU | ~15 min |

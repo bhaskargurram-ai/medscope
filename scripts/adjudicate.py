@@ -26,6 +26,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from medscope.actions import asked_finding  # noqa: E402
 from medscope.eval.compare import load_outcomes, paired_bootstrap  # noqa: E402
@@ -40,6 +41,11 @@ def load_key(path: str) -> tuple[str | None, dict]:
     if isinstance(raw, list):
         return None, {k["id"]: k for k in raw}
     return raw.get("pack"), {k["id"]: k for k in raw["items"]}
+
+
+def load_packs(key_paths, answer_paths):
+    from make_reader_study import load_packs as _lp            # same merging rules as the scoring script
+    return _lp(key_paths, answer_paths)
 
 
 def adjudicate(key: dict, readers: list[dict]) -> dict[str, dict]:
@@ -76,7 +82,7 @@ def fmt(r: dict) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--key", required=True)
+    ap.add_argument("--key", nargs="+", required=True, help="answer key(s); several packs are scored together")
     ap.add_argument("--answers", nargs="*", default=[])
     ap.add_argument("--results", required=True)
     ap.add_argument("--views", nargs="+", required=True, help="the test views the pack was drawn from")
@@ -86,17 +92,10 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
     labels = dict(x.split("=", 1) for x in args.labels)
-    pack, key = load_key(args.key)
-    readers = []
-    for f in args.answers:
-        r = json.loads(Path(f).read_text())
-        if pack and r.get("pack") != pack:
-            print(f"skipping {f}: pack {r.get('pack')!r} is not {pack!r}")
-            continue
-        readers.append(r)
+    pack, key, readers = load_packs(args.key, args.answers)
     adj = adjudicate(key, readers)
     out = ["# Reader adjudication of the synthetic labels", "",
-           f"Pack {pack or '(first pack)'}: {len(key)} images, {len(readers)} reader(s). An erased image is confirmed when no "
+           f"Pack(s) {pack}: {len(key)} images, {len(readers)} reader(s). An erased image is confirmed when no "
            "reader sees the asked finding, disputed when every reader does, indeterminate when readers split or any says "
            "cannot tell. Control-edited and unedited lesion images are confirmed when every reader sees the finding; "
            "lesion-free images when none does.", ""]

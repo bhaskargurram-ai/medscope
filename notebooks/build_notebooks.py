@@ -2606,14 +2606,24 @@ def nb28_reader_study() -> list[dict]:
 # MedScope 28: reader study (physicians)
 
 Two questions per image, answered by physician readers on a web page: has the image been digitally edited, and is the
-finding there? The page mixes, in equal numbers (48 each, 192 in all) and from different cases: unmodified lesion
-images, lesion-erased images (the LaMa erasures the models were tested on), control-edited images (the same shape
-erased elsewhere with the same tool, lesion intact) and unmodified lesion-free images. Lesion-free images mean "no
-lesion" is not a cue for "edited"; control-edited images let readers rate the control edit as well as the erasure.
-Localized findings (polyps, nodules, masses, tumours) are drawn first; diffuse findings and pneumothorax are included
-as named stress tests and reported apart. The page holds no answer key; the key stays in Drive. This is pack 3
-(pack 2 had 32 per kind: with 32 erased images even zero residual findings cannot clear a 10% upper bound; 48 can);
-every answer file names its pack, and files from earlier packs are not scored against this key.
+finding there? The live page (pack 2, 128 images: 32 each of unmodified lesion images, lesion-erased images (the LaMa erasures the
+models were tested on), control-edited images (the same shape erased elsewhere with the same tool, lesion intact) and
+unmodified lesion-free images, from different cases) **stays exactly as the readers received it**; rerunning section 1
+does not touch it. Lesion-free images mean "no lesion" is not a cue for "edited"; control-edited images let readers
+rate the control edit as well as the erasure.
+
+**Supplement (pack 3).** With 32 erased images even zero residual findings cannot clear a 10% exact upper bound
+(10.9%); the review asked for at least 36 independent erasures. Section 1 therefore adds a supplement of 24 images
+per kind (96 images, about 1 hour) from cases not in pack 2, published at `.../medscope-reader/pack3/`, for the same
+readers to do after the first page. Localized findings (polyps, nodules, masses, tumours) are drawn first; diffuse
+findings and pneumothorax are included as named stress tests and reported apart. Scoring pools both packs
+(56 erased images), matching each answer file to its pack by id. The keys stay in Drive; the pages hold no key.
+
+**Reader design (fixed before any answer is seen):** two readers qualified for each modality (thoracic imaging,
+breast ultrasound, neuroradiology, GI endoscopy) and a third adjudicator for disagreements; the supplement page
+records specialty and years of experience; arm identity is masked (same PNG format, no metadata, shuffled per
+reader); agreement is reported on clinical presence and on edit detectability. The criterion (residual finding on at
+most 10% of erased images, exact upper bound) is judged per image by reader majority on the localized findings.
 
 **Reader design (fixed before any answer is seen):** two readers qualified for each modality (thoracic imaging,
 breast ultrasound, neuroradiology, GI endoscopy) and a third adjudicator for disagreements; readers record specialty
@@ -2637,15 +2647,18 @@ files: put them (`reader_XX.json`) in `MyDrive/medscope/reader/answers/`.
         code(r"""
 RS = f'{DRIVE}/reader'
 os.makedirs(f'{RS}/answers', exist_ok=True)
-PACK = f'{WORK}/reader_pack3'
-KEY = f'{RS}/key_v3.json'            # pack 3: 48 per kind, stress tests tagged; earlier keys and site tars stay as they are
-if not os.path.exists(KEY):
-    !python scripts/make_reader_study.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {PACK} --per-kind 48 --seed 0
-    !cp {PACK}/key.json {KEY}
-    !cd {PACK}/site && tar -cf {RS}/site_v3.tar .
-elif not os.path.exists(f'{PACK}/site/index.html'):
-    os.makedirs(f'{PACK}/site', exist_ok=True)
-    !tar -C {PACK}/site -xf {RS}/site_v3.tar
+KEY2, KEY3 = f'{RS}/key_v2.json', f'{RS}/key_v3.json'
+assert os.path.exists(KEY2) and os.path.exists(f'{RS}/site_v2.tar'), 'pack 2 (the live page) must exist in Drive'
+PACK = f'{WORK}/reader_site'                       # the published tree: pack 2 at the root, the supplement under pack3/
+os.makedirs(f'{PACK}/site/pack3', exist_ok=True)
+!tar -C {PACK}/site -xf {RS}/site_v2.tar           # the live page, byte for byte
+SUPP = f'{WORK}/reader_pack3'
+if not os.path.exists(KEY3):
+    !python scripts/make_reader_study.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {SUPP} --per-kind 24 --seed 3 --exclude-keys {KEY2}
+    !cp {SUPP}/key.json {KEY3}
+    !cd {SUPP}/site && tar -cf {RS}/site_v3.tar .
+!tar -C {PACK}/site/pack3 -xf {RS}/site_v3.tar
+KEY = f'{KEY2} {KEY3}'                             # scoring pools both packs
     !cp reader/index.html {PACK}/site/index.html
 tok = (secret('GITHUB_TOKEN') or '').strip()
 if not tok:
@@ -2657,7 +2670,8 @@ r = subprocess.run(f'cd {PACK}/site && rm -rf .git && git init -q -b main && git
 print(r.stderr.replace(tok, '***') or 'published')
 if r.returncode:
     raise SystemExit('Push failed: check that medscope-reader exists and the token can write to it.')
-print('Readers open: https://bhaskargurram-ai.github.io/medscope-reader/  (after Pages is switched on, step 3 above)')
+print('Live page unchanged: https://bhaskargurram-ai.github.io/medscope-reader/')
+print('Supplement for the same readers: https://bhaskargurram-ai.github.io/medscope-reader/pack3/')
 """),
         md("## 2. Score the answers (after the readers have sent their files)"),
         code(r"""

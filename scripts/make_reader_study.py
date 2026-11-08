@@ -71,6 +71,8 @@ def build(args) -> None:
         if v.kind.value in KINDS and Path(v.image_path).exists():
             by_kind[v.kind.value][source_of(v.case_id)].append(v)
     used_cases: set[str] = set()
+    for kp in args.exclude_keys:                   # a supplement: no case that an earlier pack already shows
+        used_cases |= {k["case_id"] for k in load_key(kp)[1].values()}
     chosen = []
     for kind in ("target_removal", "random_removal", "original", "natural_negative"):   # scarcest kinds first
         # localized findings are drawn first within each source; diffuse ones (stress tests) fill in only afterwards
@@ -160,19 +162,40 @@ def load_key(path: str) -> tuple[str | None, dict]:
     return raw.get("pack"), {k["id"]: k for k in raw["items"]}
 
 
-def score(args) -> None:
-    pack, key = load_key(args.key)
-    readers = []
-    for f in args.answers:
+def load_packs(key_paths: list[str], answer_paths: list[str]) -> tuple[str, dict, list[dict]]:
+    """Several packs scored together (a pack and its supplement): item ids are namespaced by pack, an answer file is
+    matched to its pack by id, and one reader's files from several packs are pooled into one reader record."""
+    keys = {}
+    key: dict = {}
+    for kp in key_paths:
+        pack, k = load_key(kp)
+        keys[pack] = k
+        key.update({f"{pack}:{i}": {**v, "pack": pack} for i, v in k.items()})
+    by_reader: dict[str, dict] = {}
+    for f in answer_paths:
         r = json.loads(Path(f).read_text())
-        if pack and r.get("pack") != pack:
-            print(f"skipping {f}: answered on pack {r.get('pack')!r}, this key is pack {pack!r}")
+        pack = r.get("pack")
+        if pack not in keys:
+            print(f"skipping {f}: answered on pack {pack!r}, not one of {sorted(map(str, keys))}")
             continue
-        readers.append(r)
+        rec = by_reader.setdefault(r["reader"], {**r, "answers": [], "packs": []})
+        rec["answers"] += [{**a, "id": f"{pack}:{a['id']}"} for a in r["answers"]]
+        rec["packs"].append(pack)
+        for fld in ("specialty", "years"):
+            if r.get(fld) and not rec.get(fld):
+                rec[fld] = r[fld]
+    label = " + ".join(str(p) for p in keys)
+    return label, key, list(by_reader.values())
+
+
+def score(args) -> None:
+    pack, key, readers = load_packs(args.key, args.answers)
     kinds = [k for k in KINDS if any(x["kind"] == k for x in key.values())]
     n_kind = Counter(x["kind"] for x in key.values())
-    out = ["# Reader study", "", f"Pack {pack or '(first pack)'}: {len(key)} images "
-           f"({', '.join(f'{n_kind[k]} {LABEL[k].lower()}' for k in kinds)}); {len(readers)} reader(s).", "",
+    out = ["# Reader study", "", f"Pack(s) {pack}: {len(key)} images "
+           f"({', '.join(f'{n_kind[k]} {LABEL[k].lower()}' for k in kinds)}); {len(readers)} reader(s): "
+           + "; ".join(f"{r['reader']} ({r.get('specialty') or 'specialty not given'}, {r.get('years') or '?'} y, "
+                       f"{len(r['answers'])} answers)" for r in readers) + ".", "",
            "## 1. Can physicians tell edited images from unmodified ones, and the erasure from the control edit?", "",
            "Edited-rating 1 (definitely real) to 4 (definitely edited); 'called edited' = rating 3 or 4. "
            "AUC 0.5 = chance, 1.0 = always told apart. If the control edit is as recognisable as the erasure "
@@ -260,7 +283,8 @@ def main() -> None:
     ap.add_argument("--per-kind", type=int, default=32)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--score", action="store_true")
-    ap.add_argument("--key")
+    ap.add_argument("--key", nargs="*", default=[], help="answer key(s); several packs are scored together")
+    ap.add_argument("--exclude-keys", nargs="*", default=[], help="build: leave out every case already in these packs")
     ap.add_argument("--answers", nargs="*", default=[])
     args = ap.parse_args()
     score(args) if args.score else build(args)

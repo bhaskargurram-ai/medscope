@@ -988,6 +988,8 @@ applied in v0.17 (C2 wording and compute, C1 tool+shape confound, C4 "registered
 observation not seed-paired, abstract ESG definition and Gemini utility deficit, provider image settings). New:
 `scripts/review_fixes.py` + notebook 37 (overlap-excluded fresh-external estimates with SIIM denominators, errors
 by asked finding, error at fixed coverage, 491-vs-507 crosswalk count); notebook 38 (recipe held-out tests at seeds
-1–2; `v7_confirm.py` now pairs control vs recipe per seed); reader study pack 3 (48 per kind, localized findings
-first, diffuse/pneumothorax tagged as stress tests, specialty/experience fields, per-image majority criterion).
+1–2; `v7_confirm.py` now pairs control vs recipe per seed); reader study: the live pack-2 page (128 images, already with readers) is kept byte for byte; a 96-image
+supplement (pack 3: 24 per kind, cases not in pack 2, localized findings first, diffuse/pneumothorax tagged as
+stress tests, specialty/experience fields) is published under /pack3/ for the same readers; scoring and adjudication
+pool both packs (56 erased images), per-image majority criterion.
 RESULTS_SUMMARY open-model line corrected (Qwen2.5-VL-7B: 5.5% erased claims at CCR 0.144).
