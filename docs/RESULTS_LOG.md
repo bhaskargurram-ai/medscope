@@ -965,3 +965,18 @@ from "3,000 more cases on the same adapter". Trainer v3 adds a lesion-free repla
 three seeds from `v4_s1`/`v4q_cf_s1`/`v4q_cf_s2`; primary endpoint erased-lesion claims on the pooled held-out
 tools, per-seed direction + pooled CI; guards on lesion-free claims (main test) and ESG/net utility (fresh
 external). Rules: `scripts/v7_confirm.py`; notebooks 36a/36b/36c (one seed each, ~7–8 h) and 36r.
+
+## 2026-11-08 — v7 result: C4 fails (`results/v7_confirmation.md`); manuscript v0.16
+
+Three seed pairs, CMCC (`v4q_cmccn_s*`) vs matched-compute control (`v4q_sftc_s*`), held-out tools pooled (219 cases):
+erased-lesion claims 0.126 vs 0.115, +0.011 [−0.009, +0.030], p=0.27 (per seed −0.029, +0.059, +0.005) → primary
+endpoint not met. Secondary: control denial −0.033 [−0.054, −0.012] p=0.001 (lower every seed); CCR +0.030 p=0.004;
+net utility +0.051 p=0.042; ESG +0.020 n.s. Guards: main-test healthy-image claims 0.131 vs 0.079 (+0.052, p<0.001)
+→ fails; fresh external ESG +0.058, net utility +0.146 → holds, but erased claims +0.073 and CCR +0.127, denial −0.131
+(all p<0.001). Reading: the objective shifts the operating point towards "present" everywhere; the invariance term
+closed s(O)−s(C) by raising s(C), not by removing the edit's influence. Logs confirm the terms behaved as designed
+(inv 3 → 0.2, margin held at 8–10), so the hypothesis failed, not the implementation.
+Incidental: the control arm alone (recipe continued 3,000 cases, replay only) has held-out erased claims 11.5% vs the
+recipe's 16.3% and ESG 0.709 vs 0.649 — the smoke-test gain was mostly extra training. Paper v0.16: §3.7 C4 plan,
+§5.3 C4 paragraph + Table (tab:v7), abstract/contributions/discussion/conclusion/limitations updated; 27 pages.
+`docs/RESULTS_SUMMARY.md` written as a standalone status document for outside readers.

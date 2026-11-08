@@ -1,6 +1,6 @@
 # Response to the independent review of MedScope
 
-Current draft: v0.15 (7 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
+Current draft: v0.16 (7 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
 
 Review rounds: v0.7 from the PDF alone (54/100); package `7b15d59` (64/100); package `d029d26` (67/100). The
 third round rescored 134,309 outcome rows from the transcripts with the repository's own code and found zero
@@ -108,3 +108,12 @@ unedited lesion sensitivity by finding next to erased-lesion claims.
 - Model-specific instruction tuning is left as a limitation (F13).
 - Figure 2 provenance and licences (F29); generative-AI-use declaration; two references to verify (F20, F27).
 - The 22 manifests missing from the package.
+
+
+### v7 (8 November 2026): C4, the control edit as a constraint
+
+Pre-registered before training (`docs/PREREGISTRATION_v7.md`). A paired-view objective (difference-in-differences
+margin + original/control invariance + first-action consistency) against a matched-compute control over three seeds.
+Fails on the primary endpoint; the objective shifts the model towards "present" rather than reducing edit-cue reliance.
+The control arm shows that longer training on control-edit data reduces erased-lesion claims with unseen tools (11.5% vs
+16.3%). Reported in §3.7, §5.3 and Table 10 of v0.16; the training-side novelty claim is withdrawn accordingly.
