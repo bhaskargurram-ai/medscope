@@ -28,16 +28,13 @@
 \setcounter{topnumber}{3}\setcounter{totalnumber}{5}
 
 \title{\textbf{Seeing Is Not Believing: Counterfactual Lesion Erasure Teaches a Small Medical Vision--Language Agent to Report Only What the Image Shows}}
-\author{Bhaskar Gurram\\ \small Independent researcher \quad \texttt{github.com/bhaskargurram-ai/medscope}}
-\date{\small Manuscript draft v0.18, 8 November 2026}
+\author{Bhaskar Gurram\\ \small Independent Researcher\\ \small \texttt{gurrambhaskar.ai@gmail.com} \quad \texttt{github.com/bhaskargurram-ai/medscope}}
+\date{\small Preprint, version 1.0, 8 November 2026. Reader study in progress (Section~\ref{sec:reader}); collaborators sought (Section~\ref{sec:collab}).}
 
 \begin{document}
 \maketitle
 
-\begin{tcolorbox}[colback=orange!6,colframe=orange!60!black,title=Draft status (remove before submission),fonttitle=\bfseries\small]
-\small
-Draft for expert review. The confirmatory numbers come from the pre-registered v4 runs (notebooks 23--25); the post-hoc pneumothorax analysis (notebooks 26--27), the post-review checks (notebooks 29, 31, 32) and the pre-registered mechanism checks (notebooks 33--34) are labelled as such. Every number is regenerated from stored per-view transcripts. Items in orange brackets are open: the reader study (Section~\ref{sec:reader}), a few values to be pulled from the stored runs, and a final check of every reference. Not for reader-study participants until they have submitted their answers.
-\end{tcolorbox}
+
 
 \begin{abstract}
 \noindent\textbf{Background.} Medical vision--language models (VLMs) often report a finding because the question names it; standard benchmarks miss this.
@@ -662,7 +659,7 @@ Model & 256-pixel copy & Original resolution \\
 Qwen3.5-4B (base) & 0\% & 12\% \\
 Stage 1 without counterfactual views & 0\% & 5\% \\
 Stage 1 with counterfactual views & 19\% & 40\% \\
-Stage 2 & \pend{--} & 40\% \\
+Stage 2 & not run & 40\% \\
 \textbf{MedScope-4B (stage 3)} & \textbf{0\%} & \textbf{0\%} \\
 gemini-4-argon & 69\% & 69\% \\
 \bottomrule
@@ -683,7 +680,7 @@ gemini-4-argon & 69\% & 69\% \\
 
 %==============================================================================
 \section{Reader study}\label{sec:reader}
-The benchmark's labels come from datasets, and the erasures are checked only automatically. Physicians therefore read a blinded set of test images to check three assumptions: that an erased finding is no longer visible, that erased images are not trivially recognisable as edited, and that the control edit is as recognisable as the erasure, so that noticing an edit does not tell a reader which kind it is. \pend{Results pending; this section gives the design and the analysis fixed before any answer was seen.}
+The benchmark's labels come from datasets, and the erasures are checked only automatically. Physicians therefore read a blinded set of test images to check three assumptions: that an erased finding is no longer visible, that erased images are not trivially recognisable as edited, and that the control edit is as recognisable as the erasure, so that noticing an edit does not tell a reader which kind it is. Results are pending; this section gives the design and the analysis, fixed before any answer was seen, and the study is being extended as described below.
 
 \textbf{Images.} 128 images from the main test, each from a different case and stratified by source: 32 unmodified images with a lesion, 32 lesion-erased images (the LaMa erasures the models were tested on), 32 control-edited images (the same shape erased elsewhere with the same tool, lesion intact) and 32 unmodified lesion-free images. Lesion-free images are included so that ``no lesion'' is not a cue for ``edited'', and control-edited images so that readers rate the control edit as well as the erasure. Only yes/no presence questions are used. Every image is re-saved the same way (PNG, no metadata) under an opaque name.
 
@@ -691,7 +688,7 @@ The benchmark's labels come from datasets, and the erasures are checked only aut
 
 \textbf{Pre-specified analysis.} Per reader: the share of erased, control-edited and unmodified images rated probably or definitely edited; the AUC for separating edited from unmodified images on the four-level rating, and the AUC for separating erased from control-edited images (0.5 means the two edits are equally recognisable); the share answering ``yes'' to the clinical question on each image kind; agreement between readers (Cohen's $\kappa$ on edited yes/no); and results by source. The pre-specified criterion is the residual-finding rate (erased images on which a reader still answers ``yes'') with its exact 95\% confidence interval, read against an acceptable rate of 10\%; with 32 erased images, even 0 residual findings gives an upper bound of about 11\%, so this study can rule out gross failure of the erasures, not small residual rates. Edit visibility is reported separately as the AUC, with the zero-shot frontier models' 0.70--0.75 as the reference.
 
-\textbf{Readers.} \pend{Number, specialty, years of experience.} \quad \textbf{Results.} \pend{Pending.}
+\textbf{Status and extension.} The 128-image page is with its first readers. Because 32 erased images cannot clear a 10\% exact upper bound even with no residual finding (0/32 gives 10.9\%), a 96-image supplement (24 per kind, from cases not in the first page, localized findings drawn first and diffuse findings and pneumothorax tagged as named stress tests) is added for the same readers, giving 56 erased images; the planned design is two readers qualified for each modality and a third adjudicator, with specialty and years of experience recorded and agreement reported on clinical presence and on edit detectability. The criterion is judged per image by reader majority on the localized findings. Readers' counts, specialties and results will be reported in the next version; no reader has seen this manuscript.
 
 %==============================================================================
 \section{Discussion}
@@ -735,14 +732,16 @@ Three directions follow directly: per-finding coverage and sensitivity floors in
 \section{Conclusion}
 Erasing the lesion, with an edit elsewhere as the control, turns ``does the answer follow the image?'' into a property that can be measured and trained without human annotation. Trained on such views and selected by a pre-registered rule, a 4B agent claims erased findings at 4--6 times lower rates than nine frontier models, with no significant difference in accuracy on real lesions on the internal test, robustly to prompting, question wording and unseen inpainting tools, while keeping aggregate VQA accuracy. Pre-registered checks show that matching the control edit was not shown to improve the primary outcome, that no fresh-external evidence-sensitivity advantage over removal-based preference training was established, that combining the two does not help, and that a paired-view consistency objective does not beat a matched-compute control, while the same continuation without the objective reduced erased-lesion claims on unseen tools in a seed-paired comparison at a cost in sensitivity at one seed; the contribution is the measurement and the demonstration, not a unique training principle. Its perception is weaker than the frontier models' at new centres, and it is only as good as the findings its training data covers: a pre-registered fresh test exposed a complete miss of pneumothorax. Data coverage and per-finding selection safeguards are the priority hypotheses for repair; a successful repair remains to be shown on new held-out data.
 
+\section*{Call for collaboration}\label{sec:collab}
+Two parts of this work need clinical partners, and both are specified in advance so that a collaborator's contribution is a defined, creditable piece of the study. (1) \textbf{Reader validation} (Section~\ref{sec:reader}): radiologists, gastroenterologists or breast imagers to read the blinded pages (about two hours each; two readers per modality and an adjudicator), with co-authorship. (2) \textbf{A new cohort for the pre-registered selection-rule test} (\texttt{docs/PREREGISTRATION\_v8.md}): access to a colonoscopy, chest or breast dataset with segmentation masks that is not among the sources used here, under its licence, and readers to verify the erasure and control views. A methods collaborator interested in evaluation design or in the open questions of Section~\ref{sec:limits} is equally welcome. All code, views, pre-registrations and per-view outputs are public at \texttt{github.com/bhaskargurram-ai/medscope}; contact \texttt{gurrambhaskar.ai@gmail.com}.
+
 \section*{Declarations}
 \textbf{Data and code availability.} Code, view-building recipes, notebooks, the pre-registration with its git history, and the results log: \url{https://github.com/bhaskargurram-ai/medscope}. LoRA adapters and MedScope-Bench (view manifests and per-view transcripts of every evaluation run) on Hugging Face (\texttt{bhaskar-ai/MedScope-4B}; \texttt{datasets/bhaskar-ai/MedScope-Bench}), public on acceptance. All images come from public de-identified datasets under their own licences and are not redistributed.
 
 \textbf{Funding.} This research received no external funding.
 \textbf{Competing interests.} The author declares no competing interests.
-\textbf{Ethics.} The model study used only public, de-identified datasets under their published licences; no new patient data were collected. \pend{Reader study: participant consent and local ethics position.}
-\textbf{Author contributions (CRediT).} Bhaskar Gurram: conceptualisation, methodology, software, investigation, formal analysis, data curation, writing (original draft, review and editing), visualisation. \pend{Reader-study physicians: acknowledged or credited as agreed.}
-\textbf{Declaration of generative AI use.} \pend{To be completed according to the target journal's policy.}
+\textbf{Ethics.} The model study used only public, de-identified datasets under their published licences; no new patient data were collected. The reader study collects no patient data: readers view de-identified public images and submit their answers and self-reported specialty and years of experience, having been told the purpose of the study; participation is voluntary and uncompensated. The author is not affiliated with an institution and has not obtained an institutional ethics review for the reader study; a formal exemption determination will be sought through a collaborating institution before journal submission, and the position will be stated here.
+\textbf{Author contributions (CRediT).} Bhaskar Gurram: conceptualisation, methodology, software, investigation, formal analysis, data curation, writing (original draft, review and editing), visualisation. Reader-study physicians will be acknowledged or credited as agreed with them.
 
 \begin{thebibliography}{99}\small
 \bibitem{llavamed} C.~Li et al. LLaVA-Med: Training a large language-and-vision assistant for biomedicine in one day. \emph{NeurIPS Datasets and Benchmarks}, 2023.
@@ -778,7 +777,7 @@ Erasing the lesion, with an edit elsewhere as the control, turns ``does the answ
 \bibitem{claim} A.~S.~Tejani et al. Checklist for Artificial Intelligence in Medical Imaging (CLAIM): 2024 update. \emph{Radiology: Artificial Intelligence}, 6(4):e240300, 2024. doi:10.1148/ryai.240300.
 \bibitem{tripodllm} J.~Gallifant, M.~Afshar, S.~Ameen, et al. The TRIPOD-LLM reporting guideline for studies using large language models. \emph{Nature Medicine}, 31(1):60--69, 2025. \url{https://doi.org/10.1038/s41591-024-03425-5}
 \bibitem{stardai} V.~Sounderajah, A.~Guni, X.~Liu, et al. The STARD-AI reporting guideline for diagnostic accuracy studies using artificial intelligence. \emph{Nature Medicine}, 31(10):3283--3289, 2025. \url{https://doi.org/10.1038/s41591-025-03953-8}
-\bibitem{qwen35} Qwen Team. Qwen3.5-4B model card. Hugging Face, 2026. \url{https://huggingface.co/Qwen/Qwen3.5-4B} \pend{add the revision hash used}
+\bibitem{qwen35} Qwen Team. Qwen3.5-4B model card. Hugging Face, 2026. \url{https://huggingface.co/Qwen/Qwen3.5-4B} (loaded at the repository's default revision between October and November 2026; the revision was not pinned, and the released adapters record the base model identifier)
 \bibitem{lora} E.~J.~Hu et al. LoRA: Low-rank adaptation of large language models. \emph{ICLR}, 2022.
 \bibitem{efron} B.~Efron and R.~J.~Tibshirani. \emph{An Introduction to the Bootstrap}. Chapman \& Hall, 1993.
 \bibitem{kvasir} D.~Jha et al. Kvasir-SEG: A segmented polyp dataset. \emph{MMM}, 2020.

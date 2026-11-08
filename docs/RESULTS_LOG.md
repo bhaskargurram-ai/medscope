@@ -1023,3 +1023,10 @@ a 0.75 sensitivity floor; R3 ESG with the floor; 21 candidates; ties 0.005; smal
 utility; reader-verified confirmation on a new patient-disjoint cohort with replication on a second source or unseen
 editor); `scripts/v8_select.py` applies the rules mechanically. The Qwen2.5-VL-7B reversal (5.5% erased claims at
 ESG 0.146 / CCR 0.144) is described in §5.1 as the retrospective motivation.
+
+## 2026-11-08 — Preprint v1.0 prepared
+
+`paper/preprint_v1.0.pdf` (28 pages) and the arXiv source. Changes from v0.18 are listed in
+`docs/PREPRINT_SUBMISSION.md`. Author line: Bhaskar Gurram, Independent Researcher, gurrambhaskar.ai@gmail.com.
+No placeholders remain; the reader study is described as in progress with its extension; a call for collaboration
+(readers; a new cohort for the v8 selection-rule test; a methods collaborator) closes the paper.
