@@ -945,3 +945,23 @@ margin term 0.51 (active on a minority of cases), invariance term 3.08, first-ac
 replays one trajectory view per case, scores the two candidate replies of a view in one batch-of-2 pass
 (`HFPolicy.token_logprobs_pair`) and prepares the next case on the CPU while the GPU works; a v1 checkpoint is
 discarded automatically. Expected ≈ 5 s per case.
+
+## 2026-11-07 — 35a smoke test result; v7 pre-registered (C4)
+
+`v4q_cmcc_s0` (trainer v2, 3,000 triplet cases from `v4_s1`, 2.4 s/case on an RTX PRO 6000) vs the recipe and C3:
+- Held-out tools (TELEA + diffusion, 410 cases): erased-lesion claims 10.7% vs 16.3% (recipe) vs 24.4% (C3);
+  control denial 14.9% vs 18.8%; ESG 0.744 vs 0.649; net utility 0.741 vs 0.566. Diffusion: erased −0.094
+  [−0.147, −0.047] p<0.001, ESG +0.120 p<0.001, net utility +0.212 p<0.001; TELEA: ESG +0.073 p=0.008, net utility
+  +0.144 p=0.007, erased −0.023 n.s. Transplant (a training tool): no difference.
+- Fresh external: no difference on any endpoint (ESG 0.393 vs 0.381; erased 14.3 vs 16.7; denial 46.4 vs 45.2;
+  lesion-free claims 3.4 vs 6.8, p=0.068).
+- Main test: ESG 0.717 vs 0.735 n.s.; erased 12.8 vs 11.9 n.s.; denial 15.5 vs 14.6; **lesion-free claims 13.5% vs
+  9.4% (+0.042 [0.012, 0.073], p=0.006)** — the continuation saw no lesion-free image.
+- Training log: invariance term 3.1 → 0.2, margin term 0.5 → 0.3, s(O) − s(C) → ≈0, s(C) − s(E) ≈ 8–10, replay
+  loss flat at 0.25–0.28.
+Reading: the gain is where the edit signature is unfamiliar, as the objective predicts; one seed, and not separable
+from "3,000 more cases on the same adapter". Trainer v3 adds a lesion-free replay view every third case.
+`docs/PREREGISTRATION_v7.md` (C4): CMCC vs a matched-compute control (same replay, all paired-view weights zero),
+three seeds from `v4_s1`/`v4q_cf_s1`/`v4q_cf_s2`; primary endpoint erased-lesion claims on the pooled held-out
+tools, per-seed direction + pooled CI; guards on lesion-free claims (main test) and ESG/net utility (fresh
+external). Rules: `scripts/v7_confirm.py`; notebooks 36a/36b/36c (one seed each, ~7–8 h) and 36r.

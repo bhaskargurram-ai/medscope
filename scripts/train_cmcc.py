@@ -1,7 +1,8 @@
 """Control-matched counterfactual consistency pass (medscope/train/cmcc.py) from an existing adapter.
 
     python scripts/train_cmcc.py --model Qwen/Qwen3.5-4B --init ADAPTERS/v4_s1/final --views TRAIN_VIEWS... \\
-        --cases 3000 --out ADAPTERS/v4q_cmcc_s0 [--tau 2.0 --l-did 0.5 --l-inv 0.5 --l-act 0.5 --lr 2e-5]
+        --negatives NEG_VIEWS... --cases 3000 --out ADAPTERS/v4q_cmcc_s0 [--tau 2.0 --l-did 0.5 --l-inv 0.5 --l-act 0.5 --lr 2e-5]
+    --l-did 0 --l-inv 0 --l-act 0 is the matched-compute control: the same replay, no paired-view terms.
 """
 
 from __future__ import annotations
@@ -20,6 +21,8 @@ def main() -> None:
     ap.add_argument("--model", required=True)
     ap.add_argument("--init", default=None, help="adapter to continue from (None: a new LoRA on the base model)")
     ap.add_argument("--views", nargs="+", required=True)
+    ap.add_argument("--negatives", nargs="*", default=[], help="lesion-free views replayed every --neg-every cases")
+    ap.add_argument("--neg-every", type=int, default=3)
     ap.add_argument("--cases", type=int, default=0, help="number of triplet cases (0 = all)")
     ap.add_argument("--tau", type=float, default=2.0)
     ap.add_argument("--l-did", type=float, default=0.5)
@@ -39,12 +42,16 @@ def main() -> None:
         rng = np.random.default_rng(args.seed)
         triplets = [triplets[i] for i in sorted(rng.permutation(len(triplets))[:args.cases])]
     print(f"{len(triplets)} triplet cases")
+    negatives = [v for f in args.negatives for v in load_views(f)]
+    if negatives:
+        print(f"{len(negatives)} lesion-free views, one replayed every {args.neg_every} cases")
     import random, torch
     random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
     from medscope.train.hf_policy import HFPolicy
     policy = HFPolicy(args.model, adapter=args.init, trainable=True) if args.init else HFPolicy(args.model, trainable=True, new_lora=True)
     train_cmcc(policy, triplets, args.out, lr=args.lr, grad_accum=args.grad_accum, tau=args.tau, l_did=args.l_did,
-               l_inv=args.l_inv, l_act=args.l_act, seed=args.seed, max_steps=args.max_steps)
+               l_inv=args.l_inv, l_act=args.l_act, seed=args.seed, max_steps=args.max_steps, negatives=negatives,
+               neg_every=args.neg_every)
 
 
 if __name__ == "__main__":

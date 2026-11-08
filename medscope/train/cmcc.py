@@ -41,7 +41,7 @@ from .common import append_log, checkpoint_path, load_adapter_weights, load_opti
 from .sft import samples_for
 
 PREFIX = "From the image:"      # one neutral lead-in for both candidate replies, so only the decision differs
-TRAINER = "cmcc-v2"              # batched candidates, one-view replay, prefetch; state.json records it
+TRAINER = "cmcc-v3"              # v2 (batched candidates, one-view replay, prefetch) + lesion-free replay; state.json records it
 
 
 @dataclass
@@ -77,7 +77,11 @@ def candidates(view: View) -> tuple[str, str]:
 
 def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float = 2e-5, grad_accum: int = 8,
                tau: float = 2.0, l_did: float = 0.5, l_inv: float = 0.5, l_act: float = 0.5, seed: int = 0,
-               save_every: int = 50, max_steps: Optional[int] = None, log: Callable[[str], None] = print) -> Path:
+               save_every: int = 50, max_steps: Optional[int] = None, negatives: Optional[list[View]] = None,
+               neg_every: int = 3, log: Callable[[str], None] = print) -> Path:
+    """`negatives`: lesion-free (natural negative) views; one is replayed every `neg_every` cases so the continuation
+    keeps seeing healthy images (the triplets only exist for lesion cases; the smoke test without this drifted
+    towards "present" on healthy images)."""
     import torch
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -89,6 +93,8 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
         return final
     rng = np.random.default_rng(seed)
     order = [triplets[i] for i in rng.permutation(len(triplets))]
+    negatives = negatives or []
+    neg_order = [negatives[i] for i in rng.permutation(len(negatives))] if negatives else []
     total_steps = max_steps or max(1, len(order) // grad_accum)
     model.train()
     params = [p for p in model.parameters() if p.requires_grad]
@@ -112,8 +118,11 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
         imgs = [load_image(v.image_path) for v in views]
         replay_view = views[i % 3]
         kw = dict(window_prob=0.3, small_zoom=True) if replay_view is t.original else {}
-        replay = [(policy.target_ids(smp.target), policy.encode_cpu(smp.messages))
-                  for smp in samples_for(replay_view, "agentic", seed, i, **kw)]
+        replay_samples = samples_for(replay_view, "agentic", seed, i, **kw)
+        if neg_order and i % neg_every == neg_every - 1:                     # a lesion-free image every neg_every cases
+            neg = neg_order[(i // neg_every) % len(neg_order)]
+            replay_samples = replay_samples + samples_for(neg, "agentic", seed, i)
+        replay = [(policy.target_ids(smp.target), policy.encode_cpu(smp.messages)) for smp in replay_samples]
         prompts = []
         for v, img in zip(views, imgs):
             present, absent = candidates(v)
@@ -220,6 +229,7 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
         optimizer_step()
     policy.save_adapter(str(final))
     write_state(out, {"cases_done": len(order), "opt_step": step, "total_steps": total_steps, "finished": True,
-                      "trainer": TRAINER, "tau": tau, "l_did": l_did, "l_inv": l_inv, "l_act": l_act})
+                      "trainer": TRAINER, "tau": tau, "l_did": l_did, "l_inv": l_inv, "l_act": l_act,
+                      "negatives": len(negatives), "neg_every": neg_every})
     log(f"saved final adapter to {final}")
     return final

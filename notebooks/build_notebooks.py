@@ -3217,6 +3217,77 @@ runtime.unassign()
     ]
 
 
+def nb36_v7(part: str):
+    """Notebook 36: the pre-registered v7 check C4. 'a'/'b'/'c' = seed 0/1/2, each training the CMCC arm and the
+    matched-compute control from that seed's recipe adapter and testing both everywhere; 'r' = the rules (CPU)."""
+    seed = {"a": 0, "b": 1, "c": 2}.get(part)
+    recipe = {0: "v4_s1", 1: "v4q_cf_s1", 2: "v4q_cf_s2"}.get(seed)
+    what = f"seed {seed}: CMCC and the matched-compute control" if part != "r" else "report"
+    def build() -> list[dict]:
+        c = nb25_v4_recipe()
+        cells = [md(f"""
+# MedScope 36{part}: pre-registered v7 check C4: {what}
+
+`docs/PREREGISTRATION_v7.md` (committed before any of this ran) fixes the question the smoke test (notebook 35a)
+could not answer: is the gain on unseen inpainting tools due to the paired-view objective, or to 3,000 more cases of
+training on the same adapter? Two arms per seed, both continuing that seed's stage-1 recipe adapter on the same
+3,000 triplet cases with the same replay (one trajectory view per case plus a lesion-free image every third case):
+
+- **CMCC** (`v4q_cmccn_s{{seed}}`): replay + difference-in-differences margin + original/control invariance + first-action consistency.
+- **Matched-compute control** (`v4q_sftc_s{{seed}}`): replay only, all three paired-view weights at zero.
+
+Primary endpoint: erased-lesion claims on the pooled held-out tools (TELEA + diffusion), CMCC vs control, every seed
+pair in the same direction and the pooled interval excluding zero; guards on lesion-free claims (main test) and on
+ESG / net utility (fresh external). Rules in `scripts/v7_confirm.py`.
+
+**This notebook ({what}):** {'one GPU (A100 or better), about 7-8 hours (CMCC about 2.5 h, control about 1.5 h, tests about 1.5 h each).' if part != 'r' else 'CPU, a few minutes; run after 36a, 36b and 36c (partial results give partial tables, no verdict).'}
+Run all; nothing to set. Every step resumes. The runtime frees itself on failure and at the end.
+""" + SECRETS_NOTE)]
+        if part == "r":
+            cells += [code(SETUP)]
+        else:
+            cells += [code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7]]
+        cells.append(code(r"""
+plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/PREREGISTRATION_v7.md', cwd='/content/medscope').stdout.strip()
+assert plan, 'docs/PREREGISTRATION_v7.md is not in the repository: do not train without the pre-registration'
+print('pre-registration committed:', plan)
+"""))
+        if part != "r":
+            cells += [md(f"## 1. Seed {seed}: CMCC arm, then the matched-compute control, each tested everywhere"),
+                      code(f"""
+RECIPE = f'{{ADAPTERS}}/{recipe}/final'
+assert os.path.exists(f'{{RECIPE}}/adapter_config.json'), f'the stage-1 recipe adapter for seed {seed} is missing: {{RECIPE}}'
+COMMON = f'--model {BASE} --init {{RECIPE}} --views {{TRAIN_V4_BASE}} {{V4}}/train_tp/views.jsonl --negatives {{TRAIN_NEG_V4}} --neg-every 3 --cases 3000 --lr 2e-5 --grad-accum 8 --seed {seed}'
+for name, weights in (('v4q_cmccn_s{seed}', '--tau 2.0 --l-did 0.5 --l-inv 0.5 --l-act 0.5'),
+                      ('v4q_sftc_s{seed}', '--l-did 0 --l-inv 0 --l-act 0')):
+    out = f'{{ADAPTERS}}/{{name}}'
+    if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+        sh(f'python scripts/train_cmcc.py {{COMMON}} {{weights}} --out {{out}}')
+    print(name, open(f'{{out}}/state.json').read())
+    test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+""")]
+        cells += [md("## Pre-registered rule applied to whatever has finished"),
+                  code(r"""
+!python scripts/v7_confirm.py --results {RESULTS} --out {RESULTS}/v7_confirmation.md
+!python scripts/api_cost.py --results {RESULTS} --out {RESULTS}/api_cost.md
+"""),
+                  publish(f"MedScope report - 36{part} v7 check C4", """
+    ('Pre-registered confirmation (C4: CMCC vs matched-compute control, three seeds)', read_text(f'{RESULTS}/v7_confirmation.md')),
+    ('Measured API spend, all runs', read_text(f'{RESULTS}/api_cost.md')),
+""" + ("" if part == "r" else f"""
+    ('Training log, CMCC seed {seed}', read_text(f'{{ADAPTERS}}/v4q_cmccn_s{seed}/train_log.jsonl')),
+    ('Training log, control seed {seed}', read_text(f'{{ADAPTERS}}/v4q_sftc_s{seed}/train_log.jsonl')),
+"""))]
+        if part != "r":
+            cells.append(code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""))
+        return cells
+    return build
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3318,6 +3389,10 @@ NOTEBOOKS = {
     "34c_v6_dpo_seed2.ipynb": nb34_v6("dpo_s2"),
     "34r_v6_report.ipynb": nb34_v6("report"),
     "35a_cmcc_smoke.ipynb": nb35_cmcc_smoke,
+    "36a_v7_cmcc_seed0.ipynb": nb36_v7("a"),
+    "36b_v7_cmcc_seed1.ipynb": nb36_v7("b"),
+    "36c_v7_cmcc_seed2.ipynb": nb36_v7("c"),
+    "36r_v7_report.ipynb": nb36_v7("r"),
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
