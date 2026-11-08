@@ -1,6 +1,6 @@
 # Response to the independent review of MedScope
 
-Current draft: v0.17 (7 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
+Current draft: v0.18 (7 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
 
 Review rounds: v0.7 from the PDF alone (54/100); package `7b15d59` (64/100); package `d029d26` (67/100). The
 third round rescored 134,309 outcome rows from the transcripts with the repository's own code and found zero
@@ -135,3 +135,17 @@ The control arm shows that longer training on control-edit data reduces erased-l
 | Reader study: 2 readers per modality + adjudicator, ≥36 erasures, localized first, stress tests named, mask arm, record experience, report agreement | Pack 3 built to this design (48 per kind, 192 images) | notebook 28, `reader/index.html`, `scripts/make_reader_study.py` |
 | Venue: one ML-evaluation paper, TMLR | Agreed; framing unchanged from v0.16 | – |
 | Defer new loss variants; training-duration comparison only if seed-paired gain survives | Agreed; no new training arm planned before notebook 38 | – |
+
+
+## Response to the v0.17 review (8 November 2026, 72/100 retained)
+
+| Reviewer point | Action | Where |
+| --- | --- | --- |
+| Reconcile duplicate-image statements (§4.1 vs §8.5); report actual shifts (+0.002 ESG, +0.003 CCR, +0.007 utility) and post-exclusion SIIM positive denominator (47) | Done; the "0.003 upper bound" removed | §4.1, limitations |
+| Use the abstract's wording for C1 and C2 everywhere ("not shown to improve the primary outcome"; "no fresh-external ESG advantage established") | Done in highlights, §5.3, discussion, conclusion | throughout |
+| Report the paired training-duration comparison throughout (all three point estimates favour continuation, two intervals exclude zero; seed-1 CCR −4.9) | Done in C4 lead, Table caption, §5.3, abstract | §5.3, Table 10, abstract |
+| Keep the fixed-coverage comparison visible; state tie handling; no ranking without a paired interval | Tie rule stated (stable sort); figures described as per-model trade-offs, not a ranking | §5.5 |
+| Novelty: present the Qwen2.5-VL-7B reversal as an observed motivation; freeze three selection rules, candidates, ties, smallest gain; reader-verified confirmation on a new cohort | `docs/PREREGISTRATION_v8.md` committed (rules R1–R3, 21 candidates, floor 0.75, ties 0.005, gain 0.05, reader verification); `scripts/v8_select.py` applies the rules; paragraph in §5.1 and a limitation | §5.1, limitations, docs |
+| Reader validation: keep the 128-image pack, extend to ≥36 erasures, record specialty, agreement, residual signs, target survival after control edit | Pack 2 kept live; 96-image supplement under /pack3/ (56 erasures pooled); specialty/years fields; per-image majority criterion; control-view presence already asked | notebook 28 |
+| Rescore verified pairs; patient-grouped intervals; frozen selection rule on unseen patients | Adjudication script pools packs and restricts comparisons to confirmed cases; v8 plan covers the rest | `scripts/adjudicate.py`, v8 |
+| Ethics/consent, AI-use declaration, model revision | Pending author input | – |

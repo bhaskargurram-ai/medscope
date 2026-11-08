@@ -1011,3 +1011,15 @@ continuation) vs recipe, paired by seed, held-out tools: erased claims −0.012 
 with a loss of clean-image sensitivity; reported as an observation, no locked comparison planned yet.
 Paper v0.17: overlap-exclusion and 491/507 figures filled; longer-training paragraph seed-paired; new "errors by
 finding and at fixed coverage" paragraph and a confidence limitation. 28 pages.
+
+
+## 2026-11-08 — v0.17 review (72/100 retained); v0.18
+
+`docs/reviews/MedScope_v017_Review.pdf`. All four numbered corrections applied (duplicate statements reconciled with
+actual shifts +0.002/+0.003/+0.007 and the 47-film post-exclusion SIIM denominator; consistent C1/C2 wording; the
+training-duration comparison reported seed-paired throughout; fixed-coverage tie handling stated). The reviewer's
+novelty route adopted: `docs/PREREGISTRATION_v8.md` fixes a prospective selection-rule test (R1 erased claims; R2 with
+a 0.75 sensitivity floor; R3 ESG with the floor; 21 candidates; ties 0.005; smallest worthwhile gain 0.05 net
+utility; reader-verified confirmation on a new patient-disjoint cohort with replication on a second source or unseen
+editor); `scripts/v8_select.py` applies the rules mechanically. The Qwen2.5-VL-7B reversal (5.5% erased claims at
+ESG 0.146 / CCR 0.144) is described in §5.1 as the retrospective motivation.
