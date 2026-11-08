@@ -1,6 +1,6 @@
 # MedScope: complete results to date and open questions
 
-Status document for an outside reader, 8 November 2026. Everything below is in the repository
+Status document for an outside reader, 8 November 2026 (revised after the v0.16 review; manuscript v0.17). Everything below is in the repository
 (`github.com/bhaskargurram-ai/medscope`): the manuscript draft (`paper/method_paper.pdf`, v0.16), the dated log of every
 run and every change of plan (`docs/RESULTS_LOG.md`), the four pre-registrations (`docs/PREREGISTRATION_v4.md` …
 `_v7.md`, each committed before the arms it describes were trained), the per-run reports, and the notebooks that
@@ -37,7 +37,9 @@ labels (no human annotators), in three stages, with the final model chosen by a 
 | --- | --- | --- | --- | --- |
 | MedScope-4B (final) | **0.758** | **9.6%** | 0.849 | 7.6% |
 | Nine frontier VLMs (API) | 0.27–0.47 | 41–62% | comparable on real lesions | – |
-| Six open VLMs | lower | higher | – | – |
+| Six open VLMs | 0.15–0.42 | 5.5–54% | 0.14–0.76 | 12–25% |
+
+The open models' erased-claim rates are not comparable on their own: Qwen2.5-VL-7B claims an erased lesion in only 5.5% of cases but answers correctly on 14% of lesion images (CCR 0.144) — it says "absent" nearly everywhere, which ESG (0.146) and net utility (−0.74) expose. ESG is reported as absent-or-refer; the strict variant is in the reports.
 
 All frontier differences p < 0.001. No significant loss of accuracy on real lesions on the internal test.
 
@@ -126,3 +128,17 @@ erase/sham pair explicitly.
    on validation), or is it a footnote?
 5. **Which of the open directions in §6 would change a reviewer's mind**, and which would a clinician find irrelevant?
 6. **Reader study**: how many readers and what specialties make the blinded validation credible for the venues above?
+
+
+## 9. Response to the 8 November review (72/100)
+
+Accepted and applied in v0.17: C2 restated as "no fresh-external ESG advantage established" with compute per
+adaptation; C1 noted as changing tool and shape together; C4 labelled a registered comparison after a pilot on
+previously examined cases; the longer-training observation flagged as not seed-paired (notebook 38 adds the recipe's
+held-out tests at seeds 1 and 2); abstract states the ESG definition and restores the fresh-external utility deficit
+vs gemini-4-argon; provider image settings stated; the open-model line above corrected. Notebook 37 computes the
+overlap-excluded fresh-external estimates with SIIM denominators, errors by finding (misses, false claims, referrals),
+error at fixed coverage, and the 491-vs-507 crosswalk count. The reader study is rebuilt to the reviewer's design
+(pack 3: 48 per kind, localized findings first, diffuse findings and pneumothorax as named stress tests, specialty and
+experience recorded, per-image majority criterion). Not yet done: the reader study itself; an independent
+patient-disjoint confirmation cohort; a locked training-duration comparison (deferred until the seed-paired check).

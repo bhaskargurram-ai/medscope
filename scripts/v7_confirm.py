@@ -131,6 +131,15 @@ def main() -> None:
         if a and b:
             lines, _ = table(a, b, ("target_hallucination_rate", "esg", "random_denial_rate", "net_utility"))
             out += [f"**Seed {s}**", ""] + lines + [""]
+    out += ["## Supporting: matched-compute control (A) vs the recipe adapter (B), held-out tools, per seed", "",
+            "The longer-training observation, paired by seed (needs the recipe's held-out tests at every seed, notebook 38).", ""]
+    for s in SEEDS:
+        a, b = pooled(R, runs(args.control, s, "heldout")), pooled(R, runs("cf", s, "heldout"))
+        if a and b:
+            lines, _ = table(a, b, ("target_hallucination_rate", "esg", "random_denial_rate", "ccr", "net_utility"))
+            out += [f"**Seed {s}**", ""] + lines + [""]
+        else:
+            out += [f"**Seed {s}:** recipe held-out tests not available.", ""]
     a, b = pooled(R, runs(args.arm, 0, "heldout")), pooled(R, runs("cfdpo", 0, "heldout"))
     if a and b:
         lines, _ = table(a, b, ("target_hallucination_rate", "esg", "random_denial_rate", "net_utility"))

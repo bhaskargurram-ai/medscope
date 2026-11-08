@@ -980,3 +980,14 @@ Incidental: the control arm alone (recipe continued 3,000 cases, replay only) ha
 recipe's 16.3% and ESG 0.709 vs 0.649 — the smoke-test gain was mostly extra training. Paper v0.16: §3.7 C4 plan,
 §5.3 C4 paragraph + Table (tab:v7), abstract/contributions/discussion/conclusion/limitations updated; 27 pages.
 `docs/RESULTS_SUMMARY.md` written as a standalone status document for outside readers.
+
+## 2026-11-08 — v0.16 review received (72/100, major revision); v0.17
+
+Review in `docs/reviews/MedScope_v016_Review.pdf`; point-by-point in `docs/reviews/RESPONSE.md`. Text corrections
+applied in v0.17 (C2 wording and compute, C1 tool+shape confound, C4 "registered after a pilot", longer-training
+observation not seed-paired, abstract ESG definition and Gemini utility deficit, provider image settings). New:
+`scripts/review_fixes.py` + notebook 37 (overlap-excluded fresh-external estimates with SIIM denominators, errors
+by asked finding, error at fixed coverage, 491-vs-507 crosswalk count); notebook 38 (recipe held-out tests at seeds
+1–2; `v7_confirm.py` now pairs control vs recipe per seed); reader study pack 3 (48 per kind, localized findings
+first, diffuse/pneumothorax tagged as stress tests, specialty/experience fields, per-image majority criterion).
+RESULTS_SUMMARY open-model line corrected (Qwen2.5-VL-7B: 5.5% erased claims at CCR 0.144).

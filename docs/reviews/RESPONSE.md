@@ -1,6 +1,6 @@
 # Response to the independent review of MedScope
 
-Current draft: v0.16 (7 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
+Current draft: v0.17 (7 November 2026), `paper/method_paper.pdf`. This letter replaces the earlier `RESPONSE_v09.md`.
 
 Review rounds: v0.7 from the PDF alone (54/100); package `7b15d59` (64/100); package `d029d26` (67/100). The
 third round rescored 134,309 outcome rows from the transcripts with the repository's own code and found zero
@@ -117,3 +117,21 @@ margin + original/control invariance + first-action consistency) against a match
 Fails on the primary endpoint; the objective shifts the model towards "present" rather than reducing edit-cue reliance.
 The control arm shows that longer training on control-edit data reduces erased-lesion claims with unseen tools (11.5% vs
 16.3%). Reported in §3.7, §5.3 and Table 10 of v0.16; the training-side novelty claim is withdrawn accordingly.
+
+
+## Response to the v0.16 review (8 November 2026, 72/100, major revision)
+
+| Reviewer point | Action | Where |
+| --- | --- | --- |
+| C2: say "did not establish a fresh-external ESG advantage"; report compute per adaptation | Done | §5.3 C2 paragraph, abstract |
+| C1: tool and mask shape changed together | Done | §5.3 C1 paragraph |
+| C4: label as registered after a pilot on previously examined cases; confirm on a new cohort | Labelled; cohort pending | §5.3 C4 paragraph |
+| Longer training: 16.3% is seed 0, 11.5% pooled; pair by seed | Flagged in text; notebook 38 adds recipe held-out tests at seeds 1–2; `v7_confirm.py` pairs control vs recipe per seed | §5.3, notebook 38 |
+| Overlap: fresh-external estimates excluding the shared image, SIIM denominators; 491 vs 507; loose matches ambiguous | Notebook 37 section A/D; text placeholders until run | §4.1, `results/review_v016.md` |
+| Abstract: ESG definition; p-value language; Bonferroni; Gemini utility deficit | Done (Bonferroni already stated in §3.9) | abstract |
+| Summary: six-open-model claim wrong (Qwen2.5-VL-7B 5.5%) | Corrected with CCR context | `docs/RESULTS_SUMMARY.md` |
+| Utility: false claims, misses, referrals by finding; error vs coverage at fixed coverage | Notebook 37 sections B/C | `results/review_v016.md` |
+| Provider pixel inputs and settings | Done | §3.9 |
+| Reader study: 2 readers per modality + adjudicator, ≥36 erasures, localized first, stress tests named, mask arm, record experience, report agreement | Pack 3 built to this design (48 per kind, 192 images) | notebook 28, `reader/index.html`, `scripts/make_reader_study.py` |
+| Venue: one ML-evaluation paper, TMLR | Agreed; framing unchanged from v0.16 | – |
+| Defer new loss variants; training-duration comparison only if seed-paired gain survives | Agreed; no new training arm planned before notebook 38 | – |

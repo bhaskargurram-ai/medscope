@@ -58,7 +58,7 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `26_siim_fullres` | Post hoc (exploratory): the fresh-external SIIM pneumothorax cases rebuilt at original resolution, same models | A100 or L4 | ~1 h |
 | `26b_pneumothorax_diagnosis` | Post hoc: why pneumothorax is missed (training targets per stage, detection by stage, lesion size, question swap) | A100 or L4 | ~20 min |
 | `27_v41_pneumothorax_fix` | Post hoc: v4.1, stage 3 redone with SIIM pneumothorax training patients; tested on new SIIM patients and every earlier test | A100 | ~4-5 h |
-| `28_reader_study` | Reader study: builds and publishes the blinded page (128 images: unmodified, lesion-erased, control-edited, lesion-free), later scores the readers' answer files | CPU | ~5 min + scoring |
+| `28_reader_study` | Reader study: builds and publishes the blinded page (pack 3: 192 images, 48 each unmodified, lesion-erased, control-edited, lesion-free; diffuse findings tagged as stress tests), later scores the readers' answer files | CPU | ~5 min + scoring |
 | `29_review_checks` | Review checks: factorial ablation (control edits vs insertions), linear probe on the frozen vision encoder, patient-level bootstrap | A100 | ~9 h |
 | `30_audit_package` | One ZIP for an auditor: repository snapshot, git history, every report and every run's metrics and rescored outcomes | CPU | ~5 min |
 | `31_crosswalk` | Cross-set crosswalk: pixel-level search for the same image or a near-copy between any two splits or cohorts, plus id overlap | CPU | ~15 min |
@@ -72,6 +72,8 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `35a_cmcc_smoke` | Smoke test of the paired-view objective (`medscope/train/cmcc.py`): control-matched counterfactual consistency as a continuation of the stage-1 recipe, tested everywhere against the recipe and the C3 arm | A100 | ~5-6 h |
 | `36a_v7_cmcc_seed0`, `36b_v7_cmcc_seed1`, `36c_v7_cmcc_seed2` | Pre-registered v7 check C4: CMCC vs a matched-compute control (same replay, no paired-view terms) from each seed's recipe adapter, tested everywhere | A100 | ~7-8 h each |
 | `36r_v7_report` | Applies the v7 rule (`scripts/v7_confirm.py`) and publishes the report | CPU | ~5 min |
+| `37_review_analyses` | Analyses for the v0.16 review: overlap-excluded fresh-external estimates, errors by finding, error at fixed coverage, crosswalk coverage | CPU | ~5 min |
+| `38_recipe_heldout_seeds` | Held-out-tool tests of the recipe adapters at seeds 1 and 2, so the longer-training observation can be paired by seed | A100 | ~1.5 h |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.

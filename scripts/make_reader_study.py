@@ -41,6 +41,17 @@ PRESENT = {"original", "random_removal"}
 LABEL = {"original": "Unmodified lesion images", "target_removal": "Lesion-erased images",
          "random_removal": "Control-edited images (lesion intact)", "natural_negative": "Unmodified lesion-free images"}
 ACCEPTABLE_RESIDUAL = 0.10      # pre-specified: share of erased images on which a reader still sees the finding
+# Findings whose erasure is not expected to be clinically clean (diffuse, or with secondary signs): kept in the pack as
+# named stress tests and reported apart from the localized findings (polyp, nodule, mass, tumour, cyst ...).
+STRESS_FINDINGS = ("pneumothorax", "opacity", "opacities", "covid", "consolidation", "infiltrate", "infiltration",
+                   "pneumonia", "effusion", "oedema", "edema", "atelectasis", "fibrosis", "emphysema", "cardiomegaly")
+STRESS_SOURCES = ("QaTa-COV19", "SIIM")
+
+
+def is_stress(view) -> bool:
+    from medscope.actions import asked_finding
+    f = (asked_finding(view.question) or "").lower()
+    return any(k in f for k in STRESS_FINDINGS) or any(src.lower() in source_of(view.case_id).lower() for src in STRESS_SOURCES)
 
 
 def source_of(case_id: str) -> str:
@@ -62,7 +73,8 @@ def build(args) -> None:
     used_cases: set[str] = set()
     chosen = []
     for kind in ("target_removal", "random_removal", "original", "natural_negative"):   # scarcest kinds first
-        pools = {s: rng.sample(vs, len(vs)) for s, vs in by_kind[kind].items()}
+        # localized findings are drawn first within each source; diffuse ones (stress tests) fill in only afterwards
+        pools = {s: sorted(rng.sample(vs, len(vs)), key=lambda v: is_stress(v), reverse=True) for s, vs in by_kind[kind].items()}
         sources = sorted(pools)
         picked = 0
         while picked < args.per_kind and any(pools.values()):
@@ -88,12 +100,13 @@ def build(args) -> None:
         items.append({"id": iid, "image": f"images/{iid}.png", "question": v.question})
         key.append({"id": iid, "kind": v.kind.value, "edited": v.kind.value in EDITED,
                     "finding_present": v.kind.value in PRESENT, "case_id": v.case_id, "view_id": v.view_id,
-                    "source": source_of(v.case_id), "question": v.question})
+                    "source": source_of(v.case_id), "question": v.question, "stress": is_stress(v)})
     (site / "items.json").write_text(json.dumps({"pack": pack, "items": items}, indent=1))
     shutil.copy(ROOT / "reader" / "index.html", site / "index.html")
     (Path(args.out) / "key.json").write_text(json.dumps({"pack": pack, "items": key}, indent=1))
     c = Counter((k["source"], k["kind"]) for k in key)
-    print(f"pack {pack}: {len(items)} images: " + ", ".join(f"{k}: {sum(1 for x in key if x['kind'] == k)}" for k in KINDS))
+    print(f"pack {pack}: {len(items)} images: " + ", ".join(f"{k}: {sum(1 for x in key if x['kind'] == k)}" for k in KINDS)
+          + f"; stress-test items: {sum(1 for x in key if x['stress'])}")
     for (s, k), n in sorted(c.items()):
         print(f"  {s} | {k}: {n}")
 
@@ -200,6 +213,21 @@ def score(args) -> None:
         out += ["", f"Residual finding on lesion-erased images, all readers pooled: {residual_k}/{residual_n} = "
                 f"{residual_k / residual_n:.1%}, exact 95% CI [{lo:.1%}, {hi:.1%}] ({verdict}; reads of the same image by "
                 "several readers are not independent, so the interval is optimistic)."]
+        # per image (majority of readers), localized findings apart from the named stress tests; this is the
+        # independent-erasure count the criterion is judged on
+        per_img: dict[str, list[str]] = defaultdict(list)
+        for r in readers:
+            for a in r["answers"]:
+                if a.get("finding") and a["id"] in key and key[a["id"]]["kind"] == "target_removal":
+                    per_img[a["id"]].append(a["finding"])
+        for label, want in (("localized findings", False), ("named stress tests (diffuse findings, pneumothorax)", True)):
+            ids = [i for i in per_img if bool(key[i].get("stress")) == want]
+            if not ids:
+                continue
+            resid = sum(1 for i in ids if sum(x == "yes" for x in per_img[i]) * 2 > len(per_img[i]))
+            lo2, hi2 = exact_ci(resid, len(ids))
+            out.append(f"- Per image, majority of readers, {label}: {resid}/{len(ids)} erased images with a residual "
+                       f"finding, exact 95% CI [{lo2:.1%}, {hi2:.1%}]" + (" (criterion judged here)" if not want else ""))
     if len(binary) >= 2:
         names = list(binary)
         out += ["", "## 3. Agreement between readers (edited yes/no)", ""]

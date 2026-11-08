@@ -2606,12 +2606,20 @@ def nb28_reader_study() -> list[dict]:
 # MedScope 28: reader study (physicians)
 
 Two questions per image, answered by physician readers on a web page: has the image been digitally edited, and is the
-finding there? The page mixes, in equal numbers (32 each, 128 in all) and from different cases: unmodified lesion
+finding there? The page mixes, in equal numbers (48 each, 192 in all) and from different cases: unmodified lesion
 images, lesion-erased images (the LaMa erasures the models were tested on), control-edited images (the same shape
 erased elsewhere with the same tool, lesion intact) and unmodified lesion-free images. Lesion-free images mean "no
 lesion" is not a cue for "edited"; control-edited images let readers rate the control edit as well as the erasure.
-The page holds no answer key; the key stays in Drive. This is pack 2 (the first pack had no control-edited images);
-every answer file names its pack, and files from the first pack are not scored against this key.
+Localized findings (polyps, nodules, masses, tumours) are drawn first; diffuse findings and pneumothorax are included
+as named stress tests and reported apart. The page holds no answer key; the key stays in Drive. This is pack 3
+(pack 2 had 32 per kind: with 32 erased images even zero residual findings cannot clear a 10% upper bound; 48 can);
+every answer file names its pack, and files from earlier packs are not scored against this key.
+
+**Reader design (fixed before any answer is seen):** two readers qualified for each modality (thoracic imaging,
+breast ultrasound, neuroradiology, GI endoscopy) and a third adjudicator for disagreements; readers record specialty
+and years of experience on the page; arm identity is masked (same PNG format, no metadata, shuffled per reader);
+agreement is reported on clinical presence and on edit detectability. The criterion (residual finding on at most 10%
+of erased images, exact upper bound) is judged per image by reader majority on the localized findings.
 
 **Before you start (once):**
 1. On GitHub create an empty **public** repository named `medscope-reader` (no README).
@@ -2629,15 +2637,15 @@ files: put them (`reader_XX.json`) in `MyDrive/medscope/reader/answers/`.
         code(r"""
 RS = f'{DRIVE}/reader'
 os.makedirs(f'{RS}/answers', exist_ok=True)
-PACK = f'{WORK}/reader_pack2'
-KEY = f'{RS}/key_v2.json'            # pack 2: four kinds; the first pack's key.json and site.tar stay as they are
+PACK = f'{WORK}/reader_pack3'
+KEY = f'{RS}/key_v3.json'            # pack 3: 48 per kind, stress tests tagged; earlier keys and site tars stay as they are
 if not os.path.exists(KEY):
-    !python scripts/make_reader_study.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {PACK} --per-kind 32 --seed 0
+    !python scripts/make_reader_study.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {PACK} --per-kind 48 --seed 0
     !cp {PACK}/key.json {KEY}
-    !cd {PACK}/site && tar -cf {RS}/site_v2.tar .
+    !cd {PACK}/site && tar -cf {RS}/site_v3.tar .
 elif not os.path.exists(f'{PACK}/site/index.html'):
     os.makedirs(f'{PACK}/site', exist_ok=True)
-    !tar -C {PACK}/site -xf {RS}/site_v2.tar
+    !tar -C {PACK}/site -xf {RS}/site_v3.tar
     !cp reader/index.html {PACK}/site/index.html
 tok = (secret('GITHUB_TOKEN') or '').strip()
 if not tok:
@@ -3288,6 +3296,69 @@ runtime.unassign()
     return build
 
 
+def nb37_review() -> list[dict]:
+    """Notebook 37 (CPU): the analyses the v0.16 review asked for, from stored per-view outcomes."""
+    return [md("""
+# MedScope 37: analyses for the v0.16 review (CPU)
+
+From the stored per-view outcomes, no model is run (`scripts/review_fixes.py`):
+
+- **A.** Fresh-external estimates with and without the one image shared with the validation set (SIIM case
+  `siimext00119_ptx`), with SIIM-only denominators and the count of unedited pneumothorax films detected.
+- **B.** Errors by asked finding (misses on unedited lesions, false claims on erased ones, healthy-image claims,
+  referrals), MedScope-4B and the three flagships, main test and fresh external.
+- **C.** Error at fixed coverage (100 / 90 / 80 / 70 %) ranked by stated confidence, with the referral share.
+- **D.** Why the crosswalk hashed 491 image files for 507 main-test cases.
+
+CPU, about 5 minutes. Run all; nothing to set.
+""" + SECRETS_NOTE),
+        code(SETUP), code(RESTORE_ALL), code(RESTORE_V4),
+        code(r"""
+!python scripts/review_fixes.py --results {RESULTS} --views {TEST_VIEWS} {TEST_NEG} --ext2-views {EXT2} --runs v4_final_test v2_gpt6astra_test v2_claudeopus_test v2_gemini_test v4q_cf_s0_test v4q_dpo_s0_test --ext2-runs v4_final_ext2 v2_gpt6astra_ext2 v2_claudeopus_ext2 v2_gemini_ext2 v4q_cf_s0_ext2 v4q_dpo_s0_ext2 --out {RESULTS}/review_v016.md
+"""),
+        publish("MedScope report - 37 review analyses", """
+    ('Analyses for the v0.16 review', read_text(f'{RESULTS}/review_v016.md')),
+"""),
+    ]
+
+
+def nb38_recipe_heldout_seeds() -> list[dict]:
+    """Notebook 38 (GPU): held-out-tool tests of the recipe adapters at seeds 1 and 2, so the longer-training
+    observation from C4 can be paired by seed."""
+    c = nb25_v4_recipe()
+    return [md("""
+# MedScope 38: recipe adapters at seeds 1 and 2 on the held-out tools (GPU)
+
+The v7 control arms (`v4q_sftc_s*`, the recipe continued with replay only) claimed fewer erased lesions on the
+unseen inpainting tools than the recipe; but the recipe's held-out figure exists only at seed 0. This notebook runs
+the TELEA and diffusion held-out tests for `v4q_cf_s1` and `v4q_cf_s2` (the main, external and fresh sets were run
+in notebook 25), so `scripts/v7_confirm.py` can pair control against recipe at each seed.
+
+**Needs:** one GPU, about 1.5 hours. Run all; nothing to set. The runtime frees itself on failure and at the end.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7],
+        code(f"""
+for seed in (1, 2):
+    adapter = f'{{ADAPTERS}}/v4q_cf_s{{seed}}/final'
+    assert os.path.exists(f'{{adapter}}/adapter_config.json'), f'missing recipe adapter for seed {{seed}}: {{adapter}}'
+    for tool in ('telea', 'diffusion'):
+        name = f'v4q_inp_{{tool}}_cf_s{{seed}}_test'
+        if os.path.exists(f'{{RESULTS}}/{{name}}/summary.json'):
+            print('done already:', name); continue
+        sh(f"python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{INP}}/{{tool}}/views.jsonl --vocab-from {{TEST_VIEWS}} {{TEST_NEG}} --out {{RESULTS}}/{{name}} --name v4q_cf_s{{seed}} --split test --batch-size {{BATCH}}")
+!python scripts/v7_confirm.py --results {{RESULTS}} --out {{RESULTS}}/v7_confirmation.md
+"""),
+        publish("MedScope report - 38 recipe held-out seeds", """
+    ('Pre-registered v7 confirmation, with recipe at every seed in the supporting section', read_text(f'{RESULTS}/v7_confirmation.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3393,6 +3464,8 @@ NOTEBOOKS = {
     "36b_v7_cmcc_seed1.ipynb": nb36_v7("b"),
     "36c_v7_cmcc_seed2.ipynb": nb36_v7("c"),
     "36r_v7_report.ipynb": nb36_v7("r"),
+    "37_review_analyses.ipynb": nb37_review,
+    "38_recipe_heldout_seeds.ipynb": nb38_recipe_heldout_seeds,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

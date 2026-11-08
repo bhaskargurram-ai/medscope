@@ -52,10 +52,13 @@
       <li>The clinical question shown under the image (for example, "Is there a polyp?").</li>
     </ol>
     <p>Answer from the image alone, without other information. Tap the image to enlarge it. There is no time limit
-       (about 1.5 to 2 hours in total). Your progress is saved on this device, so you can stop and come back in the same
+       (about 2 to 2.5 hours in total). Your progress is saved on this device, so you can stop and come back in the same
        browser. At the end you download a small answer file and send it to the study team.</p>
     <h2>Your initials or reader code</h2>
     <input id="reader" type="text" autocomplete="off" placeholder="e.g. AB" maxlength="20">
+    <h2>Your specialty and years of experience</h2>
+    <input id="specialty" type="text" autocomplete="off" placeholder="e.g. radiology (thoracic), gastroenterology" maxlength="80">
+    <input id="years" type="text" autocomplete="off" placeholder="years since qualification, e.g. 12" maxlength="10" style="margin-top:8px">
     <div class="bar"><span class="meta" id="resume-note"></span><button class="primary" id="go" disabled>Start</button></div>
   </section>
 
@@ -142,7 +145,8 @@
   }
 
   function payload() {
-    return JSON.stringify({ reader, pack, finished: new Date().toISOString(), n_items: order.length,
+    return JSON.stringify({ reader, pack, specialty: ($('specialty').value || '').trim(), years: ($('years').value || '').trim(),
+                            finished: new Date().toISOString(), n_items: order.length,
                             user_agent: navigator.userAgent, answers: order.map(id => ({ id, ...answers[id] })) }, null, 1);
   }
 
