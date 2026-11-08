@@ -132,13 +132,13 @@ def section_d(views_files: list[str]) -> list[str]:
     orig = {v.case_id: v.image_path for v in views if v.kind.value in ("original", "natural_negative")}
     files = defaultdict(set)
     for c, p in orig.items():
-        files[Path(p).name].add(c)
+        files[str(p)].add(c)
     shared = {k: sorted(v) for k, v in files.items() if len(v) > 1}
     out = ["## D. Crosswalk coverage of the main test", "",
            f"{len(cases)} cases; {len(orig)} with an unedited image; {len(files)} distinct image files. "
            f"{len(shared)} files carry more than one case (several questions on one image), accounting for the difference.", ""]
     for k, cs in sorted(shared.items())[:40]:
-        out.append(f"- `{k}`: {', '.join(cs)}")
+        out.append(f"- `{Path(k).parent.name}/{Path(k).name}`: {', '.join(cs)}")
     return out + [""]
 
 

@@ -993,3 +993,21 @@ supplement (pack 3: 24 per kind, cases not in pack 2, localized findings first, 
 stress tests, specialty/experience fields) is published under /pack3/ for the same readers; scoring and adjudication
 pool both packs (56 erased images), per-image majority criterion.
 RESULTS_SUMMARY open-model line corrected (Qwen2.5-VL-7B: 5.5% erased claims at CCR 0.144).
+
+## 2026-11-08 — notebooks 37 and 38 done; v0.17 figures filled
+
+37 (`results/review_v016.md`): excluding the shared SIIM/ChestX-Det image moves MedScope-4B's fresh-external ESG
+0.393 → 0.395, CCR 0.476 → 0.479, net utility −0.053 → −0.046 (315 cases); SIIM unedited positives detected 0/48
+(MedScope-4B, DPO s0), 10/48 (recipe s0), 12/48 Claude Opus 5.5, 14/48 gpt-6-astra, 30/48 gemini-4-argon. Errors by
+finding: MedScope misses fibrosis 3/4, tumour 5/23, "lesion" 4/20 (main test); fresh external misses pneumothorax
+48/48, tumour 11/20, abnormality 12/32. Selective risk at fixed coverage (stated confidence), main test: MedScope-4B
+0.151 @100% / 0.107 @70% (AURC 0.065) vs flagships 0.114–0.137 / 0.023–0.055 (AURC 0.020–0.033); referral shares
+≤ 2.4%. Crosswalk 491 vs 507: 16 SLAKE lesion-free images each carry two question-cases (section D of the script
+first grouped by basename and was corrected to full path; the SLAKE count is unaffected).
+38: recipe held-out tests at seeds 1 and 2 (`v4q_inp_{telea,diffusion}_cf_s{1,2}_test`). Control (replay-only
+continuation) vs recipe, paired by seed, held-out tools: erased claims −0.012 (n.s.), −0.080 (p<0.001), −0.085
+(p<0.001); ESG +0.022, +0.027 (n.s.), +0.076 (p=0.001); CCR +0.012, −0.049 (p<0.001), −0.012; control denial −0.010,
++0.054 (p<0.001), +0.012. Longer training reduces erased claims on unseen tools in two seeds of three, at seed 1
+with a loss of clean-image sensitivity; reported as an observation, no locked comparison planned yet.
+Paper v0.17: overlap-exclusion and 491/507 figures filled; longer-training paragraph seed-paired; new "errors by
+finding and at fixed coverage" paragraph and a confidence limitation. 28 pages.
