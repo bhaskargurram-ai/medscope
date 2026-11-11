@@ -70,6 +70,8 @@ class HFPolicy:
         top_p: float = 1.0,
         max_image_side: int = 768,
         gradient_checkpointing: bool = True,
+        lora_r: int = 16,                     # new adapters only; the recipe uses 16
+        lora_vision: bool = False,            # new adapters only: also adapt the vision encoder and projector
     ):
         import torch
         import transformers
@@ -114,7 +116,15 @@ class HFPolicy:
             if adapter:
                 model = PeftModel.from_pretrained(model, adapter, is_trainable=trainable)
             elif new_lora:
-                model = get_peft_model(model, LoraConfig(**LORA_DEFAULTS))
+                lora = dict(LORA_DEFAULTS, r=lora_r, lora_alpha=2 * lora_r)
+                if lora_vision:
+                    lora.pop("exclude_modules")      # LoRA on the vision tower and projector as well
+                model = get_peft_model(model, LoraConfig(**lora))
+                n_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
+                n_vis = sum(p.numel() for n, p in model.named_parameters()
+                            if p.requires_grad and any(v in n for v in VISION_MODULES))
+                print(f"LoRA rank {lora_r}, vision adapted: {lora_vision}; trainable {n_train / 1e6:.1f}M "
+                      f"({n_vis / 1e6:.1f}M in the vision encoder and projector)")
         self.model = model
         if not trainable:
             self.model.eval()

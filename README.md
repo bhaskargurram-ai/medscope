@@ -74,6 +74,8 @@ Run the notebooks in order. Each one saves to `My Drive/medscope/` and publishes
 | `36r_v7_report` | Applies the v7 rule (`scripts/v7_confirm.py`) and publishes the report | CPU | ~5 min |
 | `37_review_analyses` | Analyses for the v0.16 review: overlap-excluded fresh-external estimates, errors by finding, error at fixed coverage, crosswalk coverage | CPU | ~5 min |
 | `38_recipe_heldout_seeds` | Held-out-tool tests of the recipe adapters at seeds 1 and 2, so the longer-training observation can be paired by seed | A100 | ~1.5 h |
+| `39a_pilot_vision_adapters` | v9 pilot: stage 1 at rank 64 with and without adapters on the vision encoder (can the model learn to see more?) | A100 | ~15 h |
+| `39b_pilot_grpo` | v9 pilot: GRPO continuation of the recipe with the cost matrix as reward | A100 | ~11 h |
 
 Notebooks 01–05 built the first version (CT/MRI and colonoscopy, refer-only); their results are in
 `docs/RESULTS_LOG.md`. Notebooks 07–10 build the final model on top of 01's data and 02b's negatives.

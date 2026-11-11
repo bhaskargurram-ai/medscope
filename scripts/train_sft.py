@@ -62,6 +62,9 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--views", required=True, nargs="+", help="one or more views files")
     ap.add_argument("--negatives", nargs="*", default=[], help="natural-negative views files to add")
     ap.add_argument("--init", default=None, help="continue training this adapter instead of a new one")
+    ap.add_argument("--lora-r", type=int, default=16, help="LoRA rank of a new adapter (alpha = 2r); the recipe uses 16")
+    ap.add_argument("--lora-vision", action="store_true",
+                    help="new adapter also adapts the vision encoder and projector (frozen in the recipe)")
     ap.add_argument("--kinds", nargs="*", default=None,
                     help="train only on these view kinds (ablations), e.g. original natural_negative degraded")
     ap.add_argument("--subsample", type=int, default=None,
@@ -159,7 +162,7 @@ def main() -> None:
     if args.init:
         policy = HFPolicy(args.model, adapter=args.init, trainable=True)
     else:
-        policy = HFPolicy(args.model, trainable=True, new_lora=True)
+        policy = HFPolicy(args.model, trainable=True, new_lora=True, lora_r=args.lora_r, lora_vision=args.lora_vision)
     trainable = sum(p.numel() for p in policy.model.parameters() if p.requires_grad)
     print(f"trainable LoRA parameters: {trainable / 1e6:.1f}M")
     train_sft(policy, views, args.mode, args.out, epochs=args.epochs, lr=args.lr,

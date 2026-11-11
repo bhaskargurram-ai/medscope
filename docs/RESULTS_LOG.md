@@ -1030,3 +1030,15 @@ ESG 0.146 / CCR 0.144) is described in §5.1 as the retrospective motivation.
 `docs/PREPRINT_SUBMISSION.md`. Author line: Bhaskar Gurram, Independent Researcher, gurrambhaskar.ai@gmail.com.
 No placeholders remain; the reader study is described as in progress with its extension; a call for collaboration
 (readers; a new cohort for the v8 selection-rule test; a methods collaborator) closes the paper.
+
+## 2026-11-11 — outreach, first reply, and the v9 pilots
+
+Preprint posted (arXiv:2611.13006, cs.AI; cross-lists cs.CL, cs.CV). 48 individual emails sent to authors of the
+closest work, radiologists and dataset owners. First reply (Yixiao He, BUPT; declined collaboration, gave advice):
+preference objectives help weak base models on perception tasks more than strong ones; LoRA gained much less than
+full fine-tuning in his video experiments; offline DPO is sensitive to pair quality, and online RL with verifiable
+rewards (GRPO) may suit a rule-scored task. `docs/PILOTS_v9.md` turns two of these into one-seed pilots:
+lead 2 (notebook 39a) trains stage 1 at rank 64 with and without adapters on the vision encoder and projector
+(`v4q_r64_s0`, `v4q_r64v_s0`; new `--lora-r` and `--lora-vision` options); lead 3 (notebook 39b) continues the
+recipe adapter with GRPO on the cost-matrix reward (`v4q_grpo_s0`; brain MRI cases excluded from the reward).
+Pilots only: a go signal leads to a separate pre-registration, not to a claim.

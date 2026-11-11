@@ -3373,6 +3373,101 @@ runtime.unassign()
     ]
 
 
+def nb39_pilot(part: str):
+    """Notebook 39: the v9 pilots (docs/PILOTS_v9.md). 'a' = rank-64 adapters with and without the vision encoder
+    (lead 2); 'b' = GRPO continuation of the recipe with the cost matrix as reward (lead 3)."""
+    def build() -> list[dict]:
+        c = nb25_v4_recipe()
+        head = {"a": "can the model learn to see more? (rank 64, with and without adapting the vision encoder)",
+                "b": "reinforcement learning with the cost matrix as reward (GRPO)"}[part]
+        body = {"a": """
+Every arm so far trained a rank-16 adapter on the language model with the vision encoder frozen, so none could change
+what the model perceives; the paper's main weakness is perception (0 of 48 pneumothorax films, fewer real lesions
+found than the frontier models at new centres). Two stage-1 arms at seed 0, the pre-registered recipe otherwise
+unchanged:
+
+- `v4q_r64_s0`: rank 64, vision encoder frozen (the capacity control)
+- `v4q_r64v_s0`: rank 64, with adapters on the vision encoder and projector as well
+
+**Needs:** one A100 (40 GB) or better, about 15 hours (each arm about 5-6 hours of training and 1.5-2 hours of
+tests). If the session ends, run it again: every step resumes.""",
+                "b": """
+The seed-0 recipe adapter continued with GRPO: the agent runs its own sampled episodes, each is scored by the cost
+matrix, and episodes that score above their group are made more likely. 150 steps, up to 12 groups drawn per step
+until 4 have signal, 4 episodes per group, lesion-free images mixed in at 20%, KL weight 0.05 to the starting
+adapter. Brain MRI cases are left out of the reward (the one reader so far questioned those erasures). Compared with
+the replay-only continuation `v4q_sftc_s0` and the recipe.
+
+**Needs:** one A100 (40 GB) or better, about 11 hours (training about 8-10 hours, tests about 1.5 hours). If the
+session ends, run it again: every step resumes."""}[part]
+        cells = [md(f"""
+# MedScope 39{part}: v9 pilot: {head}
+
+A **pilot** (`docs/PILOTS_v9.md`, committed before this ran): one seed, exploratory, on test sets already used. A go
+signal here justifies a confirmatory run with three seeds and a matched control, nothing more.
+{body}
+Run all; nothing to set. The runtime frees itself on failure and at the end.
+""" + SECRETS_NOTE),
+                 code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7],
+                 code(r"""
+plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/PILOTS_v9.md', cwd='/content/medscope').stdout.strip()
+assert plan, 'docs/PILOTS_v9.md is not in the repository'
+print('pilot plan committed:', plan)
+""")]
+        if part == "a":
+            cells += [md("## 1. Train and test the two arms"),
+                      code(f"""
+S1 = f'{S1_ARGS}'
+for name, extra in (('v4q_r64_s0', '--lora-r 64'), ('v4q_r64v_s0', '--lora-r 64 --lora-vision')):
+    out = f'{{ADAPTERS}}/{{name}}'
+    if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+        sh(f'python scripts/train_sft.py --model {BASE} {{S1}} {{extra}} --seed 0 --out {{out}}')
+    done = json.load(open(f'{{out}}/state.json'))['opt_step']
+    assert abs(done - S1_STEPS) <= 0.02 * S1_STEPS, f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like'
+    test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+"""),
+                      md("## 2. Against the recipe"),
+                      code(r"""
+!python scripts/review_fixes.py --results {RESULTS} --views {TEST_VIEWS} {TEST_NEG} --ext2-views {EXT2} --runs v4q_cf_s0_test v4q_r64_s0_test v4q_r64v_s0_test --ext2-runs v4q_cf_s0_ext2 v4q_r64_s0_ext2 v4q_r64v_s0_ext2 --out {RESULTS}/pilot_v9_lead2.md
+"""),
+                      publish("MedScope report - 39a pilot: vision adapters", """
+    ('Rank 64 + vision adapters vs rank 64 and the recipe, main test', significance_table(RESULTS, 'v4q_r64v_s0_test', ['v4q_r64_s0_test', 'v4q_cf_s0_test'])),
+    ('Rank 64 + vision adapters vs rank 64 and the recipe, fresh external', significance_table(RESULTS, 'v4q_r64v_s0_ext2', ['v4q_r64_s0_ext2', 'v4q_cf_s0_ext2'])),
+    ('Rank 64 + vision adapters vs rank 64 and the recipe, external centres', significance_table(RESULTS, 'v4q_r64v_s0_ext', ['v4q_r64_s0_ext', 'v4q_cf_s0_ext'])),
+    ('Held-out tool TELEA', significance_table(RESULTS, 'v4q_inp_telea_r64v_s0_test', ['v4q_inp_telea_r64_s0_test', 'v4q_inp_telea_cf_s0_test'])),
+    ('Held-out tool diffusion', significance_table(RESULTS, 'v4q_inp_diffusion_r64v_s0_test', ['v4q_inp_diffusion_r64_s0_test', 'v4q_inp_diffusion_cf_s0_test'])),
+    ('SIIM pneumothorax detected, errors by finding, risk at fixed coverage', read_text(f'{RESULTS}/pilot_v9_lead2.md')),
+""")]
+        else:
+            cells += [md("## 1. GRPO continuation of the recipe, then test everywhere"),
+                      code(f"""
+RECIPE = f'{{ADAPTERS}}/v4_s1/final'
+assert os.path.exists(f'{{RECIPE}}/adapter_config.json'), f'the stage-1 recipe adapter is missing: {{RECIPE}}'
+name, out = 'v4q_grpo_s0', f'{{ADAPTERS}}/v4q_grpo_s0'
+if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+    sh(f'python scripts/train_grpo.py --model {BASE} --init {{RECIPE}} --views {{TRAIN_V4_BASE}} {{V4}}/train_tp/views.jsonl --negatives {{TRAIN_NEG_V4}} --negative-share 0.2 --exclude-prefix lgg --steps 150 --views-per-step 4 --max-draws 12 --group-size 4 --lr 1e-5 --beta 0.05 --seed 0 --save-every 10 --out {{out}}')
+print(open(f'{{out}}/state.json').read())
+rows = [json.loads(l) for l in open(f'{{out}}/train_log.jsonl')]
+print(len(rows), 'logged steps; first and last:', rows[0], rows[-1])
+test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+"""),
+                      md("## 2. Against the replay-only continuation and the recipe"),
+                      publish("MedScope report - 39b pilot: GRPO", """
+    ('GRPO vs replay-only continuation and the recipe, main test', significance_table(RESULTS, 'v4q_grpo_s0_test', ['v4q_sftc_s0_test', 'v4q_cf_s0_test'])),
+    ('GRPO vs replay-only continuation and the recipe, fresh external', significance_table(RESULTS, 'v4q_grpo_s0_ext2', ['v4q_sftc_s0_ext2', 'v4q_cf_s0_ext2'])),
+    ('Held-out tool TELEA', significance_table(RESULTS, 'v4q_inp_telea_grpo_s0_test', ['v4q_inp_telea_sftc_s0_test', 'v4q_inp_telea_cf_s0_test'])),
+    ('Held-out tool diffusion', significance_table(RESULTS, 'v4q_inp_diffusion_grpo_s0_test', ['v4q_inp_diffusion_sftc_s0_test', 'v4q_inp_diffusion_cf_s0_test'])),
+    ('Training log (GRPO)', read_text(f'{ADAPTERS}/v4q_grpo_s0/train_log.jsonl')),
+""")]
+        cells.append(code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""))
+        return cells
+    return build
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3480,6 +3575,8 @@ NOTEBOOKS = {
     "36r_v7_report.ipynb": nb36_v7("r"),
     "37_review_analyses.ipynb": nb37_review,
     "38_recipe_heldout_seeds.ipynb": nb38_recipe_heldout_seeds,
+    "39a_pilot_vision_adapters.ipynb": nb39_pilot("a"),
+    "39b_pilot_grpo.ipynb": nb39_pilot("b"),
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

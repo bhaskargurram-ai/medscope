@@ -32,7 +32,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True)
     ap.add_argument("--init", required=True, help="adapter to start from")
-    ap.add_argument("--views", required=True)
+    ap.add_argument("--views", required=True, nargs="+")
+    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--exclude-prefix", nargs="*", default=[],
+                    help="drop training cases whose id starts with one of these (e.g. lgg: brain MRI erasures a reader questioned)")
     ap.add_argument("--out", required=True)
     ap.add_argument("--steps", type=int, default=150)
     ap.add_argument("--views-per-step", type=int, default=2)
@@ -48,7 +51,7 @@ def main() -> None:
     ap.add_argument("--eval-every", type=int, default=0)
     ap.add_argument("--eval-cases", type=int, default=15)
     ap.add_argument("--results", default=None)
-    ap.add_argument("--negatives", default=None,
+    ap.add_argument("--negatives", default=None, nargs="*",
                     help="natural-negative training views (unedited, lesion-free) to mix in")
     ap.add_argument("--negative-share", type=float, default=0.2,
                     help="share of training views that are natural negatives (repeated if needed)")
@@ -58,11 +61,15 @@ def main() -> None:
 
     from medscope.train.hf_policy import HFPolicy
 
-    views = load_views(args.views)
+    views = [v for f in args.views for v in load_views(f)]
+    if args.exclude_prefix:
+        n0 = len(views)
+        views = [v for v in views if not any(v.case_id.startswith(p) for p in args.exclude_prefix)]
+        print(f"excluded {n0 - len(views)} views with case-id prefix {args.exclude_prefix}")
     if args.negatives:
         # Natural negatives guard against the edit-detection shortcut: on them, claiming the
         # finding costs as much as on lesion-removed images, and refusing pays the same.
-        views = mix_in(views, load_views(args.negatives), args.negative_share)
+        views = mix_in(views, [v for f in args.negatives for v in load_views(f)], args.negative_share)
         print(f"training on {len(views)} views, {sum(v.kind.value == 'natural_negative' for v in views)} "
               f"of them natural negatives")
     cfg = with_vocab(load_config(), views)
@@ -83,7 +90,7 @@ def main() -> None:
                views_per_step=args.views_per_step, group_size=args.group_size, lr=args.lr,
                beta=args.beta, ref_adapter=args.init if args.beta > 0 else None,
                save_every=args.save_every, eval_every=args.eval_every, eval_fn=eval_fn,
-               max_draws=args.max_draws)
+               max_draws=args.max_draws, seed=args.seed)
 
 
 if __name__ == "__main__":
