@@ -3389,8 +3389,9 @@ unchanged:
 - `v4q_r64_s0`: rank 64, vision encoder frozen (the capacity control)
 - `v4q_r64v_s0`: rank 64, with adapters on the vision encoder and projector as well
 
-**Needs:** one A100 (40 GB) or better, about 15 hours (each arm about 5-6 hours of training and 1.5-2 hours of
-tests). If the session ends, run it again: every step resumes.""",
+**Needs:** a G4 runtime (RTX PRO 6000, 96 GB) is best: both arms train at the same time, about 5-6 hours in all.
+On a 40 GB A100 the arms run one after the other, about 16 hours. If the session ends or you switch GPU, run it
+again: every step resumes from its last checkpoint.""",
                 "b": """
 The seed-0 recipe adapter continued with GRPO: the agent runs its own sampled episodes, each is scored by the cost
 matrix, and episodes that score above their group are made more likely. 150 steps, up to 12 groups drawn per step
@@ -3415,16 +3416,61 @@ assert plan, 'docs/PILOTS_v9.md is not in the repository'
 print('pilot plan committed:', plan)
 """)]
         if part == "a":
-            cells += [md("## 1. Train and test the two arms"),
+            cells += [md("## 1. Train and test the two arms, both at once on this GPU"),
                       code(f"""
+import threading, subprocess, shutil, sys, time
 S1 = f'{S1_ARGS}'
-for name, extra in (('v4q_r64_s0', '--lora-r 64'), ('v4q_r64v_s0', '--lora-r 64 --lora-vision')):
-    out = f'{{ADAPTERS}}/{{name}}'
-    if not os.path.exists(f'{{out}}/final/adapter_config.json'):
-        sh(f'python scripts/train_sft.py --model {BASE} {{S1}} {{extra}} --seed 0 --out {{out}}')
-    done = json.load(open(f'{{out}}/state.json'))['opt_step']
-    assert abs(done - S1_STEPS) <= 0.02 * S1_STEPS, f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like'
-    test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+ARMS = (('v4q_r64_s0', '--lora-r 64'), ('v4q_r64v_s0', '--lora-r 64 --lora-vision'))
+# Both arms run as separate processes on the one GPU (each needs about 20-30 GB; a 40 GB A100 runs them one after
+# the other instead). Nothing about either arm's training changes: same samples, same order, same steps.
+PARALLEL = GPU_GB >= 70
+os.environ['OMP_NUM_THREADS'] = str(max(2, (os.cpu_count() or 8) // (2 if PARALLEL else 1)))
+def start_mps():        # NVIDIA MPS: the two processes' GPU kernels run at the same time instead of taking turns
+    if not PARALLEL or not shutil.which('nvidia-cuda-mps-control'):
+        return False
+    env = {{'CUDA_MPS_PIPE_DIRECTORY': '/tmp/mps_pipe', 'CUDA_MPS_LOG_DIRECTORY': '/tmp/mps_log'}}
+    for d in env.values():
+        os.makedirs(d, exist_ok=True)
+    os.environ.update(env)
+    subprocess.run(['nvidia-cuda-mps-control', '-d'], capture_output=True)
+    ok = subprocess.run([sys.executable, '-c', 'import torch; x = torch.ones(1024, device="cuda"); print(float(x.sum()))'],
+                        capture_output=True, text=True, timeout=300).returncode == 0
+    if not ok:
+        subprocess.run('echo quit | nvidia-cuda-mps-control', shell=True, capture_output=True)
+        for k in env:
+            os.environ.pop(k, None)
+    return ok
+print(f'GPU memory {{round(GPU_GB)}} GB | arms at once: {{2 if PARALLEL else 1}} | CPU threads per arm: {{os.environ["OMP_NUM_THREADS"]}} | MPS:', 'on' if start_mps() else 'off')
+stop = threading.Event()
+def gpu_monitor():
+    while not stop.wait(300):
+        q = subprocess.run(['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total', '--format=csv,noheader'],
+                           capture_output=True, text=True).stdout.strip()
+        print(time.strftime('%H:%M'), 'GPU util, memory used, memory total:', q, flush=True)
+threading.Thread(target=gpu_monitor, daemon=True).start()
+errors = []
+def run_arm(name, extra):
+    try:
+        out = f'{{ADAPTERS}}/{{name}}'
+        if not os.path.exists(f'{{out}}/final/adapter_config.json'):
+            sh(f'python scripts/train_sft.py --model {BASE} {{S1}} {{extra}} --seed 0 --out {{out}}')
+        done = json.load(open(f'{{out}}/state.json'))['opt_step']
+        assert abs(done - S1_STEPS) <= 0.02 * S1_STEPS, f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like'
+        test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+    except BaseException as e:      # noqa: BLE001 - reported after both arms have finished
+        errors.append(f'{{name}}: {{e}}')
+if PARALLEL:
+    threads = [threading.Thread(target=run_arm, args=a) for a in ARMS]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+else:
+    for a in ARMS:
+        run_arm(*a)
+stop.set()
+if errors:
+    raise SystemExit('failed: ' + ' | '.join(str(e)[:300] for e in errors))
 """),
                       md("## 2. Against the recipe"),
                       code(r"""

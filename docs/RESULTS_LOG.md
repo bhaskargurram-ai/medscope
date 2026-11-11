@@ -1042,3 +1042,9 @@ lead 2 (notebook 39a) trains stage 1 at rank 64 with and without adapters on the
 (`v4q_r64_s0`, `v4q_r64v_s0`; new `--lora-r` and `--lora-vision` options); lead 3 (notebook 39b) continues the
 recipe adapter with GRPO on the cost-matrix reward (`v4q_grpo_s0`; brain MRI cases excluded from the reward).
 Pilots only: a go signal leads to a separate pre-registration, not to a claim.
+
+**2026-11-11, 39a moved to a G4 runtime.** The first arm (`v4q_r64_s0`) had reached step 1,701 of 3,473 on an A100
+after about three hours when the run was stopped and restarted on a 96 GB RTX PRO 6000. Notebook 39a now trains
+both arms as two processes at once when the GPU has 70 GB or more (NVIDIA MPS when available); samples, order and
+steps of each arm are unchanged, and the first arm resumes from its checkpoint, so its first half was computed on
+an A100 and its second half on the RTX PRO 6000 (small floating-point differences between GPU types are possible).
