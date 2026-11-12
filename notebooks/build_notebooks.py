@@ -3406,8 +3406,9 @@ it ran:
 compared with the frozen-vision arm `v4q_r64_s0` and the recipe, same go signal. No further settings are tried
 whatever the outcome.
 
-**Needs:** a G4 runtime (RTX PRO 6000, 96 GB) is best, about 3-4 hours; an A100 works, about 8 hours. If the session
-ends, run it again: training resumes from its last checkpoint.
+**Needs:** a G4 runtime (RTX PRO 6000, 96 GB), about 3-4 hours from the start; an A100 works but takes about 8
+(a first run on an A100 80 GB did 8-9 steps a minute). If the session ends or you stop it, run it again: training
+resumes from its last checkpoint, and on a 70 GB+ GPU the six test sets then run three at a time.
 
 **Check in the first minutes:** the training output must show `LoRA rank 64, vision adapted: True` and
 `learning rate: ... at 2.0e-04, ... at 2.0e-05`.""",
@@ -3472,6 +3473,21 @@ def gpu_monitor():
                            capture_output=True, text=True).stdout.strip()
         print(time.strftime('%H:%M'), 'GPU util, memory used, memory total:', q, flush=True)
 threading.Thread(target=gpu_monitor, daemon=True).start()
+def tests(model, adapter, name):
+    # the six test sets are independent of each other: with one arm on a 70 GB+ GPU, three run at a time
+    # (same commands and replies as one after the other; a finished set is skipped on a rerun)
+    workers = 3 if GPU_GB >= 70 and len(ARMS) == 1 else 1
+    if workers == 1:
+        return test_all(model, adapter, name, heldout=True)
+    from concurrent.futures import ThreadPoolExecutor
+    head, rest = name.split('_', 1)
+    sets = [('test', f'{{TEST_VIEWS}} {{TEST_NEG}}', '', f'{{name}}_test'), ('ext', EXT_VIEWS, '', f'{{name}}_ext'), ('ext2', EXT2, '', f'{{name}}_ext2')]
+    sets += [('test', f'{{INP}}/{{t}}/views.jsonl', f'--vocab-from {{TEST_VIEWS}} {{TEST_NEG}}', f'{{head}}_inp_{{t}}_{{rest}}_test') for t in ('telea', 'transplant', 'diffusion')]
+    cmds = [f'python scripts/evaluate.py --model {{model}} --adapter {{adapter}} --views {{views}} {{extra}} --out {{RESULTS}}/{{run}} --name {{name}} --split {{split}} --batch-size {{BATCH}}'
+            for split, views, extra, run in sets]
+    print('testing', len(cmds), 'sets,', workers, 'at a time')
+    with ThreadPoolExecutor(workers) as ex:
+        list(ex.map(sh, cmds))
 errors = []
 def run_arm(name, extra):
     try:
@@ -3480,7 +3496,7 @@ def run_arm(name, extra):
             sh(f'python scripts/train_sft.py --model {BASE} {{S1}} {{extra}} --seed 0 --out {{out}}')
         done = json.load(open(f'{{out}}/state.json'))['opt_step']
         assert abs(done - S1_STEPS) <= 0.02 * S1_STEPS, f'{{name}} took {{done}} steps, stage 1 took {{S1_STEPS}}: not like-for-like'
-        test_all('{BASE}', f'{{out}}/final', name, heldout=True)
+        tests('{BASE}', f'{{out}}/final', name)
     except BaseException as e:      # noqa: BLE001 - reported after both arms have finished
         errors.append(f'{{name}}: {{e}}')
 if PARALLEL:
