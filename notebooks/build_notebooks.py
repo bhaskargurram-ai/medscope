@@ -3378,7 +3378,9 @@ def nb39_pilot(part: str):
     (lead 2); 'b' = GRPO continuation of the recipe with the cost matrix as reward (lead 3)."""
     def build() -> list[dict]:
         c = nb25_v4_recipe()
+        V = "r64vl" if part == "d" else "r64v"
         head = {"a": "can the model learn to see more? (rank 64, with and without adapting the vision encoder)",
+                "d": "the vision adapters again, at a tenth of the learning rate (one declared retry)",
                 "b": "reinforcement learning with the cost matrix as reward (GRPO)"}[part]
         body = {"a": """
 Every arm so far trained a rank-16 adapter on the language model with the vision encoder frozen, so none could change
@@ -3392,6 +3394,23 @@ unchanged:
 **Needs:** a G4 runtime (RTX PRO 6000, 96 GB) is best: both arms train at the same time, about 5-6 hours in all.
 On a 40 GB A100 the arms run one after the other, about 16 hours. If the session ends or you switch GPU, run it
 again: every step resumes from its last checkpoint.""",
+                "d": """
+In pilot 39a the arm with adapters on the vision encoder (`v4q_r64v_s0`) ended up answering from the question's
+wording alone (ESG 0.000 everywhere). Notebook 39c showed the saved adapter loads correctly, so the collapse is real.
+The likely cause: the vision adapters were trained at the language model's learning rate (2e-4), which is high for a
+pretrained vision encoder and can wreck its features. This is the one retry declared in `docs/PILOTS_v9.md` before
+it ran:
+
+- `v4q_r64vl_s0`: rank 64 with vision adapters, vision adapters at 2e-5 (a tenth), everything else as in 39a
+
+compared with the frozen-vision arm `v4q_r64_s0` and the recipe, same go signal. No further settings are tried
+whatever the outcome.
+
+**Needs:** a G4 runtime (RTX PRO 6000, 96 GB) is best, about 3-4 hours; an A100 works, about 8 hours. If the session
+ends, run it again: training resumes from its last checkpoint.
+
+**Check in the first minutes:** the training output must show `LoRA rank 64, vision adapted: True` and
+`learning rate: ... at 2.0e-04, ... at 2.0e-05`.""",
                 "b": """
 The seed-0 recipe adapter continued with GRPO: the agent runs its own sampled episodes, each is scored by the cost
 matrix, and episodes that score above their group are made more likely. 150 steps, up to 12 groups drawn per step
@@ -3415,15 +3434,20 @@ plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/PILOTS_v9.md
 assert plan, 'docs/PILOTS_v9.md is not in the repository'
 print('pilot plan committed:', plan)
 """)]
-        if part == "a":
-            cells += [md("## 1. Train and test the two arms, both at once on this GPU"),
+        if part in "ad":
+            arms = {"a": "(('v4q_r64_s0', '--lora-r 64'), ('v4q_r64v_s0', '--lora-r 64 --lora-vision'))",
+                    "d": "(('v4q_r64vl_s0', '--lora-r 64 --lora-vision --vision-lr-scale 0.1'),)"}[part]
+            lead2 = "pilot_v9_lead2.md" if part == "a" else "pilot_v9_lead2_retry.md"
+            title = {"a": "## 1. Train and test the two arms, both at once on this GPU", "d": "## 1. Train and test the retry arm"}[part]
+            pub = lambda t: t.replace("r64v_s0", V + "_s0").replace("pilot_v9_lead2.md", lead2)  # noqa: E731
+            cells += [md(title),
                       code(f"""
 import threading, subprocess, shutil, sys, time
 S1 = f'{S1_ARGS}'
-ARMS = (('v4q_r64_s0', '--lora-r 64'), ('v4q_r64v_s0', '--lora-r 64 --lora-vision'))
+ARMS = {arms}
 # Both arms run as separate processes on the one GPU (each needs about 20-30 GB; a 40 GB A100 runs them one after
 # the other instead). Nothing about either arm's training changes: same samples, same order, same steps.
-PARALLEL = GPU_GB >= 70
+PARALLEL = GPU_GB >= 70 and len(ARMS) > 1
 os.environ['OMP_NUM_THREADS'] = str(max(2, (os.cpu_count() or 8) // (2 if PARALLEL else 1)))
 def start_mps():        # NVIDIA MPS: the two processes' GPU kernels run at the same time instead of taking turns
     if not PARALLEL or not shutil.which('nvidia-cuda-mps-control'):
@@ -3473,17 +3497,17 @@ if errors:
     raise SystemExit('failed: ' + ' | '.join(str(e)[:300] for e in errors))
 """),
                       md("## 2. Against the recipe"),
-                      code(r"""
+                      code(pub(r"""
 !python scripts/review_fixes.py --results {RESULTS} --views {TEST_VIEWS} {TEST_NEG} --ext2-views {EXT2} --runs v4q_cf_s0_test v4q_r64_s0_test v4q_r64v_s0_test --ext2-runs v4q_cf_s0_ext2 v4q_r64_s0_ext2 v4q_r64v_s0_ext2 --out {RESULTS}/pilot_v9_lead2.md
-"""),
-                      publish("MedScope report - 39a pilot: vision adapters", """
+""")),
+                      publish("MedScope report - 39a pilot: vision adapters" if part == "a" else "MedScope report - 39d pilot: vision adapters, gentle learning rate", pub("""
     ('Rank 64 + vision adapters vs rank 64 and the recipe, main test', significance_table(RESULTS, 'v4q_r64v_s0_test', ['v4q_r64_s0_test', 'v4q_cf_s0_test'])),
     ('Rank 64 + vision adapters vs rank 64 and the recipe, fresh external', significance_table(RESULTS, 'v4q_r64v_s0_ext2', ['v4q_r64_s0_ext2', 'v4q_cf_s0_ext2'])),
     ('Rank 64 + vision adapters vs rank 64 and the recipe, external centres', significance_table(RESULTS, 'v4q_r64v_s0_ext', ['v4q_r64_s0_ext', 'v4q_cf_s0_ext'])),
     ('Held-out tool TELEA', significance_table(RESULTS, 'v4q_inp_telea_r64v_s0_test', ['v4q_inp_telea_r64_s0_test', 'v4q_inp_telea_cf_s0_test'])),
     ('Held-out tool diffusion', significance_table(RESULTS, 'v4q_inp_diffusion_r64v_s0_test', ['v4q_inp_diffusion_r64_s0_test', 'v4q_inp_diffusion_cf_s0_test'])),
     ('SIIM pneumothorax detected, errors by finding, risk at fixed coverage', read_text(f'{RESULTS}/pilot_v9_lead2.md')),
-""")]
+"""))]
         else:
             cells += [md("## 1. GRPO continuation of the recipe, then test everywhere"),
                       code(f"""
@@ -3691,6 +3715,7 @@ NOTEBOOKS = {
     "39a_pilot_vision_adapters.ipynb": nb39_pilot("a"),
     "39b_pilot_grpo.ipynb": nb39_pilot("b"),
     "39c_check_vision_arm.ipynb": nb39c_check,
+    "39d_pilot_vision_retry.ipynb": nb39_pilot("d"),
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

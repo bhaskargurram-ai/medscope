@@ -179,6 +179,12 @@ class TestTrainingPieces(unittest.TestCase):
         groups, cur = collect_groups(rollout, lambda r: r, 0, want=2, max_draws=3)
         self.assertEqual((calls, cur), ([0, 1, 2], 3))                         # capped
 
+    def test_vision_parameters_are_recognised(self):
+        from medscope.train.sft import is_vision_param
+        self.assertTrue(is_vision_param("base_model.model.model.visual.blocks.3.attn.qkv.lora_A.default.weight"))
+        self.assertTrue(is_vision_param("base_model.model.multi_modal_projector.linear_1.lora_B.default.weight"))
+        self.assertFalse(is_vision_param("base_model.model.model.language_model.layers.3.self_attn.q_proj.lora_A.default.weight"))
+
     def test_lr_schedule(self):
         lrs = [lr_at(s, 100, 1e-4) for s in range(100)]
         self.assertLess(lrs[0], lrs[3])                     # warmup

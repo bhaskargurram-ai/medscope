@@ -125,6 +125,12 @@ def prepared_views(policy, order, start_view, mode, seed, replays, cfg, window_p
         yield item
 
 
+def is_vision_param(name: str) -> bool:
+    """Is this parameter part of the vision encoder or projector (or an adapter on them)?"""
+    from medscope.train.hf_policy import VISION_MODULES
+    return any(v in name for v in VISION_MODULES)
+
+
 def train_sft(
     policy,
     views: list[View],
@@ -141,6 +147,7 @@ def train_sft(
     window_prob: float = 0.0,
     small_zoom: bool = False,
     schedule_steps: Optional[int] = None,
+    vision_lr_scale: float = 1.0,
 ) -> Path:
     import torch
 
@@ -153,8 +160,17 @@ def train_sft(
 
     model = policy.model
     model.train()
-    params = [p for p in model.parameters() if p.requires_grad]
-    opt = torch.optim.AdamW(params, lr=lr, weight_decay=0.0)
+    named = [(n, p) for n, p in model.named_parameters() if p.requires_grad]
+    params = [p for _, p in named]
+    # one group per learning-rate scale: adapters on the vision encoder and projector can be trained more gently
+    groups = [{"params": [p for n, p in named if is_vision_param(n) == vis], "lr": lr * scale, "scale": scale}
+              for vis, scale in ((False, 1.0), (True, vision_lr_scale))]
+    groups = [g for g in groups if g["params"]]
+    if vision_lr_scale != 1.0:
+        log("learning rate: " + ", ".join(f"{len(g['params'])} tensors at {lr * g['scale']:.1e}" for g in groups)
+            + " (language model first, then vision encoder and projector)")
+        assert len(groups) == 2, "--vision-lr-scale needs an adapter that includes the vision encoder (--lora-vision)"
+    opt = torch.optim.AdamW(groups, lr=lr, weight_decay=0.0)
 
     final = out / "final"
     state = read_state(out)
@@ -170,7 +186,7 @@ def train_sft(
     def optimizer_step() -> None:
         nonlocal step
         for g in opt.param_groups:
-            g["lr"] = lr_at(step, total_steps, lr)
+            g["lr"] = lr_at(step, total_steps, lr) * g.get("scale", 1.0)
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         opt.step()
         opt.zero_grad(set_to_none=True)

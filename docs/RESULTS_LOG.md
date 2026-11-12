@@ -1067,3 +1067,14 @@ One seed, stage 1, against the recipe `v4q_cf_s0` (report `results/39a_pilot:_vi
   nothing about whether the vision encoder can learn; the go signal is not met either way.
 Lead 3 (39b): GRPO rollouts can now be generated a whole step at a time (`--draw-batch`; the groups trained on
 follow the same draw-until-enough-signal rule, tested).
+
+## 2026-11-11 — notebook 39c: the vision arm's collapse is real; one retry declared
+
+Check of `v4q_r64v_s0` (`results/pilot_v9_lead2_check.md`): the saved adapter holds 692 tensors, 196 on the vision
+encoder and projector, all non-zero; the test loader attaches all of them with values equal to the saved file; the
+loaded model's loss on 200 training views is 0.235 (frozen-vision arm: 0.179). So there is no save or load fault,
+and the earlier entry's reasoning was wrong: a model that answers from the question alone can reach a mean token
+loss near 0.22 because format tokens dominate the mean. The arm did learn to ignore the image.
+Probable cause: vision adapters trained at 2e-4. `docs/PILOTS_v9.md` now declares one retry, `v4q_r64vl_s0`
+(notebook 39d), with the vision-side adapters at a tenth of the learning rate (`--vision-lr-scale 0.1`, new option;
+two optimizer groups, same schedule shape). No other setting will be tried under this plan.

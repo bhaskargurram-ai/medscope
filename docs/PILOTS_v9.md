@@ -32,6 +32,26 @@ lesions on the fresh external set (CCR up by at least 0.05) or any SIIM pneumoth
 recipe's 10 of 48, **without** erased-lesion claims rising by more than 0.03 on the main test or the held-out tools.
 If the rank-64 control alone gives the gain, the result is about capacity, not about vision.
 
+### One declared retry of the vision arm (notebook 39d), written on 11 November 2026 before it ran
+
+**What happened.** `v4q_r64_s0` matched the recipe (no gain from capacity). `v4q_r64v_s0` collapsed: ESG 0.000 on
+every set, answers fixed by the question's wording. Notebook 39c ruled out a save or load fault (692 saved adapter
+tensors, 196 of them on the vision side and non-zero, all loaded equal to the saved values; loss of the loaded model
+on 200 training views 0.235 against 0.179 for the frozen-vision arm). The collapse is a property of the trained
+model. The mean training loss did not reveal it because most target tokens are format tokens.
+
+**Hypothesis.** The vision adapters were trained at the language model's learning rate (2e-4). That is high for a
+pretrained vision encoder and may have degraded its features early, after which the language model fitted the
+question-conditional answer rates.
+
+**The retry.** `v4q_r64vl_s0`: as `v4q_r64v_s0` (rank 64, adapters on the vision encoder and projector, seed 0, same
+views, order, steps and schedule), with the vision-side adapters at one tenth of the learning rate (2e-5 peak, same
+warm-up and decay shape; `--vision-lr-scale 0.1`). Language-side adapters unchanged at 2e-4.
+
+**Rule.** Same go signal as above, against `v4q_r64_s0` and the recipe. This is the only retry: if the arm collapses
+again or misses the go signal, lead 2 with low-rank vision adapters is closed as negative and no other learning
+rate, rank or schedule is tried under this plan. A full unfreeze of the vision encoder would be a new plan.
+
 ## Lead 3: reinforcement learning with the cost matrix as reward (notebook 39b)
 
 **Why.** Four training ideas built on supervised or preference losses did not beat plain supervised training on the
