@@ -1078,3 +1078,21 @@ loss near 0.22 because format tokens dominate the mean. The arm did learn to ign
 Probable cause: vision adapters trained at 2e-4. `docs/PILOTS_v9.md` now declares one retry, `v4q_r64vl_s0`
 (notebook 39d), with the vision-side adapters at a tenth of the learning rate (`--vision-lr-scale 0.1`, new option;
 two optimizer groups, same schedule shape). No other setting will be tried under this plan.
+
+## 2026-11-12 — pilot 39b result (lead 3, GRPO): go signal narrowly missed; a sensitivity gain with slightly more claims
+
+`v4q_grpo_s0` (150 steps, ran on an A100 80 GB; report `results/39b_pilot:_grpo_report.md`), one seed, against the
+replay-only continuation `v4q_sftc_s0` and the recipe `v4q_cf_s0`. Training had signal in nearly every step
+(typically 2-4 of 12 groups drawn), unlike notebook 05.
+- **Held-out tools vs control:** TELEA (219): net utility +0.021 [-0.073, +0.118], erased claims +0.032 (p = 0.10),
+  CCR +0.027. Diffusion (191): net utility +0.097 [+0.003, +0.199], erased claims +0.010, CCR +0.058 (p < 0.001).
+  Case-weighted over both: net utility about +0.056, erased claims about +0.022.
+- **Main test vs control:** net utility +0.026 (n.s.), CCR +0.034 (p = 0.010), erased claims +0.009, healthy claims
+  +0.021 (within the 0.03 guard).
+- **Fresh external vs control:** net utility +0.124 [+0.038, +0.209], ESG +0.083, CCR +0.107, but erased claims
+  +0.042 (p = 0.09) and healthy claims +0.054 (p < 0.001). Against the recipe there: net utility -0.016, ESG +0.071,
+  erased claims -0.065.
+**Reading against the declared go signal:** net utility (+0.056 >= 0.05), sensitivity and the healthy-claim guard
+pass; "erased-lesion claims not higher than the control's" does not (+0.022 on the point estimate, not
+significant). The signal as written is therefore not met. The pattern is consistent: GRPO makes the model answer
+more, which finds more real lesions and adds a few false claims; the cost matrix rates that trade as a gain.
