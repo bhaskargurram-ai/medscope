@@ -685,3 +685,18 @@ class CMCCTest(unittest.TestCase):
         self.assertEqual(fin(present)["answer"], "Yes"); self.assertEqual(fin(present)["box"], [100, 100, 300, 300])
         self.assertEqual(fin(absent)["answer"], "No"); self.assertNotIn("box", fin(absent))
         self.assertEqual(present.split(" <final>")[0], absent.split(" <final>")[0])     # identical lead-in
+
+
+class GRPODrawBatchTest(unittest.TestCase):
+    def test_batched_draws_follow_the_one_at_a_time_rule(self):
+        from medscope.train.grpo import collect_groups
+        # reward pattern per view position: groups 1, 4, 5, 9 have signal (unequal rewards)
+        signal = {1, 4, 5, 9}
+        rollout = lambda pos: [pos, pos, pos, pos + (1 if pos in signal else 0)]   # noqa: E731
+        rewards = lambda eps_: [float(x) for x in eps_]                            # noqa: E731
+        many = lambda ps: [rollout(p) for p in ps]                                 # noqa: E731
+        for want, max_draws in ((2, 12), (3, 12), (4, 6), (5, 12)):
+            a, ca = collect_groups(rollout, rewards, 0, want, max_draws)
+            for db in (2, 4, 12):
+                b, cb = collect_groups(rollout, rewards, 0, want, max_draws, rollout_many=many, draw_batch=db)
+                self.assertEqual((a, ca), (b, cb), (want, max_draws, db))

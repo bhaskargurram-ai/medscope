@@ -3399,8 +3399,8 @@ until 4 have signal, 4 episodes per group, lesion-free images mixed in at 20%, K
 adapter. Brain MRI cases are left out of the reward (the one reader so far questioned those erasures). Compared with
 the replay-only continuation `v4q_sftc_s0` and the recipe.
 
-**Needs:** one A100 (40 GB) or better, about 11 hours (training about 8-10 hours, tests about 1.5 hours). If the
-session ends, run it again: every step resumes."""}[part]
+**Needs:** a G4 runtime (RTX PRO 6000, 96 GB) is best: a whole step's episodes are generated in one batch, about
+3-4 hours in all. On a 40 GB A100 about 9-11 hours. If the session ends, run it again: every step resumes."""}[part]
         cells = [md(f"""
 # MedScope 39{part}: v9 pilot: {head}
 
@@ -3490,8 +3490,12 @@ if errors:
 RECIPE = f'{{ADAPTERS}}/v4_s1/final'
 assert os.path.exists(f'{{RECIPE}}/adapter_config.json'), f'the stage-1 recipe adapter is missing: {{RECIPE}}'
 name, out = 'v4q_grpo_s0', f'{{ADAPTERS}}/v4q_grpo_s0'
+# views rolled out per generation batch: all 12 draws of a step at once on a 70 GB+ GPU (48 episodes in one batch),
+# 4 at a time on a 40 GB card. The groups trained on follow the same draw-until-4-have-signal rule either way.
+DRAW = 12 if GPU_GB >= 70 else 4
+print('GPU memory', round(GPU_GB), 'GB | views per generation batch:', DRAW)
 if not os.path.exists(f'{{out}}/final/adapter_config.json'):
-    sh(f'python scripts/train_grpo.py --model {BASE} --init {{RECIPE}} --views {{TRAIN_V4_BASE}} {{V4}}/train_tp/views.jsonl --negatives {{TRAIN_NEG_V4}} --negative-share 0.2 --exclude-prefix lgg --steps 150 --views-per-step 4 --max-draws 12 --group-size 4 --lr 1e-5 --beta 0.05 --seed 0 --save-every 10 --out {{out}}')
+    sh(f'python scripts/train_grpo.py --model {BASE} --init {{RECIPE}} --views {{TRAIN_V4_BASE}} {{V4}}/train_tp/views.jsonl --negatives {{TRAIN_NEG_V4}} --negative-share 0.2 --exclude-prefix lgg --steps 150 --views-per-step 4 --max-draws 12 --draw-batch {{DRAW}} --group-size 4 --lr 1e-5 --beta 0.05 --seed 0 --save-every 10 --out {{out}}')
 print(open(f'{{out}}/state.json').read())
 rows = [json.loads(l) for l in open(f'{{out}}/train_log.jsonl')]
 print(len(rows), 'logged steps; first and last:', rows[0], rows[-1])
@@ -3512,6 +3516,69 @@ runtime.unassign()
 """))
         return cells
     return build
+
+
+def nb39c_check() -> list[dict]:
+    """Notebook 39c: is the vision-adapter arm's collapse at test time real, or a save/load fault?"""
+    return [md("""
+# MedScope 39c: check of the vision-adapter arm (`v4q_r64v_s0`)
+
+In pilot 39a the arm with adapters on the vision encoder trained normally (final training loss about 0.22, the same
+as the frozen-vision arm) but at test time answered from the question alone (ESG 0.000 on every set: "tumor" always
+yes, "polyp" always no). A model that ignores the image cannot reach that training loss, so the saved adapter may
+not be what the test code loads. This notebook checks three things:
+
+1. how many vision-encoder adapter tensors are in the saved file, and whether they are non-zero;
+2. how many of them the test code's loader attaches to the model, and whether the loaded values equal the saved ones;
+3. the loss of the loaded model on 200 training views (it should be near 0.22; near 0.5 or above means the loaded
+   model is not the trained one).
+
+**Needs:** any GPU, about 10 minutes. Run all; nothing to set.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4),
+        code(f"""
+import torch, numpy as np, json
+from safetensors.torch import load_file
+from medscope.train.hf_policy import HFPolicy, VISION_MODULES
+from medscope.eval.runner import load_views
+from medscope.train.sft import samples_for
+report = []
+for name in ('v4q_r64v_s0', 'v4q_r64_s0'):
+    path = f'{{ADAPTERS}}/{{name}}/final'
+    saved = load_file(f'{{path}}/adapter_model.safetensors')
+    vis = {{k: v for k, v in saved.items() if any(m in k for m in VISION_MODULES)}}
+    nonzero = sum(1 for v in vis.values() if float(v.float().abs().max()) > 0)
+    cfg = json.load(open(f'{{path}}/adapter_config.json'))
+    report.append(f'{{name}}: saved tensors {{len(saved)}}, of which vision {{len(vis)}} (non-zero {{nonzero}}); '
+                  f'r={{cfg.get("r")}}, target_modules={{str(cfg.get("target_modules"))[:120]}}, exclude_modules={{cfg.get("exclude_modules")}}')
+    policy = HFPolicy('{BASE}', adapter=path)                      # exactly how scripts/evaluate.py loads it
+    loaded = {{n: p for n, p in policy.model.named_parameters() if 'lora_' in n}}
+    lvis = {{n: p for n, p in loaded.items() if any(m in n for m in VISION_MODULES)}}
+    lnz = sum(1 for p in lvis.values() if float(p.float().abs().max()) > 0)
+    report.append(f'{{name}}: loaded LoRA tensors {{len(loaded)}}, of which vision {{len(lvis)}} (non-zero {{lnz}})')
+    # do loaded values equal saved ones? (key names differ by the adapter name PEFT inserts)
+    def norm(k): return k.replace('.default', '').replace('base_model.model.', '')
+    smap = {{norm(k): v for k, v in saved.items()}}
+    same = diff = missing = 0
+    for n, p in loaded.items():
+        k = norm(n)
+        if k not in smap: missing += 1
+        elif torch.allclose(p.detach().float().cpu(), smap[k].float(), atol=1e-3): same += 1
+        else: diff += 1
+    report.append(f'{{name}}: loaded vs saved: equal {{same}}, different {{diff}}, not in file {{missing}}')
+    views = [v for f in TRAIN_V4.split() for v in load_views(f)]
+    rng = np.random.default_rng(0)
+    losses = []
+    with torch.no_grad():
+        for i in rng.permutation(len(views))[:200]:
+            for smp in samples_for(views[int(i)], 'agentic', 0, int(i), window_prob=0.3, small_zoom=True):
+                losses.append(float(-policy.token_logprobs(smp.messages, policy.target_ids(smp.target)).mean()))
+    report.append(f'{{name}}: loss of the loaded model on 200 training views: {{np.mean(losses):.3f}} (training ended near 0.22)')
+    del policy; torch.cuda.empty_cache()
+print('\\n'.join(report))
+open(f'{{RESULTS}}/pilot_v9_lead2_check.md', 'w').write('# Check of the vision-adapter arm\\n\\n' + '\\n'.join('- ' + r for r in report) + '\\n')
+"""),
+    ]
 
 
 def nb26_local() -> list[dict]:
@@ -3623,6 +3690,7 @@ NOTEBOOKS = {
     "38_recipe_heldout_seeds.ipynb": nb38_recipe_heldout_seeds,
     "39a_pilot_vision_adapters.ipynb": nb39_pilot("a"),
     "39b_pilot_grpo.ipynb": nb39_pilot("b"),
+    "39c_check_vision_arm.ipynb": nb39c_check,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

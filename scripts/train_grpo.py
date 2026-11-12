@@ -43,6 +43,9 @@ def main() -> None:
     ap.add_argument("--max-draws", type=int, default=0,
                     help="dynamic sampling: roll out up to this many groups per step until --views-per-step "
                          "of them have signal (0 = off, plain GRPO)")
+    ap.add_argument("--draw-batch", type=int, default=1,
+                    help="views rolled out per generation batch when drawing until enough groups have signal "
+                         "(same groups trained on; faster on a large GPU)")
     ap.add_argument("--lr", type=float, default=1e-5)
     ap.add_argument("--beta", type=float, default=0.0, help="KL weight to the starting adapter (0 = off)")
     ap.add_argument("--max-new-tokens", type=int, default=256)
@@ -90,7 +93,7 @@ def main() -> None:
                views_per_step=args.views_per_step, group_size=args.group_size, lr=args.lr,
                beta=args.beta, ref_adapter=args.init if args.beta > 0 else None,
                save_every=args.save_every, eval_every=args.eval_every, eval_fn=eval_fn,
-               max_draws=args.max_draws, seed=args.seed)
+               max_draws=args.max_draws, seed=args.seed, draw_batch=args.draw_batch)
 
 
 if __name__ == "__main__":

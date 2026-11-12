@@ -1048,3 +1048,22 @@ after about three hours when the run was stopped and restarted on a 96 GB RTX PR
 both arms as two processes at once when the GPU has 70 GB or more (NVIDIA MPS when available); samples, order and
 steps of each arm are unchanged, and the first arm resumes from its checkpoint, so its first half was computed on
 an A100 and its second half on the RTX PRO 6000 (small floating-point differences between GPU types are possible).
+
+## 2026-11-11 — pilot 39a result (lead 2): no go; the vision arm's test result is suspect
+
+One seed, stage 1, against the recipe `v4q_cf_s0` (report `results/39a_pilot:_vision_adapters_report.md`).
+- **Rank 64, vision frozen (`v4q_r64_s0`)**: indistinguishable from the rank-16 recipe on the main test (ESG 0.731 vs
+  0.735, erased claims 10.5% vs 11.9%, CCR 0.831 vs 0.847, healthy claims 10.8% vs 9.4%) and on the held-out tools.
+  Fresh external: ESG 0.339 vs 0.381, healthy claims 14.9% vs 6.8%. It "detects" 25 of 48 SIIM pneumothorax films
+  against 10, but also claims 21 of 48 erased ones and 12 of 48 healthy ones (SIIM ESG 0.042): a response bias, not
+  perception. More adapter capacity does not help.
+- **Rank 64 with vision adapters (`v4q_r64v_s0`)**: ESG 0.000 on every set. It answers from the question alone:
+  tumour, breast mass and "lesion" always present (0 misses, 96-100% erased and healthy claims), polyp and pleural
+  effusion always absent, pneumothorax 1 of 48. Its training loss, however, fell normally (0.47 -> 0.22 over 3,700
+  logged steps, the same as the frozen-vision arm), which a model that ignores the image cannot reach on paired
+  original/erased views. So the tested model is probably not the trained one (a save or load fault for the vision
+  adapter weights), or the vision adapters behave differently in the test path. Notebook 39c checks the saved file,
+  what the test loader attaches, and the loaded model's loss on training views. Until that is settled the arm says
+  nothing about whether the vision encoder can learn; the go signal is not met either way.
+Lead 3 (39b): GRPO rollouts can now be generated a whole step at a time (`--draw-batch`; the groups trained on
+follow the same draw-until-enough-signal rule, tested).

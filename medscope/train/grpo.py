@@ -51,13 +51,32 @@ def episode_tokens(ep: Episode) -> int:
 
 
 def collect_groups(rollout: Callable[[int], list], rewards: Callable[[list], list[float]],
-                   cursor: int, want: int, max_draws: int = 0) -> tuple[list[tuple[list, list[float]]], int]:
+                   cursor: int, want: int, max_draws: int = 0,
+                   rollout_many: Optional[Callable[[list[int]], list[list]]] = None,
+                   draw_batch: int = 1) -> tuple[list[tuple[list, list[float]]], int]:
     """Roll out groups for one step, starting at position `cursor` of the view order.
 
     max_draws <= want: exactly `want` groups (plain GRPO). Otherwise keep drawing until `want`
     groups have signal (non-zero advantages) or `max_draws` groups were drawn.
-    Returns every drawn group with its advantages, and the next cursor."""
+    Returns every drawn group with its advantages, and the next cursor.
+
+    draw_batch > 1 with `rollout_many`: the same rule, but `draw_batch` views are rolled out in one generation
+    batch. Groups are taken in order until `want` have signal; any rolled out past that point are dropped and the
+    cursor stops right after the last group used, so the groups trained on and the cursor follow the one-at-a-time
+    rule exactly (only the wasted generation differs)."""
     groups: list[tuple[list, list[float]]] = []
+    if rollout_many is not None and draw_batch > 1 and max_draws > want:
+        with_signal = 0
+        while with_signal < want and len(groups) < max_draws:
+            n = min(draw_batch, max_draws - len(groups))
+            for eps_ in rollout_many(list(range(cursor, cursor + n))):
+                cursor += 1
+                advs = group_advantages(rewards(eps_))
+                groups.append((eps_, advs))
+                with_signal += any(a != 0 for a in advs)
+                if with_signal >= want:
+                    break
+        return groups, cursor
     if max_draws <= want:
         for i in range(want):
             eps_ = rollout(cursor + i)
@@ -90,6 +109,7 @@ def train_grpo(
     eval_every: int = 0,
     eval_fn: Optional[Callable[[int], dict]] = None,
     max_draws: int = 0,
+    draw_batch: int = 1,
 ) -> Path:
     import torch
 
@@ -130,10 +150,18 @@ def train_grpo(
     def rollout(pos: int) -> list[Episode]:
         return run_group(policy, views[order[pos]], cfg, group_size, sample=True)
 
+    def rollout_many(positions: list[int]) -> list[list[Episode]]:
+        """Groups for several views in one generation batch (group_size episodes each)."""
+        from ..agent.episode import run_episodes
+        vs = [views[order[p]] for p in positions for _ in range(group_size)]
+        eps_ = run_episodes(policy, vs, cfg, sample=True)
+        return [eps_[i * group_size:(i + 1) * group_size] for i in range(len(positions))]
+
     for step in range(start, steps):
         t0 = time.time()
         groups, cursor = collect_groups(rollout, lambda eps_: [e.outcome.reward for e in eps_],
-                                        cursor, views_per_step, max_draws)
+                                        cursor, views_per_step, max_draws,
+                                        rollout_many=rollout_many if draw_batch > 1 else None, draw_batch=draw_batch)
 
         model.train()
         opt.zero_grad(set_to_none=True)
