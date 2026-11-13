@@ -1096,3 +1096,20 @@ replay-only continuation `v4q_sftc_s0` and the recipe `v4q_cf_s0`. Training had 
 pass; "erased-lesion claims not higher than the control's" does not (+0.022 on the point estimate, not
 significant). The signal as written is therefore not met. The pattern is consistent: GRPO makes the model answer
 more, which finds more real lesions and adds a few false claims; the cost matrix rates that trade as a gain.
+
+## 2026-11-13 — pilot 39d (lead 2 retry): no collapse, but no go; lead 2 with low-rank vision adapters is closed
+
+`v4q_r64vl_s0` (rank 64, vision adapters at 2e-5; trained on an A100 80 GB, stopped at about step 1,600 and resumed
+from its checkpoint on an A100 40 GB; report `results/39d_pilot:_vision_adapters,_gentle_learning_rate_report.md`).
+- **The collapse is gone:** ESG 0.776 on the main test (frozen-vision rank 64: 0.731; recipe: 0.735), so the 2e-4
+  learning rate was the likely cause of the 39a collapse.
+- **Declared go signal not met:** fresh-external sensitivity fell (CCR 0.488 against 0.548 for rank 64 and 0.560 for
+  the recipe; -0.071 vs the recipe, p = 0.03) and SIIM pneumothorax detection fell to 7 of 48 (recipe 10 of 48).
+  Under `docs/PILOTS_v9.md` this was the only retry, so lead 2 with low-rank vision adapters is closed as negative
+  and no further setting is tried.
+- **Exploratory, not a claim:** the arm withdrew erased findings more often at unchanged main-test sensitivity
+  (erased claims 6.8% vs 11.9% for the recipe, p = 0.007, CCR 0.854 vs 0.847; fresh external 7.7% vs 16.7%,
+  p = 0.002), but its fresh-external net utility was lower than the recipe's (-0.112, p = 0.046) and its stated
+  confidence ranked errors worse there (AURC 0.508 vs 0.305). It became more conservative, not more perceptive.
+- Under the plan, full unfreezing of the vision encoder was conditional on this pilot being positive; it is not
+  supported by these results.
