@@ -80,13 +80,21 @@
 
   <section id="done" class="card hidden">
     <h1>Thank you</h1>
-    <p>All images answered. Please download your answer file and send it to the study team (email or WhatsApp).</p>
+    <p>All images answered. Please send your answers to the study team (email or WhatsApp) in one of these ways.
+       Your answers stay saved on this device, so if one way does not work, try the next.</p>
     <div class="bar" style="justify-content:flex-start;flex-wrap:wrap">
-      <button class="primary" id="dl">Download answers</button>
+      <button class="primary" id="share">Send answers</button>
+      <button id="dl">Download answer file</button>
       <button id="copy">Copy answers</button>
       <button id="review">Review my answers</button>
     </div>
     <p class="meta" id="copied"></p>
+    <div id="manual" class="hidden">
+      <p class="meta">If nothing worked: press and hold in the box below, choose <b>Select all</b>, then <b>Copy</b>,
+         and paste it into a WhatsApp message or an email to the study team.</p>
+      <textarea id="answers-text" readonly rows="8" style="width:100%;font:12px/1.4 ui-monospace,monospace;
+        background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px"></textarea>
+    </div>
   </section>
 </main>
 <p class="meta" style="max-width:760px;margin:0 auto;padding:0 16px 24px">Images from public research datasets
@@ -169,16 +177,55 @@
   $('review').addEventListener('click', () => { pos = 0; render(); });
   $('img').addEventListener('click', () => { $('zoom').querySelector('img').src = $('img').src; $('zoom').style.display = 'flex'; });
   $('zoom').addEventListener('click', () => { $('zoom').style.display = 'none'; });
+  // Sending answers. Phones often open links inside WhatsApp, Gmail or another app's built-in browser, where file
+  // downloads and the clipboard can fail without any message; the saved progress lives in that same browser, so every
+  // way to get the answers out has to work there: the phone's share sheet, a download, a copy, and finally a text box.
+  const fileName = () => `reader_${(reader || 'reader').replace(/[^A-Za-z0-9_-]/g, '_')}.json`;
+  function manual(msg) {
+    $('answers-text').value = payload();
+    $('manual').classList.remove('hidden');
+    if (msg) $('copied').textContent = msg;
+  }
+  $('share').addEventListener('click', async () => {
+    const text = payload();
+    try {
+      const file = new File([text], fileName(), { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Reader study answers' });
+        $('copied').textContent = 'Sent. Thank you.'; return;
+      }
+      if (navigator.share) {
+        await navigator.share({ title: 'Reader study answers', text });
+        $('copied').textContent = 'Sent. Thank you.'; return;
+      }
+      manual('Sending is not available in this browser: use Download, Copy, or the box below.');
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;          // the reader closed the share sheet
+      manual('Sending did not work here: use Download, Copy, or the box below.');
+    }
+  });
   $('dl').addEventListener('click', () => {
-    const blob = new Blob([payload()], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `reader_${reader.replace(/[^A-Za-z0-9_-]/g, '_')}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
+    try {
+      const blob = new Blob([payload()], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName();
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      manual('If no file appeared (common inside WhatsApp or Gmail), use Send, Copy, or the box below.');
+    } catch (e) { manual('Download is not allowed here: use Send, Copy, or the box below.'); }
   });
   $('copy').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(payload()); $('copied').textContent = 'Copied. Paste it into an email or message.'; }
-    catch (e) { $('copied').textContent = 'Copy not allowed here: use Download answers.'; }
+    const text = payload();
+    try { await navigator.clipboard.writeText(text); $('copied').textContent = 'Copied. Paste it into an email or WhatsApp message.'; return; }
+    catch (e) { /* older or in-app browsers: fall back to selecting the text box */ }
+    manual();
+    const ta = $('answers-text');
+    ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    $('copied').textContent = ok ? 'Copied. Paste it into an email or WhatsApp message.'
+                                 : 'Copy is blocked here: press and hold in the box below, Select all, Copy.';
   });
 
   fetch('items.json').then(r => r.json()).then(d => { items = d.items; pack = d.pack || ''; })

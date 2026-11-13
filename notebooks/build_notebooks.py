@@ -2659,7 +2659,9 @@ if not os.path.exists(KEY3):
     !cd {SUPP}/site && tar -cf {RS}/site_v3.tar .
 !tar -C {PACK}/site/pack3 -xf {RS}/site_v3.tar
 KEY = f'{KEY2} {KEY3}'                             # scoring pools both packs
-    !cp reader/index.html {PACK}/site/index.html
+# the page code (not the images or items): the current reader/index.html, so fixes reach both packs
+!cp reader/index.html {PACK}/site/index.html
+!cp reader/index.html {PACK}/site/pack3/index.html
 tok = (secret('GITHUB_TOKEN') or '').strip()
 if not tok:
     raise SystemExit('Add the Colab secret GITHUB_TOKEN (write access to medscope-reader), then rerun this cell.')
