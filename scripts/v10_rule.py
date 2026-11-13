@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from medscope.eval.compare import load_outcomes, paired_bootstrap  # noqa: E402
-from medscope.mas.arbiter import RUN_TAG  # noqa: E402
+from medscope.mas.arbiter import run_tag  # noqa: E402
 from medscope.mas.reports import read_reports  # noqa: E402
 
 HELDOUT = ("telea", "diffusion")
@@ -95,10 +95,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--results", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--base", default="mas", help="mas (v10) or mas2 (v11: arbiter trained on out-of-sample reports)")
     args = ap.parse_args()
     R = Path(args.results)
-    full = RUN_TAG["full"]
-    out = ["# Pre-registered lead-4 rule (docs/PREREGISTRATION_v10.md)", ""]
+    full = run_tag("full", args.base)
+    plan = "docs/PREREGISTRATION_v10.md" + ("" if args.base == "mas" else " as retried in docs/PREREGISTRATION_v11.md")
+    out = [f"# Pre-registered lead-4 rule ({plan}), runs `v4q_{full}_s0*`", ""]
     metrics = ("net_utility", "target_hallucination_rate", "ccr", "esg", "random_denial_rate")
 
     out += ["## Go signal: full system (A) vs replay-only continuation `v4q_sftc_s0` (B), held-out tools pooled", ""]
@@ -130,7 +132,7 @@ def main() -> None:
             f"An agent contributes if removing it lowers net utility by {CONTRIB} or more (A − B ≥ {CONTRIB}); the control "
             f"half also if erased-lesion claims rise by {CONTRIB} or more without it.", ""]
     for name in ("nob", "nos", "nov", "noc", "dir"):
-        tag = RUN_TAG[name]
+        tag = run_tag(name, args.base)
         bb = outcomes(R, run_names(tag, "heldout"))
         lines, rr = compare(a, bb, ("net_utility", "target_hallucination_rate", "ccr"))
         out += [f"### `{tag}`", ""] + lines

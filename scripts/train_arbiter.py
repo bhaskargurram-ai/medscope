@@ -25,7 +25,7 @@ def main() -> None:
     ap.add_argument("--model", required=True)
     ap.add_argument("--init", required=True, help="adapter to continue from (the recipe)")
     ap.add_argument("--views", nargs="+", required=True)
-    ap.add_argument("--reports", required=True)
+    ap.add_argument("--reports", nargs="+", required=True, help="one or more reports files (e.g. shards)")
     ap.add_argument("--out", required=True)
     ap.add_argument("--epochs", type=int, default=2)
     ap.add_argument("--lr", type=float, default=1e-4)
@@ -34,7 +34,9 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--max-steps", type=int, default=None, help="stop early (smoke test)")
     args = ap.parse_args()
-    reports = read_reports(args.reports)
+    reports = {}
+    for f in args.reports:
+        reports.update(read_reports(f))
     views = [v for f in args.views for v in load_views(f) if v.view_id in reports]
     seen, unique = set(), []
     for v in views:                      # a view listed in two files trains once

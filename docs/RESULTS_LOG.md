@@ -1143,3 +1143,9 @@ Report `results/40_pilot:_counterfactual_multi-agent_reader_report.md`, rule `re
   specialist's own training images (found on 96%), so it learned to trust "specialist found nothing" far more than
   the specialist deserves on unseen centres. Out-of-fold specialist reports for arbiter training would remove this;
   that would be a new pre-registered plan, not a change to this one.
+
+## 2026-11-13 — lead 4 retry declared (docs/PREREGISTRATION_v11.md)
+
+The one declared retry: the deciding agent is trained on the other agents' reports on the validation views (images
+none of them was trained on) instead of a training subset; 3 epochs; everything else, including the rule, as in v10.
+Notebook 41. A NO GO closes lead 4.

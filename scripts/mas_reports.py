@@ -30,6 +30,7 @@ def main() -> None:
     ap.add_argument("--exclude-meta", nargs="*", default=["inserted", "benchmark"],
                     help="leave out views whose meta has any of these flags")
     ap.add_argument("--batch-size", type=int, default=16)
+    ap.add_argument("--shard", default=None, help="k/n: only every n-th view starting at k (parallel processes, own --out each)")
     ap.add_argument("--inpainter", default="lama", help="the verifier's inpainter (the training tool)")
     args = ap.parse_args()
     from medscope.data.inpaint import get_inpainter
@@ -42,6 +43,9 @@ def main() -> None:
     views = [v for v in views if not any((v.meta or {}).get(k) for k in args.exclude_meta)]
     if args.subsample:
         views = stratified_subset(views, args.subsample, seed=0)
+    if args.shard:
+        k, n = (int(x) for x in args.shard.split("/"))
+        views = views[k::n]
     kinds = {}
     for v in views:
         kinds[v.kind.value] = kinds.get(v.kind.value, 0) + 1

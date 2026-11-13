@@ -47,6 +47,11 @@ ABLATIONS: dict[str, frozenset] = {
     "dir": frozenset({"blind", "specialist", "verify"}),
 }
 RUN_TAG = {"full": "mas", "nob": "masnob", "nos": "masnos", "nov": "masnov", "noc": "masnoc", "dir": "masdir"}
+
+
+def run_tag(ablation: str, base: str = "mas") -> str:
+    """Run tag of an ablation for a plan: base 'mas' (v10) or 'mas2' (v11)."""
+    return base + ("" if ablation == "full" else ablation)
 DROP_P = 0.25
 
 

@@ -3744,6 +3744,102 @@ runtime.unassign()
     ]
 
 
+def nb41_mas2() -> list[dict]:
+    """Notebook 41: the one declared retry of lead 4 (docs/PREREGISTRATION_v11.md): the deciding agent learns from
+    reports made on images no agent has seen in training (the validation set)."""
+    c = nb25_v4_recipe()
+    B = lambda t: t.replace('@BASE@', BASE)  # noqa: E731
+    return [md("""
+# MedScope 41: lead 4 retry, the deciding agent learns from unseen images
+
+The first run (notebook 40) helped on the held-out tests but missed far too many real lesions at new hospitals. Its
+deciding agent had learned from the other agents' answers on images they were trained on, where they are almost
+always right, so it trusted "nothing found" too much. Here it learns from their answers on the **validation images,
+which no agent has seen**, so it learns how far to trust them. Everything else is as in notebook 40, and the same
+pre-registered rule decides (`docs/PREREGISTRATION_v11.md`, committed before this ran). This is the only retry.
+
+**Needs:** notebook 40 finished (it reuses its segmenter and its test-set reports). An 80 GB GPU: about 3-4 hours
+(validation reports in three parallel parts); a 40 GB A100: about 5-6 hours. Run all; nothing to set. Every stage
+resumes if the session ends.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7],
+        code(LAMA_CELL),
+        code(r"""
+plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/PREREGISTRATION_v11.md', cwd='/content/medscope').stdout.strip()
+assert plan, 'docs/PREREGISTRATION_v11.md is not in the repository: do not train without the pre-registration'
+print('pre-registration committed:', plan)
+"""),
+        code(B(r"""
+import json, shutil, glob
+from concurrent.futures import ThreadPoolExecutor
+RECIPE = f'{ADAPTERS}/v4_s1/final'
+SPEC, REPORTS, MAS2 = f'{ADAPTERS}/specialist_v10', f'{RESULTS}/mas_reports', f'{ADAPTERS}/v4q_mas2_s0'
+assert os.path.exists(f'{RECIPE}/adapter_config.json'), 'the recipe adapter is missing'
+assert json.load(open(f'{SPEC}/specialist.json')).get('finished'), 'run notebook 40 first: its segmenter is reused'
+BIG = GPU_GB >= 70
+RB, PAR = (16, 3) if BIG else (12, 1)
+VAL = f'{VAL_V4} {VAL_NEG_V4}'
+VOCAB = f'--vocab-from {TEST_VIEWS} {TEST_NEG}'
+SETS = {'test': (f'{TEST_VIEWS} {TEST_NEG}', ''), 'ext': (EXT_VIEWS, ''), 'ext2': (EXT2, ''),
+        'telea': (f'{INP}/telea/views.jsonl', VOCAB), 'diffusion': (f'{INP}/diffusion/views.jsonl', VOCAB)}
+def run_name(tag, s):
+    return f'v4q_inp_{s}_{tag}_s0_test' if s in ('telea', 'diffusion') else f'v4q_{tag}_s0_{s}'
+def run_par(cmds):
+    if PAR == 1 or len(cmds) == 1:
+        for cmd in cmds:
+            sh(cmd)
+    else:
+        with ThreadPoolExecutor(PAR) as ex:
+            list(ex.map(sh, cmds))
+print(f'GPU {round(GPU_GB)} GB | reports batch {RB} | parallel parts {PAR}')
+""")),
+        md("## 1. Reports of the other agents on every validation view (images no agent was trained on)"),
+        code(B(r"""
+if not os.path.exists(f'{MAS2}/final/adapter_config.json'):
+    run_par([f'python scripts/mas_reports.py --model @BASE@ --adapter {RECIPE} --specialist {SPEC} --views {VAL} --shard {k}/{PAR} --out {REPORTS}/val_{k}of{PAR}.jsonl --batch-size {RB}'
+             for k in range(PAR)])
+VAL_REPORTS = ' '.join(sorted(glob.glob(f'{REPORTS}/val_*of{PAR}.jsonl')))
+print(VAL_REPORTS, '|', sum(sum(1 for _ in open(f)) for f in VAL_REPORTS.split()), 'validation views with reports')
+""")),
+        md("## 2. Train the deciding agent on them (3 epochs)"),
+        code(B(r"""
+if not os.path.exists(f'{MAS2}/final/adapter_config.json'):
+    sh(f'python scripts/train_arbiter.py --model @BASE@ --init {RECIPE} --views {VAL} --reports {VAL_REPORTS} --epochs 3 --out {MAS2}')
+print(open(f'{MAS2}/state.json').read())
+""")),
+        md("## 3. Test-set reports (reused from notebook 40; anything missing is computed)"),
+        code(B(r"""
+run_par([f'python scripts/mas_reports.py --model @BASE@ --adapter {RECIPE} --specialist {SPEC} --views {v} {x} --out {REPORTS}/{s}.jsonl --batch-size {RB}'
+         for s, (v, x) in SETS.items()])
+""")),
+        md("## 4. Test the full system everywhere and the five ablations on the fresh external set and the held-out tools"),
+        code(B(r"""
+jobs = [('full', s) for s in SETS] + [(a, s) for a in ('nob', 'nos', 'nov', 'noc', 'dir') for s in ('ext2', 'telea', 'diffusion')]
+tag = lambda a: 'mas2' + ('' if a == 'full' else a)
+run_par([f'python scripts/eval_mas.py --model @BASE@ --arbiter {MAS2}/final --ablation {a} --views {SETS[s][0]} {SETS[s][1]} '
+         f'--reports {REPORTS}/{s}.jsonl --out {RESULTS}/{run_name(tag(a), s)} --name v4q_{tag(a)}_s0 '
+         f'--split {"test" if s in ("telea", "diffusion") else s} --batch-size {BATCH}' for a, s in jobs])
+""")),
+        md("## 5. The pre-registered rule"),
+        code(r"""
+!python scripts/v10_rule.py --results {RESULTS} --base mas2 --out {RESULTS}/v11_rule.md
+"""),
+        publish("MedScope report - 41 pilot: multi-agent reader, out-of-sample reports", """
+    ('Pre-registered rule and ablations', read_text(f'{RESULTS}/v11_rule.md')),
+    ('Retry vs first run, replay-only continuation and the recipe, fresh external', significance_table(RESULTS, 'v4q_mas2_s0_ext2', ['v4q_mas_s0_ext2', 'v4q_sftc_s0_ext2', 'v4q_cf_s0_ext2'])),
+    ('Retry vs first run and the recipe, external centres', significance_table(RESULTS, 'v4q_mas2_s0_ext', ['v4q_mas_s0_ext', 'v4q_cf_s0_ext'])),
+    ('Retry vs first run, replay-only continuation and the recipe, main test', significance_table(RESULTS, 'v4q_mas2_s0_test', ['v4q_mas_s0_test', 'v4q_sftc_s0_test', 'v4q_cf_s0_test'])),
+    ('Held-out tool TELEA', significance_table(RESULTS, 'v4q_inp_telea_mas2_s0_test', ['v4q_inp_telea_mas_s0_test', 'v4q_inp_telea_sftc_s0_test', 'v4q_inp_telea_cf_s0_test'])),
+    ('Held-out tool diffusion', significance_table(RESULTS, 'v4q_inp_diffusion_mas2_s0_test', ['v4q_inp_diffusion_mas_s0_test', 'v4q_inp_diffusion_sftc_s0_test', 'v4q_inp_diffusion_cf_s0_test'])),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3856,6 +3952,7 @@ NOTEBOOKS = {
     "39c_check_vision_arm.ipynb": nb39c_check,
     "39d_pilot_vision_retry.ipynb": nb39_pilot("d"),
     "40_mas_pilot.ipynb": nb40_mas,
+    "41_mas2_retry.ipynb": nb41_mas2,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
