@@ -3621,6 +3621,128 @@ open(f'{{RESULTS}}/pilot_v9_lead2_check.md', 'w').write('# Check of the vision-a
     ]
 
 
+def nb40_mas() -> list[dict]:
+    """Notebook 40: lead 4, the counterfactual multi-agent reader (docs/PREREGISTRATION_v10.md), end to end."""
+    c = nb25_v4_recipe()
+    B = lambda t: t.replace('@BASE@', BASE)  # noqa: E731
+    return [md("""
+# MedScope 40: lead 4 pilot, a counterfactual multi-agent reader
+
+Pre-registered in `docs/PREREGISTRATION_v10.md` (committed before anything here ran). Five agents on every case:
+
+1. **Direct reader**: the recipe model answers the question as asked.
+2. **Question-blind reader**: the recipe model is asked only "Is there any abnormality in this image?".
+3. **Specialist**: a lesion segmenter trained here on unedited training images only.
+4. **Verifier**: erases the region the others point to, makes an equal edit elsewhere, and asks the direct reader again.
+5. **Deciding agent**: trained here to read the image, the question and the four reports, and give the final answer.
+
+Then the full system and five ablations (each agent removed in turn, the verifier without its control edit, and the
+deciding agent alone) are tested, and the pre-registered rule is applied. A pilot: one seed, a go signal leads to a
+confirmatory plan, nothing more.
+
+**Needs:** an A100 (about 12 hours in all) or a G4 / 80 GB GPU (about 6-8 hours: test sets run three at a time).
+Run all; nothing to set. Every stage resumes where it stopped, so if the session ends, run all again.
+The first minutes run a small end-to-end smoke test of every step on 8 views, so a code fault shows up before the
+long stages start.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL), c[7],
+        code(LAMA_CELL),
+        code(r"""
+plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/PREREGISTRATION_v10.md', cwd='/content/medscope').stdout.strip()
+assert plan, 'docs/PREREGISTRATION_v10.md is not in the repository: do not train without the pre-registration'
+print('pre-registration committed:', plan)
+"""),
+        code(B(r"""
+import json, shutil
+from concurrent.futures import ThreadPoolExecutor
+RECIPE = f'{ADAPTERS}/v4_s1/final'
+assert os.path.exists(f'{RECIPE}/adapter_config.json'), f'the stage-1 recipe adapter is missing: {RECIPE}'
+SPEC, REPORTS, MAS = f'{ADAPTERS}/specialist_v10', f'{RESULTS}/mas_reports', f'{ADAPTERS}/v4q_mas_s0'
+os.makedirs(REPORTS, exist_ok=True)
+BIG = GPU_GB >= 70
+RB = 24 if BIG else 12          # views per reports batch (each runs two readers, then the verifier's two questions)
+PAR = 3 if BIG else 1           # independent test sets at a time on one GPU
+TRAIN = f'{TRAIN_V4_BASE} {TRAIN_NEG_V4}'
+VOCAB = f'--vocab-from {TEST_VIEWS} {TEST_NEG}'
+SETS = {'test': (f'{TEST_VIEWS} {TEST_NEG}', ''), 'ext': (EXT_VIEWS, ''), 'ext2': (EXT2, ''),
+        'telea': (f'{INP}/telea/views.jsonl', VOCAB), 'diffusion': (f'{INP}/diffusion/views.jsonl', VOCAB)}
+TAG = {'full': 'mas', 'nob': 'masnob', 'nos': 'masnos', 'nov': 'masnov', 'noc': 'masnoc', 'dir': 'masdir'}
+def run_name(tag, s):
+    return f'v4q_inp_{s}_{tag}_s0_test' if s in ('telea', 'diffusion') else f'v4q_{tag}_s0_{s}'
+def run_par(cmds):
+    if PAR == 1 or len(cmds) == 1:
+        for cmd in cmds:
+            sh(cmd)
+    else:
+        with ThreadPoolExecutor(PAR) as ex:
+            list(ex.map(sh, cmds))
+print(f'GPU {round(GPU_GB)} GB | reports batch {RB} | test sets at a time {PAR}')
+""")),
+        md("## 1. The specialist: lesion segmenter on unedited training images (about 30-60 minutes)"),
+        code(r"""
+meta = f'{SPEC}/specialist.json'
+if not (os.path.exists(meta) and json.load(open(meta)).get('finished')):
+    sh(f'python scripts/train_specialist.py --views {TRAIN_V4_BASE} --negatives {TRAIN_NEG_V4} --out {SPEC} --workers {min(8, os.cpu_count() or 4)}')
+print(open(meta).read())
+"""),
+        md("## 2. Smoke test of every later step on 8 training views (a few minutes; nothing kept)"),
+        code(B(r"""
+SMOKE = '/content/work/mas_smoke'
+if not os.path.exists(f'{MAS}/final/adapter_config.json'):
+    shutil.rmtree(SMOKE, ignore_errors=True)
+    sh(f'python scripts/mas_reports.py --model @BASE@ --adapter {RECIPE} --specialist {SPEC} --views {TRAIN} --subsample 8 --out {SMOKE}/reports.jsonl --batch-size 4')
+    print(open(f'{SMOKE}/reports.jsonl').readline()[:1500])
+    sh(f'python scripts/train_arbiter.py --model @BASE@ --init {RECIPE} --views {TRAIN} --reports {SMOKE}/reports.jsonl --out {SMOKE}/arbiter --grad-accum 2 --max-steps 2')
+    sh(f'python scripts/eval_mas.py --model @BASE@ --arbiter {SMOKE}/arbiter/final --views {TRAIN} --reports {SMOKE}/reports.jsonl --only-with-reports --out {SMOKE}/eval --name smoke --batch-size 4')
+    print('smoke test passed')
+else:
+    print('the deciding agent is already trained: smoke test skipped')
+""")),
+        md("## 3. Reports of the other agents on 4,000 training views (about 2 hours on an A100)"),
+        code(B(r"""
+if not os.path.exists(f'{MAS}/final/adapter_config.json'):
+    sh(f'python scripts/mas_reports.py --model @BASE@ --adapter {RECIPE} --specialist {SPEC} --views {TRAIN} --subsample 4000 --out {REPORTS}/train.jsonl --batch-size {RB}')
+print(sum(1 for _ in open(f'{REPORTS}/train.jsonl')), 'training views with reports')
+""")),
+        md("## 4. Train the deciding agent (about 2 hours on an A100)"),
+        code(B(r"""
+if not os.path.exists(f'{MAS}/final/adapter_config.json'):
+    sh(f'python scripts/train_arbiter.py --model @BASE@ --init {RECIPE} --views {TRAIN} --reports {REPORTS}/train.jsonl --out {MAS}')
+print(open(f'{MAS}/state.json').read())
+""")),
+        md("## 5. Reports on every test set (about 3-4 hours on an A100; three sets at a time on an 80 GB GPU)"),
+        code(B(r"""
+run_par([f'python scripts/mas_reports.py --model @BASE@ --adapter {RECIPE} --specialist {SPEC} --views {v} {x} --out {REPORTS}/{s}.jsonl --batch-size {RB}'
+         for s, (v, x) in SETS.items()])
+""")),
+        md("## 6. Test the full system everywhere, and the five ablations on the fresh external set and the held-out tools"),
+        code(B(r"""
+jobs = [('full', s) for s in SETS] + [(a, s) for a in ('nob', 'nos', 'nov', 'noc', 'dir') for s in ('ext2', 'telea', 'diffusion')]
+run_par([f'python scripts/eval_mas.py --model @BASE@ --arbiter {MAS}/final --ablation {a} --views {SETS[s][0]} {SETS[s][1]} '
+         f'--reports {REPORTS}/{s}.jsonl --out {RESULTS}/{run_name(TAG[a], s)} --name v4q_{TAG[a]}_s0 '
+         f'--split {"test" if s in ("telea", "diffusion") else s} --batch-size {BATCH}' for a, s in jobs])
+""")),
+        md("## 7. The pre-registered rule"),
+        code(r"""
+!python scripts/v10_rule.py --results {RESULTS} --out {RESULTS}/v10_rule.md
+"""),
+        publish("MedScope report - 40 pilot: counterfactual multi-agent reader", """
+    ('Pre-registered rule, ablations and the agents on their own', read_text(f'{RESULTS}/v10_rule.md')),
+    ('Full system vs replay-only continuation and the recipe, main test', significance_table(RESULTS, 'v4q_mas_s0_test', ['v4q_sftc_s0_test', 'v4q_cf_s0_test'])),
+    ('Full system vs replay-only continuation and the recipe, fresh external', significance_table(RESULTS, 'v4q_mas_s0_ext2', ['v4q_sftc_s0_ext2', 'v4q_cf_s0_ext2'])),
+    ('Full system vs the recipe, external centres', significance_table(RESULTS, 'v4q_mas_s0_ext', ['v4q_cf_s0_ext'])),
+    ('Held-out tool TELEA', significance_table(RESULTS, 'v4q_inp_telea_mas_s0_test', ['v4q_inp_telea_sftc_s0_test', 'v4q_inp_telea_cf_s0_test'])),
+    ('Held-out tool diffusion', significance_table(RESULTS, 'v4q_inp_diffusion_mas_s0_test', ['v4q_inp_diffusion_sftc_s0_test', 'v4q_inp_diffusion_cf_s0_test'])),
+    ('Specialist', read_text(f'{ADAPTERS}/specialist_v10/specialist.json')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3732,6 +3854,7 @@ NOTEBOOKS = {
     "39b_pilot_grpo.ipynb": nb39_pilot("b"),
     "39c_check_vision_arm.ipynb": nb39c_check,
     "39d_pilot_vision_retry.ipynb": nb39_pilot("d"),
+    "40_mas_pilot.ipynb": nb40_mas,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

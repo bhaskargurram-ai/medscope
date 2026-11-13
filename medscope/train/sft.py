@@ -83,13 +83,16 @@ def estimate_samples(views: list[View], mode: str) -> float:
     return sum(1.0 if v.kind.value == "degraded" else 1.6 for v in views)
 
 
-def prepared_views(policy, order, start_view, mode, seed, replays, cfg, window_prob, small_zoom, stop, ahead=4):
+def prepared_views(policy, order, start_view, mode, seed, replays, cfg, window_prob, small_zoom, stop, ahead=4,
+                   sample_fn=None):
     """(view index, [(sample, target ids, tokenised inputs)]) in training order. A background thread builds and
     tokenises the next views (images included) while the GPU trains on the current one, so the GPU no longer waits
     for the CPU; the samples and their order are exactly those of the plain loop. MEDSCOPE_PREFETCH=0 turns it off."""
     def build(vi):
         out = []
-        for s in samples_for(order[vi], mode, seed, vi, replays, cfg, window_prob, small_zoom):
+        samples = sample_fn(order[vi], seed, vi) if sample_fn is not None else \
+            samples_for(order[vi], mode, seed, vi, replays, cfg, window_prob, small_zoom)
+        for s in samples:
             target = policy.target_ids(s.target)
             inputs = policy.encode_cpu(s.messages) if hasattr(policy, "encode_cpu") else None
             out.append((s, target, inputs))
@@ -148,6 +151,7 @@ def train_sft(
     small_zoom: bool = False,
     schedule_steps: Optional[int] = None,
     vision_lr_scale: float = 1.0,
+    sample_fn: Optional[Callable] = None,   # (view, seed, index) -> [SFTSample]; replaces the synthetic trajectories
 ) -> Path:
     import torch
 
@@ -196,7 +200,7 @@ def train_sft(
     save_due = False
     stop = threading.Event()
     for vi, prepared in prepared_views(policy, order, start_view, mode, seed, replays, cfg, window_prob, small_zoom,
-                                       stop):
+                                       stop, sample_fn=sample_fn):
         for s, target, inputs in prepared:
             lp = policy.token_logprobs(s.messages, target, inputs=inputs) if inputs is not None \
                 else policy.token_logprobs(s.messages, target)

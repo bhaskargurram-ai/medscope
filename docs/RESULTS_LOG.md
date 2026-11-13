@@ -1113,3 +1113,13 @@ from its checkpoint on an A100 40 GB; report `results/39d_pilot:_vision_adapters
   confidence ranked errors worse there (AURC 0.508 vs 0.305). It became more conservative, not more perceptive.
 - Under the plan, full unfreezing of the vision encoder was conditional on this pilot being positive; it is not
   supported by these results.
+
+## 2026-11-13 — lead 4 declared: a counterfactual multi-agent reader (docs/PREREGISTRATION_v10.md)
+
+After leads 2 and 3, the method question moves from "train one model differently" to structure: a direct reader and a
+question-blind reader (both the frozen recipe adapter), a lesion segmenter trained only on unedited training images,
+a verifier that erases the region the others point to and makes an equal edit elsewhere before asking again, and a
+trained deciding agent that reads all four reports. Prior-work check: the closest published method (counter-evidence
+verification, Zhou et al., MICCAI 2026) masks the claimed region at test time without a matched control edit and
+without training; lead 4's go signal and its "no control" ablation test exactly that difference. Plan, arms,
+ablations and go signal were committed before anything was trained; notebook 40 runs it end to end.

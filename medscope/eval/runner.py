@@ -70,8 +70,10 @@ def evaluate(
     log: Callable[[str], None] = print,
     n_bootstrap: int = 2000,
     batch_size: int = 1,
+    episodes: Optional[Callable[[list[View]], list]] = None,
 ) -> dict:
-    """Greedy episodes on every view; appends to outcomes.jsonl so reruns resume."""
+    """Greedy episodes on every view; appends to outcomes.jsonl so reruns resume.
+    `episodes` replaces the agent loop (views -> finished episodes), e.g. the deciding agent of lead 4."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     outcomes_path, transcripts_path = out / "outcomes.jsonl", out / "transcripts.jsonl"
@@ -117,7 +119,8 @@ def evaluate(
         last_log = -10
         for b in range(0, len(todo), batch_size):
             chunk = todo[b:b + batch_size]
-            for v, ep in zip(chunk, run_episodes(policy, chunk, cfg, sample=False)):
+            eps = episodes(chunk) if episodes is not None else run_episodes(policy, chunk, cfg, sample=False)
+            for v, ep in zip(chunk, eps):
                 fo.write(json.dumps({**ep.outcome.to_dict(), "vkey": keys[v.view_id]}) + "\n")
                 ft.write(json.dumps({"view_id": v.view_id, "vkey": keys[v.view_id], "kind": v.kind.value,
                                      "question": v.question, "gold": v.answer, "error": ep.error,
