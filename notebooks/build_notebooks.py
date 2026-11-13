@@ -3842,6 +3842,36 @@ runtime.unassign()
     ]
 
 
+def nb42a_screen() -> list[dict]:
+    """Notebook 42a: screening stage A (docs/SCREENING.md), CPU only."""
+    return [md("""
+# MedScope 42a: screening stage A, about 130 ideas in minutes (CPU only)
+
+Every idea here decides, per image, whether to keep the recipe model's answer, say the finding is absent, refer, or
+say it is present, using only the answers the other agents already gave in notebooks 40-41 (question-blind reader,
+lesion segmenter, verifier). No model is run. Ideas are tried on the **validation images only**: picked on one half,
+checked on the other. The test sets are not touched. The pass rule was written in `docs/SCREENING.md` before this
+ran; it asks for a better evidence sensitivity gap, not just a different yes/no threshold.
+
+**Needs:** notebooks 40 and 41 finished. A CPU runtime is enough, about 10-15 minutes. Run all; nothing to set.
+"""),
+        code(SETUP), code(RESTORE_ALL), code(RESTORE_V4),
+        code(r"""
+import glob
+plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/SCREENING.md', cwd='/content/medscope').stdout.strip()
+assert plan, 'docs/SCREENING.md is not in the repository'
+print('screening plan committed:', plan)
+VAL_REPORTS = ' '.join(sorted(glob.glob(f'{RESULTS}/mas_reports/val_*of*.jsonl')))
+assert VAL_REPORTS, 'no validation reports: run notebook 41 first'
+print(VAL_REPORTS)
+sh(f'python scripts/screen_a.py --views {VAL_V4} {VAL_NEG_V4} --reports {VAL_REPORTS} --out {RESULTS}/screen_a')
+"""),
+        publish("MedScope report - 42a screening stage A", """
+    ('Stage A', read_text(f'{RESULTS}/screen_a/screen_a.md')),
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3955,6 +3985,7 @@ NOTEBOOKS = {
     "39d_pilot_vision_retry.ipynb": nb39_pilot("d"),
     "40_mas_pilot.ipynb": nb40_mas,
     "41_mas2_retry.ipynb": nb41_mas2,
+    "42a_screen_stage_a.ipynb": nb42a_screen,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
