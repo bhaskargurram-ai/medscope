@@ -1164,3 +1164,19 @@ Notebook 41. A NO GO closes lead 4.
   because readers also call many healthy films positive) chest X-ray they often still see a finding after erasure.
   The "erased = absent" label is reader-supported for colonoscopy only so far. Two trainee readers, single images
   without clinical context; pack 3 (localized findings) not yet read.
+
+## 2026-11-13 — lead 4 retry result (notebook 41, v11): NO GO; lead 4 closed
+
+Report `results/41_pilot:_multi-agent_reader,_out-of-sample_reports_report.md`, rule `results/v11_rule.md`.
+- **Held-out tools pooled vs `v4q_sftc_s0`:** net utility +0.042 [-0.033, +0.119] (needed +0.05), erased claims
+  **+0.061** [+0.027, +0.096] (needed not higher), CCR +0.056, ESG -0.002. Fresh-external CCR 0.449 vs the recipe's
+  0.560 (guard fails). Three of five conditions fail: **NO GO**.
+- **What the fix did:** the deciding agent stopped over-trusting "nothing found". At the external centres sensitivity
+  recovered (CCR 0.803 vs 0.513 in the first run; recipe 0.769) and on the main test it had the best net utility of
+  any arm (0.809; +0.069 vs the control, +0.117 vs the recipe), but the main test uses the verifier's own inpainter.
+  On the held-out tools it now claims more erased lesions. ESG did not move on any set: the agents shifted the
+  answer threshold, they did not make the system better at telling an erased lesion from a present one.
+- Ablations: only the specialist contributes again (removing it -0.066 net utility); the question-blind reader,
+  verifier and matched control add nothing measurable.
+- Under `docs/PREREGISTRATION_v11.md` this was the only retry: **lead 4 is closed.** Method leads tried since the
+  preprint: C1-C4, lead 2 (vision adapters, 2 runs), lead 3 (GRPO), lead 4 (multi-agent, 2 runs); none met its rule.
