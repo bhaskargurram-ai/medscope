@@ -1123,3 +1123,23 @@ trained deciding agent that reads all four reports. Prior-work check: the closes
 verification, Zhou et al., MICCAI 2026) masks the claimed region at test time without a matched control edit and
 without training; lead 4's go signal and its "no control" ablation test exactly that difference. Plan, arms,
 ablations and go signal were committed before anything was trained; notebook 40 runs it end to end.
+
+## 2026-11-13 — lead 4 result (notebook 40): NO GO; held-out gain, but sensitivity collapses at new centres
+
+Report `results/40_pilot:_counterfactual_multi-agent_reader_report.md`, rule `results/v10_rule.md` (A100 80 GB).
+- **Held-out tools pooled, full system vs `v4q_sftc_s0`:** net utility +0.090 [+0.004, +0.180] (p = 0.044), erased
+  claims -0.015, CCR +0.022. The three primary conditions and the main-test healthy-claim guard are met.
+- **Guard-rail failed:** fresh-external CCR 0.378 vs the recipe's 0.560 (-0.182, p < 0.001); external centres CCR
+  0.513 vs 0.769 and net utility 0.232 vs 0.604. Pneumothorax 3 of 48. Erased claims are lower at new centres
+  (6.5% vs 16.7%) because the system says "absent" far more often. **Go signal: NO GO.**
+- **Ablations (held-out pooled):** only the specialist contributes by the rule (removing it: net utility -0.055,
+  erased claims +0.029); the reports together add +0.042 over the arbiter alone (n.s.). The question-blind reader,
+  the verifier and the verifier's matched control each change net utility by under 0.02.
+- **Agents on their own:** the specialist finds a region on 86-87% of unedited test lesion images but only 50-53% at
+  new centres, and still "finds" 19-29% of erased lesions. The verifier behaves as designed where it acts (about 80%
+  of claims withdrawn after erasing their region, about 95% kept after the control edit), but the direct reader
+  rarely claims an erased lesion with a box (20 of 219 on the main test), so it seldom gets to act.
+- **Likely cause of the collapse (post hoc, not tested):** the arbiter was trained on specialist reports for the
+  specialist's own training images (found on 96%), so it learned to trust "specialist found nothing" far more than
+  the specialist deserves on unseen centres. Out-of-fold specialist reports for arbiter training would remove this;
+  that would be a new pre-registered plan, not a change to this one.
