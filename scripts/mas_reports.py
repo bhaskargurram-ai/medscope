@@ -47,9 +47,14 @@ def main() -> None:
         kinds[v.kind.value] = kinds.get(v.kind.value, 0) + 1
     print(f"{len(views)} views: {kinds}")
     cfg = with_vocab(load_config(), [v for f in (args.vocab_from or args.views) for v in load_views(f)])
-    policy = HFPolicy(args.model, adapter=args.adapter, max_new_tokens=384)
     spec = Specialist(args.specialist)
     print(f"specialist threshold {spec.threshold}")
+    from medscope.mas.reports import remaining_reports
+    left = remaining_reports(views, args.out, args.adapter, {"threshold": spec.threshold})
+    if left == 0:
+        print(f"all {len(views)} reports already in {args.out}")
+        return
+    policy = HFPolicy(args.model, adapter=args.adapter, max_new_tokens=384)
     compute_reports(policy, spec, get_inpainter(args.inpainter), views, cfg, args.out, adapter=args.adapter,
                     batch_size=args.batch_size)
 

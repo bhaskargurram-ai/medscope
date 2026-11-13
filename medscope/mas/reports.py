@@ -89,6 +89,12 @@ def read_reports(path: str | Path) -> dict[str, dict]:
     return out
 
 
+def remaining_reports(views: list[View], out_path: str | Path, adapter: str, specialist_meta: dict) -> int:
+    """How many views compute_reports would still run (so a finished set need not load the model)."""
+    have = read_reports(out_path)
+    return sum(1 for v in views if (have.get(v.view_id) or {}).get("key") != report_key(v, adapter, specialist_meta))
+
+
 def compute_reports(policy, specialist, inpaint_fn, views: list[View], cfg: dict, out_path: str | Path,
                     adapter: str, batch_size: int = 16, log: Callable[[str], None] = print) -> dict[str, dict]:
     """Reports for every view, appended to out_path; views already there with the same key are skipped."""

@@ -3660,7 +3660,8 @@ assert os.path.exists(f'{RECIPE}/adapter_config.json'), f'the stage-1 recipe ada
 SPEC, REPORTS, MAS = f'{ADAPTERS}/specialist_v10', f'{RESULTS}/mas_reports', f'{ADAPTERS}/v4q_mas_s0'
 os.makedirs(REPORTS, exist_ok=True)
 BIG = GPU_GB >= 70
-RB = 24 if BIG else 12          # views per reports batch (each runs two readers, then the verifier's two questions)
+RB = 16 if BIG else 12          # views per reports batch (each runs two readers, then the verifier's two questions);
+                                # 16 leaves room for three processes on one 80 GB GPU (24 ran out of memory)
 PAR = 3 if BIG else 1           # independent test sets at a time on one GPU
 TRAIN = f'{TRAIN_V4_BASE} {TRAIN_NEG_V4}'
 VOCAB = f'--vocab-from {TEST_VIEWS} {TEST_NEG}'
