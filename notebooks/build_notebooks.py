@@ -3886,8 +3886,8 @@ evidence are screened with the stage-A rule, which now has to hold on our own er
 TELEA, a tool none of our models was trained or tested with during screening. Validation images only; the test sets
 are not touched.
 
-**Needs:** notebooks 40 and 41 finished (the segmenter). A GPU: about 1.5-2 hours on an A100 80 GB, 2.5-3 hours on
-40 GB. Run all; nothing to set. If the session ends, run all again: it continues where it stopped.
+**Needs:** notebooks 40 and 41 finished (the segmenter). An A100 (or L4) GPU: about 1.5-2 hours on an A100 80 GB,
+2.5-3 hours on 40 GB; the notebook stops at once on a T4, which would take 8+ hours. Run all; nothing to set. If the session ends, run all again: it continues where it stopped.
 """ + SECRETS_NOTE),
         code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4),
         code(B(r"""
@@ -3895,11 +3895,16 @@ plan = git('log', '--format=%H %ci', '--', 'docs/SCREENING.md', cwd='/content/me
 assert plan, 'docs/SCREENING.md is not in the repository'
 print('screening plan, latest commit:', plan[0])
 import torch
-GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+print(torch.cuda.get_device_name(0) if GPU_GB else 'no GPU', f'({round(GPU_GB)} GB)')
+ALLOW_SMALL_GPU = False      # a T4 (15 GB) works but takes 8+ hours: set True only if nothing better is available
+if GPU_GB < 20 and not ALLOW_SMALL_GPU:
+    raise SystemExit('This GPU is too small for a fast run (T4 or none). Runtime > Change runtime type > A100 (or L4), '
+                     'then run all again. Everything already computed is kept.')
 SB = f'{RESULTS}/screen_b'
 ARGS = (f'--views {VAL_V4} --negatives {VAL_NEG_V4} --cases 200 --negs 80 --dev-dir {SB}/dev --probes {SB}/probes.jsonl '
         f'--out {SB} --model @BASE@ --adapter {ADAPTERS}/v4_s1/final --second-model Qwen/Qwen2.5-VL-7B-Instruct '
-        f'--specialist {ADAPTERS}/specialist_v10 --batch-size {12 if GPU_GB >= 70 else 6}')
+        f'--specialist {ADAPTERS}/specialist_v10 --batch-size {12 if GPU_GB >= 70 else 6 if GPU_GB >= 35 else 3}')
 print('GPU', round(GPU_GB), 'GB')
 """)),
         md("## 1. New evidence on every dev image (the long part)"),

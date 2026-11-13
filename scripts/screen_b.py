@@ -35,7 +35,7 @@ def main() -> None:
     ap.add_argument("--specialist", default=None)
     ap.add_argument("--batch-size", type=int, default=12)
     args = ap.parse_args()
-    from medscope.screen.probes import compute_probes, dev_views, read_probes
+    from medscope.screen.probes import compute_probes, dev_views
     views = [v for f in args.views for v in load_views(f)]
     negs = [v for f in args.negatives for v in load_views(f)]
     dev = dev_views(views, negs, args.cases, args.negs, args.dev_dir)
@@ -45,18 +45,31 @@ def main() -> None:
         kinds[k] = kinds.get(k, 0) + 1
     print(f"dev set: {len(dev)} views {kinds}")
     cfg = with_vocab(load_config(), views + negs)
+    second_path = str(Path(args.probes).with_name("second.jsonl"))
     if args.stage in ("probe", "both"):
+        import gc
+
+        import torch
+
+        from medscope.screen.probes import compute_second
         from medscope.train.hf_policy import HFPolicy
+        # one model on the GPU at a time: the recipe's probes first, then the second model's answers
         policy = HFPolicy(args.model, adapter=args.adapter, max_new_tokens=384)
-        second = HFPolicy(args.second_model, max_new_tokens=384) if args.second_model else None
         spec = None
         if args.specialist:
             from medscope.mas.specialist import Specialist
             spec = Specialist(args.specialist)
-        compute_probes(policy, second, spec, dev, cfg, args.probes, batch_size=args.batch_size)
+        compute_probes(policy, None, spec, dev, cfg, args.probes, batch_size=args.batch_size)
+        del policy, spec
+        gc.collect()
+        torch.cuda.empty_cache()
+        if args.second_model:
+            second = HFPolicy(args.second_model, max_new_tokens=384)
+            compute_second(second, dev, cfg, second_path, batch_size=args.batch_size)
     if args.stage in ("screen", "both"):
+        from medscope.screen.probes import merged_probes
         from medscope.screen.stage_b import report_b, run_screen_b
-        rows = run_screen_b(dev, read_probes(args.probes), cfg)
+        rows = run_screen_b(dev, merged_probes(args.probes, second_path), cfg)
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
         ser = [{(k if isinstance(k, str) else "/".join(k)): v for k, v in r.items()} for r in rows]

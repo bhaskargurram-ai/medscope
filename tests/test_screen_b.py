@@ -44,6 +44,9 @@ class TestStageB(unittest.TestCase):
             cfg = with_vocab(CFG, views)
             pol, sec = Yes(), Yes()
             pr = compute_probes(pol, sec, Spec(), dev, cfg, d / "p.jsonl", batch_size=5, log=lambda m: None)
+            from medscope.screen.probes import compute_second, merged_probes
+            compute_second(sec, dev, cfg, d / "s.jsonl", batch_size=4, log=lambda m: None)
+            self.assertEqual(len(merged_probes(d / "p.jsonl", d / "s.jsonl")), len(dev))
             self.assertEqual(set(pr), {v.view_id for v in dev})
             r = next(iter(pr.values()))
             self.assertEqual(len(r["tta"]), 3)

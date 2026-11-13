@@ -185,6 +185,7 @@ def compute_probes(policy, second, specialist, views: list[View], cfg: dict, out
             finally:
                 set_prompt("agent")
             sec = [says(e) for e in run_episodes(second, list(chunk), cfg, sample=False, images=list(imgs))] if second else [None] * n
+            # (on small GPUs the second model runs in its own pass afterwards: compute_second)
             spec = [specialist.report(im) for im in imgs] if specialist else [None] * n
             for i, v in enumerate(chunk):
                 f.write(json.dumps({"view_id": v.view_id, "version": PROBES_VERSION, "direct": direct[i], "tta": tta[i],
@@ -196,3 +197,34 @@ def compute_probes(policy, second, specialist, views: list[View], cfg: dict, out
             rate = (time.time() - t0) / done
             log(f"  probes {done}/{len(todo)}, {rate:.1f}s per view, ~{rate * (len(todo) - done) / 60:.0f} min left")
     return read_probes(out)
+
+
+def compute_second(second, views: list[View], cfg: dict, out_path: str | Path, batch_size: int = 12,
+                   log: Callable[[str], None] = print) -> dict[str, dict]:
+    """The second model's answers in a pass of their own (out_path: view_id -> answer), so the two models never
+    have to share a small GPU."""
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    have = read_probes(out)
+    todo = [v for v in views if v.view_id not in have]
+    log(f"second model: {len(have)} done, {len(todo)} to run")
+    t0 = time.time()
+    with open(out, "a") as f:
+        for b in range(0, len(todo), batch_size):
+            chunk = todo[b:b + batch_size]
+            eps = run_episodes(second, chunk, cfg, sample=False, images=[load_image(v.image_path) for v in chunk])
+            for v, e in zip(chunk, eps):
+                f.write(json.dumps({"view_id": v.view_id, "second": says(e)}) + "\n")
+            f.flush()
+            done = b + len(chunk)
+            rate = (time.time() - t0) / done
+            log(f"  second model {done}/{len(todo)}, {rate:.1f}s per view, ~{rate * (len(todo) - done) / 60:.0f} min left")
+    return read_probes(out)
+
+
+def merged_probes(probes_path: str | Path, second_path: str | Path) -> dict[str, dict]:
+    pr = read_probes(probes_path)
+    for vid, r in read_probes(second_path).items():
+        if vid in pr and pr[vid].get("second") is None:
+            pr[vid]["second"] = r.get("second")
+    return pr
