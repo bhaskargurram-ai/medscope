@@ -1149,3 +1149,18 @@ Report `results/40_pilot:_counterfactual_multi-agent_reader_report.md`, rule `re
 The one declared retry: the deciding agent is trained on the other agents' reports on the validation views (images
 none of them was trained on) instead of a training subset; 3 epochs; everything else, including the rule, as in v10.
 Notebook 41. A NO GO closes lead 4.
+
+## 2026-11-13 — reader study, second reader (TR, radiology, 1 year), pack 2
+
+- Finding judged present (yes): unedited lesion images 26/32 (cannot tell 3), **erased 16/32 (cannot tell 8)**,
+  control-edited 27/32, lesion-free 7/32 (cannot tell 9). Edited vs unedited AUC 0.55; erased vs control 0.61.
+- Both readers pooled: residual finding on erased images 35/64 reads; per image by majority, 13/32 erased images
+  (exact 95% CI 24-59%). **The pre-registered criterion (at most 10%) fails.** Agreement between readers: kappa 0.10
+  on "edited", 0.47 on "finding present".
+- By source (reader 1 | reader 2, finding present on erased vs lesion-free images): colonoscopy erased 1/6 | 2/6 vs
+  lesion-free 2/6 | 0/6 (erasure works); breast ultrasound 6/7 | 4/7 vs 5/7 | 1/7; chest X-ray 5/6 | 4/6 vs 4/6 | 3/6;
+  brain MRI 3/7 | 5/7 vs 1/7 | 1/7; SLAKE 4/6 | 1/6 vs 4/6 | 2/6.
+- Reading: physicians cannot tell edited images from unedited ones, but on ultrasound, brain MRI and (less clearly,
+  because readers also call many healthy films positive) chest X-ray they often still see a finding after erasure.
+  The "erased = absent" label is reader-supported for colonoscopy only so far. Two trainee readers, single images
+  without clinical context; pack 3 (localized findings) not yet read.
