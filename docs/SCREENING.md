@@ -22,3 +22,18 @@ are fit on half A only (their half-A numbers come from two-fold cross-fitting in
 verifier must hold on held-out-tool erasures (stage B data) before they go further.
 
 **Reporting.** Every stage's number of ideas screened and passed goes into the paper.
+
+## Stage B (added 13 November 2026, before stage B was run)
+
+**Dev set.** 200 validation lesion cases (fixed seed) with their unedited image, LaMa erasure and LaMa control edit,
+the same erasure and control made with TELEA (held-out tool, made here), and 80 validation lesion-free images.
+
+**New evidence per image (probes):** the recipe's answer and the probability of its answer tokens; its answer on three
+altered copies (mirror, 90% centre crop, contrast change); its answer on a close-up of the region it marked and on an
+equal close-up elsewhere on tissue; its answer under the cautious prompt; a second model's answer (Qwen2.5-VL-7B,
+zero-shot); the segmenter's peak score.
+
+**Pass rule.** The stage-A rule, required separately on the LaMa erasures and on the TELEA erasures (unedited and
+lesion-free images count in both), on half A and again on half B. Policies: veto, upgrade and voting rules on the
+probes, and learned combiners (logistic, boosted trees) on all probes, on the recipe plus each probe, and on all
+probes but one.

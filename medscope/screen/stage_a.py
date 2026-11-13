@@ -216,6 +216,9 @@ def fit_combiner(kind: str, names: tuple, feats: list[Features], views: dict[str
             X.append(f.vec[idx])
             y.append(lab)
     X, y = np.array(X), np.array(y)
+    if len(y) == 0 or len(set(y.tolist())) < 2:          # too few labelled views to fit: a constant guess
+        const = float(np.mean(y)) if len(y) else 0.5
+        return lambda f: const
     if kind == "logistic":
         from sklearn.linear_model import LogisticRegression
         m = LogisticRegression(C=1.0, max_iter=2000)

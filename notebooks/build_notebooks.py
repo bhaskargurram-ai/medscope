@@ -3872,6 +3872,55 @@ sh(f'python scripts/screen_a.py --views {VAL_V4} {VAL_NEG_V4} --reports {VAL_REP
     ]
 
 
+def nb42b_screen() -> list[dict]:
+    """Notebook 42b: screening stage B (docs/SCREENING.md): new image evidence on a validation dev set."""
+    B = lambda t: t.replace('@BASE@', BASE)  # noqa: E731
+    return [md("""
+# MedScope 42b: screening stage B, new evidence from the images
+
+Stage A showed that combining the answers we already had cannot separate an erased lesion from a real one any better.
+Here each validation image gets **new** evidence: the recipe's answer on altered copies (mirror, crop, contrast), on a
+close-up of the region it marked (and an equal close-up elsewhere), under a cautious prompt, its own probability of
+"present", a second model's answer (Qwen2.5-VL-7B), and the segmenter's score. Then about 100 ideas that use this
+evidence are screened with the stage-A rule, which now has to hold on our own erasures **and** on erasures made with
+TELEA, a tool none of our models was trained or tested with during screening. Validation images only; the test sets
+are not touched.
+
+**Needs:** notebooks 40 and 41 finished (the segmenter). A GPU: about 1.5-2 hours on an A100 80 GB, 2.5-3 hours on
+40 GB. Run all; nothing to set. If the session ends, run all again: it continues where it stopped.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4),
+        code(B(r"""
+plan = git('log', '--format=%H %ci', '--', 'docs/SCREENING.md', cwd='/content/medscope').stdout.strip().splitlines()
+assert plan, 'docs/SCREENING.md is not in the repository'
+print('screening plan, latest commit:', plan[0])
+import torch
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30
+SB = f'{RESULTS}/screen_b'
+ARGS = (f'--views {VAL_V4} --negatives {VAL_NEG_V4} --cases 200 --negs 80 --dev-dir {SB}/dev --probes {SB}/probes.jsonl '
+        f'--out {SB} --model @BASE@ --adapter {ADAPTERS}/v4_s1/final --second-model Qwen/Qwen2.5-VL-7B-Instruct '
+        f'--specialist {ADAPTERS}/specialist_v10 --batch-size {12 if GPU_GB >= 70 else 6}')
+print('GPU', round(GPU_GB), 'GB')
+""")),
+        md("## 1. New evidence on every dev image (the long part)"),
+        code(r"""
+sh(f'python scripts/screen_b.py {ARGS} --stage probe')
+"""),
+        md("## 2. Screen the ideas (CPU, a few minutes)"),
+        code(r"""
+sh(f'python scripts/screen_b.py {ARGS} --stage screen')
+"""),
+        publish("MedScope report - 42b screening stage B", """
+    ('Stage B', read_text(f'{RESULTS}/screen_b/screen_b.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -3986,6 +4035,7 @@ NOTEBOOKS = {
     "40_mas_pilot.ipynb": nb40_mas,
     "41_mas2_retry.ipynb": nb41_mas2,
     "42a_screen_stage_a.ipynb": nb42a_screen,
+    "42b_screen_stage_b.ipynb": nb42b_screen,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
