@@ -275,8 +275,9 @@ def run_screen(views: list[View], reports: dict[str, dict], cfg: dict, log=print
                      "B": metrics(outcomes(banded(prob_all, lo, hi), halves["B"], by_id, cfg))})
     for r in rows:
         r["pass_A"], r["pass_B"] = passes(r["A"], base["A"]), passes(r["B"], base["B"])
-        r["uses_verifier"] = "verifier" in r["policy"] or "vote" in r["policy"] or (
-            "learned" in r["policy"] and "no verifier" not in r["policy"] and "direct + specialist" not in r["policy"])
+        p = r["policy"]
+        r["uses_verifier"] = (("verifier" in p and "no verifier" not in p) or p.startswith("vote")
+                              or (p.startswith("learned") and "no verifier" not in p and "direct + specialist" not in p))
     rows.sort(key=lambda r: -(r["A"]["net_utility"] if r["A"]["net_utility"] == r["A"]["net_utility"] else -9))
     return [{"policy": "baseline", "A": base["A"], "B": base["B"], "pass_A": False, "pass_B": False,
              "family": "baseline", "uses_verifier": False}] + rows

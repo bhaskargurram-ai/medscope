@@ -1180,3 +1180,13 @@ Report `results/41_pilot:_multi-agent_reader,_out-of-sample_reports_report.md`, 
   verifier and matched control add nothing measurable.
 - Under `docs/PREREGISTRATION_v11.md` this was the only retry: **lead 4 is closed.** Method leads tried since the
   preprint: C1-C4, lead 2 (vision adapters, 2 runs), lead 3 (GRPO), lead 4 (multi-agent, 2 runs); none met its rule.
+
+## 2026-11-13 — screening stage A (notebook 42a): 128 policies, 19 pass on half A, 0 confirm on half B
+
+Validation set only (`results/screen_a/screen_a.md`). Every policy that passed on half A failed on half B, always on
+the ESG condition (and some on CCR). Net utility rose a lot on both halves for many learned combiners (half B: 0.539
+for the recipe alone, up to 0.706 for boosted trees on direct reader + specialist with a refer band, with erased claims
+3.9% vs 11.2%) but ESG on half B moved by at most +0.026 for any policy (+0.013 for that one) and CCR fell (0.727 vs
+0.773). The stored agents add no information that separates an erased lesion from a present one beyond what the
+recipe already has; they allow better-calibrated abstention. Combining existing signals is closed; stage B needs new
+evidence. (The "V" column of the first report also marked "no verifier" combiners; fixed.)
