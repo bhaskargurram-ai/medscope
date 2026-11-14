@@ -1238,3 +1238,19 @@ The first reading (previous entry) over-read 10 images. Checks added to `scripts
   colonoscopy subset supports the headline that frontier models claim erased findings. The non-colonoscopy rates mix
   real claims with residual evidence and broad "abnormality" questions; that caveat belongs in the next revision,
   no retraction is indicated.
+
+## 2026-11-14 — literature review (six strands) and framework stage 0 pre-registered
+
+Six reviews of published work in `docs/litreview/` (about 280 papers; venues marked confirmed or from memory, every
+citation re-checked before use). Synthesis and plan in `docs/FRAMEWORK.md`. Checks of our stored results first
+(recipe seed 0, main test, 219 cases; denies = absent or refer):
+- LaMa: denies control 14.6%, but only 2.7% (5/186) where the lesion is found on the unedited image: the remaining
+  gap is perception.
+- TELEA: erased claims 8%; denies control 21.9%, **12.9% (24/186) where the lesion is found**, 13 of them breast
+  ultrasound: on the held-out tool the loss is edit-induced denial, not hallucination.
+- Diffusion: erased claims 25.7%; 41 of 45 claims point at the erased site (the diffusion edits have not been
+  reader-checked; claims there are not yet known to be errors).
+- Our erasures are edited at the lesion and our control edits elsewhere: a site-of-edit shortcut is possible and
+  untested (the stage-1 arm trained on erasures without controls already denied 47% of TELEA controls).
+`docs/FRAMEWORK_STAGE0.md` fixes the test before any score: same-site ring edits with the lesion intact, restored
+and half erasures, six models, probes on hidden features, validation images only (notebook 44).

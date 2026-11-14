@@ -3926,6 +3926,67 @@ runtime.unassign()
     ]
 
 
+def nb44_fw_stage0() -> list[dict]:
+    """Notebook 44: framework stage 0 (docs/FRAMEWORK_STAGE0.md): site-matched edits, scores and probes (validation)."""
+    B = lambda t: t.replace('@BASE@', BASE)  # noqa: E731
+    return [md("""
+# MedScope 44: framework stage 0 - does the model answer from the lesion or from where the image was edited?
+
+Our erasures are always edited **at** the lesion and our control edits **elsewhere**, so a model could learn
+"edited where the question points -> absent" instead of looking for the lesion. This notebook adds edits made **at
+the same place with the lesion left intact** (a ring around it), the erasure with the lesion put back, and half
+erasures, and scores six models on them, plus linear probes on the recipe's internal features. No training. The
+reading rule was fixed in `docs/FRAMEWORK_STAGE0.md` before this ran; it decides which framework is built.
+Validation images only; the test sets are not touched.
+
+**Needs:** notebook 42b finished (its dev set and answers are reused). An A100 (or L4/G4) GPU, about 1 hour; the
+notebook stops at once on a T4. Run all; nothing to set. If the session ends, run all again: it continues.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(LAMA_CELL),
+        code(B(r"""
+plan = git('log', '--format=%H %ci', '--', 'docs/FRAMEWORK_STAGE0.md', cwd='/content/medscope').stdout.strip().splitlines()
+assert plan, 'docs/FRAMEWORK_STAGE0.md is not in the repository'
+print('stage 0 plan, latest commit:', plan[0])
+import torch
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+print(torch.cuda.get_device_name(0) if GPU_GB else 'no GPU', f'({round(GPU_GB)} GB)')
+if GPU_GB < 20:
+    raise SystemExit('This GPU is too small (T4 or none). Runtime > Change runtime type > A100 (or L4), then run all again.')
+SB = f'{RESULTS}/screen_b'
+assert os.path.exists(f'{SB}/probes.jsonl'), 'run notebook 42b first (its answers check the score)'
+S0 = f'{RESULTS}/fw_stage0'
+MODELS = [('recipe', f'{ADAPTERS}/v4_s1/final'), ('base', ''), ('nocf', f'{ADAPTERS}/v4q_nocf_s0/final'),
+          ('erasures_only', f'{ADAPTERS}/v4q_tgt_s0/final'), ('cmcc', f'{ADAPTERS}/v4q_cmccn_s0/final'),
+          ('replay_control', f'{ADAPTERS}/v4q_sftc_s0/final')]
+for n, a in MODELS:
+    print(f'{n:15s}', a or '(no adapter)', '' if not a or os.path.exists(a) else '<- MISSING, will be skipped')
+ARGS = (f'--views {VAL_V4} --negatives {VAL_NEG_V4} --cases 200 --negs 80 --dev-dir {SB}/dev --out {S0} '
+        f'--base-model @BASE@ --probes {SB}/probes.jsonl --hidden-dir {WORK}/fw_stage0_hidden '
+        + ' '.join(f'--model {n}={a}' for n, a in MODELS))
+""")),
+        md("## 1. The new views (LaMa and TELEA; a few minutes)"),
+        code(r"""
+sh(f'python scripts/fw_stage0.py {ARGS} --stage views')
+"""),
+        md("## 2. Scores of the six models, one at a time (the long part, about 45 minutes on an A100)"),
+        code(r"""
+sh(f'python scripts/fw_stage0.py {ARGS} --stage score')
+"""),
+        md("## 3. The reading (CPU, a minute)"),
+        code(r"""
+sh(f'python scripts/fw_stage0.py {ARGS} --stage analyse')
+"""),
+        publish("MedScope report - 44 framework stage 0", """
+    ('Stage 0', read_text(f'{RESULTS}/fw_stage0/stage0.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 def nb43_reader_verified() -> list[dict]:
     """Notebook 43: the reader-verified analysis (docs/READER_VERIFIED.md), CPU only."""
     return [md("""
@@ -4072,6 +4133,7 @@ NOTEBOOKS = {
     "42a_screen_stage_a.ipynb": nb42a_screen,
     "42b_screen_stage_b.ipynb": nb42b_screen,
     "43_reader_verified.ipynb": nb43_reader_verified,
+    "44_framework_stage0.ipynb": nb44_fw_stage0,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
