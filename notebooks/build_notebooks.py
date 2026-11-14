@@ -3926,6 +3926,36 @@ runtime.unassign()
     ]
 
 
+def nb43_reader_verified() -> list[dict]:
+    """Notebook 43: the reader-verified analysis (docs/READER_VERIFIED.md), CPU only."""
+    return [md("""
+# MedScope 43: which models still claim erased lesions on images doctors agree are clean?
+
+Uses the two physicians' answers on the reader-study images to decide which erasures really removed the finding,
+then scores every model already run on the main test (stored replies; no model is run) on exactly those images. The
+rule for reading the result was written in `docs/READER_VERIFIED.md` before this ran.
+
+**Needs:** a CPU runtime, about 5 minutes. The readers' answer files in `MyDrive/medscope/reader/answers/`.
+Run all; nothing to set.
+"""),
+        code(SETUP),
+        code(r"""
+import glob
+plan = git('log', '--diff-filter=A', '--format=%H %ci', '--', 'docs/READER_VERIFIED.md', cwd='/content/medscope').stdout.strip()
+assert plan, 'docs/READER_VERIFIED.md is not in the repository'
+print('analysis plan committed:', plan)
+RS = f'{DRIVE}/reader'
+ANS = sorted(glob.glob(f'{RS}/answers/*.json'))
+print(len(ANS), 'answer files:', [os.path.basename(a) for a in ANS])
+assert ANS, 'put the readers answer files (reader_XX.json) in MyDrive/medscope/reader/answers/'
+sh(f'python scripts/reader_verified.py --key {RS}/key_v2.json --answers {" ".join(ANS)} --results {RESULTS} --out {RESULTS}/reader_verified.md')
+"""),
+        publish("MedScope report - 43 reader-verified analysis", """
+    ('Reader-verified analysis', read_text(f'{RESULTS}/reader_verified.md')),
+"""),
+    ]
+
+
 def nb26_local() -> list[dict]:
     """Notebook 26 for your own computer (one NVIDIA GPU, 12 GB or more), with Jupyter instead of Colab."""
     return [
@@ -4041,6 +4071,7 @@ NOTEBOOKS = {
     "41_mas2_retry.ipynb": nb41_mas2,
     "42a_screen_stage_a.ipynb": nb42a_screen,
     "42b_screen_stage_b.ipynb": nb42b_screen,
+    "43_reader_verified.ipynb": nb43_reader_verified,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
