@@ -1265,3 +1265,14 @@ control -0.34 [-0.78, 0.08] nats on LaMa, +0.89 [-0.23, 1.89] on TELEA); half er
 of an erasure (graded); TELEA edits anywhere lower it by 13-40% of an erasure, least for CMCC (2-5%). Linear probes:
 erased vs ring separable at AUROC 0.90 (LaMa) and 0.85 (TELEA, trained on LaMa) in the recipe, 0.87/0.83 in the
 untrained base model. Amendment in `docs/FRAMEWORK_STAGE0.md`; rerun with generated answers in notebook 44b.
+
+## 2026-11-14 — stage 0, generated answers (notebook 44b): recipe complete, decision not yet possible
+
+Generated answers agree with the recipe's stage-B answers on 97.2% of dev views (check passed). Recipe, 143 cases it
+finds unedited: denies after a far control 4.2% / ring at the lesion 7.7% / erasure 86.7% (LaMa); 12.6% / **20.3%**
+/ 92.3% (TELEA); TELEA site minus far +0.077 [0.000, 0.154]. The recipe meets the first two parts of the site rule on
+TELEA (>= 0.10; >= 0.05 above far), not on LaMa. Read-out gap below the rule (0.028 image features, -0.008 last token).
+The run was stopped with the base model at 270 of 1,870 views (no ring view), and the report printed "branch C":
+**that verdict is void** - the code read a missing base value as "not above base" (fixed: it now says undecided).
+Notebook 44c runs the base model on the unedited, ring and control views only (what the rule needs) and applies the
+rule.

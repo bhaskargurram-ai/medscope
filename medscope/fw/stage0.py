@@ -269,18 +269,23 @@ def answer_score(reply: Optional[dict], question: str) -> float:
     return max(p, 1e-3) if sp else -max(p, 1e-3)
 
 
+VARIANT_ORDER = {"original": 0, "ring": 1, "control": 2, "erased": 3, "restored": 4, "partial": 5, "negative": 6}
+
+
 def generate_answers(policy, views: list[View], cfg: dict, out_path: str | Path, batch_size: int = 12,
-                     log: Callable[[str], None] = print) -> dict[str, dict]:
+                     log: Callable[[str], None] = print, variants: Optional[set] = None) -> dict[str, dict]:
     """The agent's answer on every view (one episode each, greedy, as the benchmark), resumable; each row carries the
-    stage-0 fields (variant, tool, s) so the same analysis applies."""
+    stage-0 fields (variant, tool, s) so the same analysis applies. The views the decision rule needs come first
+    (unedited, ring, control), so a run stopped early still serves the rule; `variants` limits the run to some."""
     from ..agent.episode import run_episodes
     from ..screen.probes import says
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     have = _read_gen(out)
     out.write_text("".join(json.dumps(r) + "\n" for r in have.values()))
-    todo = [v for v in views if v.view_id not in have]
-    log(f"stage 0 answers: {len(have)} done, {len(todo)} to run")
+    todo = [v for v in views if v.view_id not in have and (variants is None or variant_of(v)[0] in variants)]
+    todo.sort(key=lambda v: (VARIANT_ORDER.get(variant_of(v)[0], 9), v.case_id, v.view_id))
+    log(f"stage 0 answers: {len(have)} done, {len(todo)} to run" + (f" (variants {sorted(variants)})" if variants else ""))
     t0 = time.time()
     with open(out, "a") as f:
         for b in range(0, len(todo), batch_size):

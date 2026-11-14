@@ -37,6 +37,7 @@ def main() -> None:
     ap.add_argument("--gen-model", action="append", default=[],
                     help="name=adapter for the generated-answer rerun (docs/FRAMEWORK_STAGE0.md, amendment)")
     ap.add_argument("--batch-size", type=int, default=12)
+    ap.add_argument("--gen-variants", default=None, help="comma-separated variants to generate (default: all)")
     ap.add_argument("--probes", default=None, help="screening stage B probes.jsonl (the agent's answers, to check the score)")
     args = ap.parse_args()
 
@@ -132,7 +133,8 @@ def main() -> None:
                 continue
             print(f"== {name} ({adapter or 'no adapter'})")
             policy = HFPolicy(args.base_model, adapter=adapter or None, max_new_tokens=384)
-            generate_answers(policy, all_views, cfg, out / f"answers_{name}.jsonl", batch_size=args.batch_size)
+            generate_answers(policy, all_views, cfg, out / f"answers_{name}.jsonl", batch_size=args.batch_size,
+                             variants=set(args.gen_variants.split(",")) if args.gen_variants else None)
             del policy
             gc.collect()
             torch.cuda.empty_cache()

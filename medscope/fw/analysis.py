@@ -195,13 +195,16 @@ def decide(summ: dict[str, dict], probes: Optional[dict], agree: float, recipe: 
     """The pre-registered reading (docs/FRAMEWORK_STAGE0.md)."""
     r, b = summ[recipe], summ.get(base)
     out = {"score_valid": bool(agree == agree and agree >= MIN_AGREE), "agreement": agree}
-    site = {}
+    site, missing = {}, []
     for tool in ("lama", "telea"):
         rt = r[tool]
         bt = b[tool] if b else None
-        site[tool] = bool(rt["site_effect"] >= SITE_SHORTCUT and rt["site_minus_far"] >= OVER_FAR
-                          and (bt is None or rt["site_effect"] - bt["site_effect"] >= OVER_BASE))
+        first = rt["site_effect"] >= SITE_SHORTCUT and rt["site_minus_far"] >= OVER_FAR
+        if first and (bt is None or bt["site_effect"] != bt["site_effect"]):
+            missing.append(tool)                 # the comparison with the base model cannot be made yet
+        site[tool] = bool(first and bt is not None and rt["site_effect"] - bt["site_effect"] >= OVER_BASE)
     out["site_shortcut"] = site
+    out["missing_base"] = missing
     out["site_shortcut_any"] = any(site.values())
     gap = {}
     if probes:
@@ -217,6 +220,9 @@ def decide(summ: dict[str, dict], probes: Optional[dict], agree: float, recipe: 
                      "A: footprint-balanced counterfactual training" if s else
                      "B: evidence read-out from internal features" if g else
                      "C: perception-limited; the gap is in what the model sees")
+    if missing and not out["site_shortcut_any"]:
+        out["branch"] = (f"undecided: the base model's answers on the ring views are missing ({', '.join(missing)}); "
+                         "the rule cannot be applied until they are in")
     if not out["score_valid"]:
         out["branch"] = "invalid: the single-turn score does not track the agent's answers; rerun with generation"
     return out

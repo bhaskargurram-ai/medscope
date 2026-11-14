@@ -171,3 +171,13 @@ class TestGenerated(unittest.TestCase):
             self.assertEqual(pol.n, n)
             summ = model_summary(read_answers(d / "a.jsonl"))
             self.assertEqual(summ["lama"]["denial_ring"], 0.0)
+
+
+class TestUndecided(unittest.TestCase):
+    def test_missing_base_is_undecided(self):
+        nan = float("nan")
+        t = {"site_effect": 0.2, "far_effect": 0.1, "site_minus_far": 0.1, "auroc_site": 0.8}
+        b = {"site_effect": nan, "far_effect": 0.05, "site_minus_far": nan, "auroc_site": nan}
+        d = decide({"recipe": {"lama": dict(t), "telea": dict(t)}, "base": {"lama": dict(b), "telea": dict(b)}}, None, 0.9)
+        self.assertTrue(d["branch"].startswith("undecided"))
+        self.assertEqual(d["missing_base"], ["lama", "telea"])
