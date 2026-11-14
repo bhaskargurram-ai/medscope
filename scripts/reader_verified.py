@@ -59,9 +59,88 @@ def runs_on(results: Path, ids: set[str], min_cover: float = 0.9) -> list[tuple[
             continue
         if meta.get("ablation") or meta.get("fewshot") or meta.get("tool_budget") is not None:
             continue
-        rows = {r["view_id"]: r for r in scored_rows(d) if r["view_id"] in ids}
+        allrows = {r["view_id"]: r for r in scored_rows(d)}
+        rows = {k: v for k, v in allrows.items() if k in ids}
         if len(rows) >= min_cover * len(ids):
+            FULL[d.name] = allrows
             out.append((d.name, meta.get("precision") == "api", rows))
+    return out
+
+
+FULL: dict[str, dict] = {}       # run name -> every scored row of the run (for the checks below)
+
+
+def source(case_id: str) -> str:
+    for pre, name in (("kvasir", "Colonoscopy"), ("hyperkvasir", "Colonoscopy"), ("busi", "Breast ultrasound"),
+                      ("chestxdet", "Chest X-ray"), ("lgg", "Brain MRI"), ("slake", "SLAKE CT/MRI")):
+        if case_id.startswith(pre):
+            return name
+    return "other"
+
+
+def checks(keys: dict, answers: list[dict], runs) -> list[str]:
+    """Checks for confounds in the reader-verified comparison (added after the first result, 14 November 2026)."""
+    out = ["", "## Checks for confounds (added after the first result; descriptive)", ""]
+    n = len(answers)
+    erased = [(i, it) for i, it in keys.items() if it["kind"] == "target_removal"]
+    grp = {i: ("clean" if sum(a[i]["finding"] == "yes" for a in answers) == 0 else
+               "residual" if sum(a[i]["finding"] == "yes" for a in answers) == n else "split") for i, _ in erased}
+    # 1. which imaging types end up in each group
+    out += ["**1. Imaging type of the erased images in each reader group**", "",
+            "| Group | " + " | ".join(sorted({source(it['case_id']) for _, it in erased})) + " |",
+            "| --- | " + " | ".join("---" for _ in sorted({source(it['case_id']) for _, it in erased})) + " |"]
+    srcs = sorted({source(it["case_id"]) for _, it in erased})
+    for gname in ("clean", "split", "residual"):
+        out.append(f"| {gname} | " + " | ".join(str(sum(1 for i, it in erased if grp[i] == gname and source(it['case_id']) == s))
+                                               for s in srcs) + " |")
+    broad = sum(1 for i, it in erased if grp[i] == "residual" and "abnormalit" in it["question"].lower())
+    out += ["", f"Residual erasures asked as 'Is there an abnormality ...?': {broad} of "
+                f"{sum(1 for i in grp if grp[i] == 'residual')} (another finding in the image makes 'yes' correct "
+                "for physicians and models alike).", ""]
+    # 2. paired: did each frontier model see the lesion on the unedited image of the same case?
+    fr = [(name, FULL[name]) for name, f, _ in runs if f]
+    if fr:
+        out += ["**2. Frontier models, same cases: claim on the erasure, split by whether the model found the lesion "
+                "on the unedited image of the same case (main test)**", "",
+                "| Group | Found unedited lesion: claims after erasure | Missed unedited lesion: claims after erasure |",
+                "| --- | --- | --- |"]
+        for gname in ("clean", "split", "residual"):
+            a = b = na = nb = 0
+            for i, it in erased:
+                if grp[i] != gname:
+                    continue
+                for _, rows in fr:
+                    o, e = rows.get(f"{it['case_id']}__original"), rows.get(it["view_id"])
+                    if not o or not e:
+                        continue
+                    if found(o):
+                        na += 1
+                        a += claims(e)
+                    else:
+                        nb += 1
+                        b += claims(e)
+            out.append(f"| {gname} | {a}/{na} ({100 * a / max(na, 1):.0f}%) | {b}/{nb} ({100 * b / max(nb, 1):.0f}%) |")
+        # 3. the whole main test by imaging type
+        out += ["", "**3. Whole main test (all erasures, not only the reader images), frontier models pooled: claims after "
+                "erasure by imaging type. Readers judged colonoscopy erasures clean (erased images called positive no "
+                "more often than lesion-free ones).**", "",
+                "| Imaging type | Erasures | Frontier claims after erasure | Frontier finds unedited lesion |", "| --- | --- | --- | --- |"]
+        by = {}
+        for _, rows in fr:
+            for vid, r in rows.items():
+                if r.get("kind") not in ("target_removal", "original"):
+                    continue
+                s = source(r["case_id"])
+                d = by.setdefault(s, {"e": 0, "ec": 0, "o": 0, "of": 0, "cases": set()})
+                if r["kind"] == "target_removal":
+                    d["e"] += 1
+                    d["ec"] += claims(r)
+                    d["cases"].add(r["case_id"])
+                else:
+                    d["o"] += 1
+                    d["of"] += found(r)
+        for s, d in sorted(by.items()):
+            out.append(f"| {s} | {len(d['cases'])} | {100 * d['ec'] / max(d['e'], 1):.0f}% | {100 * d['of'] / max(d['o'], 1):.0f}% |")
     return out
 
 
@@ -149,6 +228,7 @@ def main() -> None:
     out += ["", f"Pre-registered reading: the headline that frontier models claim erased findings {verdict}.", "",
             "Limits: two trainee readers, single images without clinical context, and few reader-clean erasures; "
             "every model read the same images, so the pooled interval resamples images, not models."]
+    out += checks(keys, answers, runs)
     Path(args.out).write_text("\n".join(out) + "\n")
     print("\n".join(out))
 
