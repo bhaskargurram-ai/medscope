@@ -1203,3 +1203,21 @@ Stages A and B together: 270 policies screened, none passed. No cheap inference-
 lesion from a present one better than the recipe. One likely reason, from the reader study: physicians still see the
 finding on about 40% of erasures, so the "erased = absent" label is itself noisy outside colonoscopy, which caps
 how far ESG can rise and how small a real gain can be measured.
+
+## 2026-11-14 — reader-verified analysis (notebook 43, docs/READER_VERIFIED.md): the headline does not hold as stated
+
+Pack 2, two trainee readers: 10 reader-clean erasures (neither reader saw the finding), 19 majority-clean, 13 residual
+(both saw it). 52 main-test runs scored on these images from stored replies (`results/reader_verified.md`).
+- **Frontier models pooled (9):** claim the finding on 26% of reader-clean erasures (95% interval 10-42%), 36% of
+  majority-clean, **82% of residual** erasures. Pre-registered rule (lower bound above 20%): **not met.** The
+  41-62% erased-claim rates in the preprint are largely driven by erasures that left the finding visible to
+  physicians; on clean erasures the rate is about a quarter, with wide uncertainty (10 images).
+- **Open and MedScope models pooled (43):** 12% clean, 19% majority-clean, 40% residual.
+- **MedScope-4B (v4_final):** 0/10 clean, 4/13 residual (31%), finds 56/63 reader-confirmed lesions, 0/16 claims on
+  reader-confirmed healthy images. It says "absent" on most erasures that physicians still read as positive: either
+  the readers over-call (they also called many healthy images positive) or the model reacts to the erasure itself;
+  13 images cannot separate the two.
+- Frontier models' claims track what physicians see (82% residual vs 26% clean), which supports reading their
+  erased-lesion claims as partly correct perception of imperfect erasures, not only question-driven hallucination.
+- Consequences: the preprint headline must be corrected (v2); the erasure criterion and the clean-image count
+  (pack 3, senior readers) decide what can be claimed.
