@@ -61,7 +61,8 @@ def main() -> None:
             def lama(*_):      # score stage: views must already exist
                 raise SystemExit("ring/partial LaMa views are missing: run --stage views first")
         extra = new_views(dev, out / "views", lama)
-        (out / "views.json").write_text(json.dumps([v.to_dict() for v in extra]))
+        if args.stage in ("views", "all"):          # parallel generate runs must not rewrite it
+            (out / "views.json").write_text(json.dumps([v.to_dict() for v in extra]))
         kinds: dict[str, int] = {}
         for v in extra:
             k = f"{v.meta['inpainter']}/{v.meta['stage0_variant']}"

@@ -1297,3 +1297,11 @@ Reading: the rule is met, but what the data support is a training-amplified sens
 tool, concentrated in chest X-ray, rather than a site shortcut. A tool-invariance objective (several fill tools on
 both ring and far controls) addresses both readings; the expected headroom is the TELEA control denial among found
 lesions (main test 12.9% vs 2.7% on LaMa).
+
+## 2026-11-14 — framework stage 1 screen pre-registered (docs/FRAMEWORK_STAGE1.md, notebook 45)
+
+Tool-family training: each training case's erasure and control are made with one of LaMa, blur, mean fill or
+shuffled pixels (TELEA and diffusion held out), the control far or in a ring around the lesion. Two arms on the
+control's exact 2,739 cases, order and settings (`v4q_tfr_s0` replay only, `v4q_tfc_s0` with the paired-view terms)
+against the replay-only control `v4q_sftc_s0` (trainer cmcc-v3, 1,117 lesion-free images). Screen on validation
+answers; rule: TELEA ESG +0.03, TELEA control denial -0.03, guards on LaMa ESG, lesions found and lesion-free claims.

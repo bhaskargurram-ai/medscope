@@ -4097,6 +4097,97 @@ runtime.unassign()
     ]
 
 
+def nb45_fw_stage1() -> list[dict]:
+    """Notebook 45: framework stage 1 screen (docs/FRAMEWORK_STAGE1.md): tool-family training, validation only."""
+    B = lambda t: t.replace('@BASE@', BASE)  # noqa: E731
+    return [md("""
+# MedScope 45: framework stage 1 - teach the model that an editing tool is not evidence
+
+Stage 0 found that our training made the model about twice as likely to deny a lesion it can see when an unfamiliar
+tool (TELEA) has edited the image near it or elsewhere. Here two short training arms continue the recipe on the
+**same 2,739 cases** as the replay-only control, but every erasure and its control edit are made with one of four
+tools (LaMa, blur, mean fill, shuffled pixels), the control either elsewhere or in a ring right around the lesion, so
+neither the tool nor the place of an edit tells the answer. TELEA and the diffusion tool are never used in training.
+Arm 1 only replays these views; arm 2 adds the paired-view terms. Both are compared with the control on validation
+images, by the rule fixed in `docs/FRAMEWORK_STAGE1.md` before training.
+
+**Needs:** notebooks 42b and 44-44c (dev set, ring views, recipe answers). A G4 (RTX PRO 6000, 96 GB) or an A100
+80 GB: about 6 hours (two jobs at a time); on 40 GB about 10 hours (one at a time). Run all; nothing to set. If the
+session ends, run all again: training resumes from its checkpoints and finished answers are kept.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4), code(LAMA_CELL),
+        code(B(r"""
+plan = git('log', '--format=%H %ci', '--', 'docs/FRAMEWORK_STAGE1.md', cwd='/content/medscope').stdout.strip().splitlines()
+assert plan, 'docs/FRAMEWORK_STAGE1.md is not in the repository: do not train without the pre-registration'
+print('stage 1 plan committed:', plan[-1], '| latest:', plan[0])
+import torch
+from concurrent.futures import ThreadPoolExecutor
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+print(torch.cuda.get_device_name(0) if GPU_GB else 'no GPU', f'({round(GPU_GB)} GB)')
+if GPU_GB < 35:
+    raise SystemExit('This GPU is too small. Runtime > Change runtime type > A100 (or G4), then run all again.')
+BIG = GPU_GB >= 70
+PAR = 2 if BIG else 1
+BS = 16 if BIG else 12
+def run_par(cmds):
+    if PAR == 1 or len(cmds) == 1:
+        for cmd in cmds:
+            sh(cmd)
+    else:
+        with ThreadPoolExecutor(PAR) as ex:
+            list(ex.map(sh, cmds))
+RECIPE = f'{ADAPTERS}/v4_s1/final'
+CONTROL = f'{ADAPTERS}/v4q_sftc_s0/final'
+for a in (RECIPE, CONTROL):
+    assert os.path.exists(f'{a}/adapter_config.json'), f'missing adapter: {a}'
+SB, S0, S1 = f'{RESULTS}/screen_b', f'{RESULTS}/fw_stage0', f'{RESULTS}/fw_stage1'
+assert os.path.exists(f'{S0}/answers_recipe.jsonl'), 'run notebooks 44, 44b and 44c first'
+TF = f'{WORK}/toolfamily'
+COMMON = (f'--model @BASE@ --init {RECIPE} --views {TF}/views.jsonl --negatives {TRAIN_NEG_V4} --neg-every 3 '
+          f'--cases 0 --lr 2e-5 --grad-accum 8 --seed 0')
+ARMS = {'tf_replay': ('v4q_tfr_s0', '--l-did 0 --l-inv 0 --l-act 0'),
+        'tf_cmcc': ('v4q_tfc_s0', '--tau 2.0 --l-did 0.5 --l-inv 0.5 --l-act 0.5')}
+GEN = (f'--views {VAL_V4} --negatives {VAL_NEG_V4} --cases 200 --negs 80 --dev-dir {SB}/dev --out {S0} '
+       f'--base-model @BASE@ --batch-size {BS} --gen-variants original,erased,control,ring,negative')
+print('GPU', round(GPU_GB), 'GB | jobs at a time', PAR, '| answer batch', BS)
+""")),
+        md("## 1. Tool-family views for the control's 2,739 training cases (CPU and LaMa; about 10-20 minutes)"),
+        code(r"""
+if not os.path.exists(f'{TF}/views.jsonl'):
+    sh(f'python scripts/build_toolfamily.py --views {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl --cases 3000 --seed 0 --out {TF}')
+print(sum(1 for _ in open(f'{TF}/views.jsonl')), 'training views')
+"""),
+        md("## 2. Train the two arms (resumable; about 2-2.5 hours with both at once)"),
+        code(r"""
+cmds = []
+for arm, (name, weights) in ARMS.items():
+    out = f'{ADAPTERS}/{name}'
+    if not os.path.exists(f'{out}/final/adapter_config.json'):
+        cmds.append(f'python scripts/train_cmcc.py {COMMON} {weights} --out {out}')
+run_par(cmds)
+for arm, (name, _) in ARMS.items():
+    print(name, open(f'{ADAPTERS}/{name}/state.json').read()[:300])
+"""),
+        md("## 3. Answers of the control and both arms on the validation views (about 1.5 hours each)"),
+        code(r"""
+models = [('replay_control', CONTROL)] + [(arm, f'{ADAPTERS}/{name}/final') for arm, (name, _) in ARMS.items()]
+run_par([f'python scripts/fw_stage0.py {GEN} --gen-model {n}={a} --stage generate' for n, a in models])
+"""),
+        md("## 4. The rule (CPU, a minute)"),
+        code(r"""
+sh(f'python scripts/fw_stage1.py --answers {S0} --control replay_control --arms tf_replay tf_cmcc --reference recipe --out {S1}')
+"""),
+        publish("MedScope report - 45 framework stage 1 screen", """
+    ('Stage 1 screen', read_text(f'{RESULTS}/fw_stage1/stage1.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 def nb43_reader_verified() -> list[dict]:
     """Notebook 43: the reader-verified analysis (docs/READER_VERIFIED.md), CPU only."""
     return [md("""
@@ -4246,6 +4337,7 @@ NOTEBOOKS = {
     "44_framework_stage0.ipynb": nb44_fw_stage0,
     "44b_framework_stage0_generated.ipynb": nb44b_fw_stage0_gen,
     "44c_framework_stage0_base.ipynb": nb44c_fw_stage0_base,
+    "45_framework_stage1_screen.ipynb": nb45_fw_stage1,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
