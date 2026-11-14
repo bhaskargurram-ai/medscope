@@ -1276,3 +1276,24 @@ The run was stopped with the base model at 270 of 1,870 views (no ring view), an
 **that verdict is void** - the code read a missing base value as "not above base" (fixed: it now says undecided).
 Notebook 44c runs the base model on the unedited, ring and control views only (what the rule needs) and applies the
 rule.
+
+## 2026-11-14 — framework stage 0 decided (notebook 44c): branch A by the rule; robustness checks weaken it
+
+**Pre-registered rule (docs/FRAMEWORK_STAGE0.md, generated answers):** branch **A** (footprint-balanced
+counterfactual training), on TELEA only. Recipe ring denial 0.203 (>= 0.10), ring minus far +0.077 [0.000, 0.154]
+(>= 0.05), base model ring denial 0.116 (recipe 0.087 above, >= 0.05). LaMa: no (recipe ring denial 0.077). Read-out
+gap: no (0.028 / -0.008). Score check passed (97.2%).
+
+**Checks run after the decision (post hoc, so declared):** the rule compares each model on the cases *it* finds
+(recipe 143, base 127). On the 112 cases both models find:
+- TELEA ring denial recipe 12.5% vs base 6.2%: difference +0.062 [-0.009, 0.134] (bootstrap over cases, 4,000);
+  far control 8.9% vs 4.5%. Training roughly doubles sensitivity to TELEA edits near *and* away from the lesion.
+- The site-specific part ((ring - far) recipe minus base) is +0.018 [-0.080, 0.116]: no evidence that training
+  taught a *site* shortcut specifically.
+- The recipe's TELEA ring denials are 12 of 17 chest X-rays (0 of 33 breast ultrasound, 2 of 34 colonoscopy, 0 of
+  24 brain MRI). A TELEA ring 2 pixels from a small chest lesion may also blur its edge; no reader has checked these.
+- LaMa: recipe 4.5% vs base 7.1% (-0.027 [-0.081, 0.027]).
+Reading: the rule is met, but what the data support is a training-amplified sensitivity to an unfamiliar editing
+tool, concentrated in chest X-ray, rather than a site shortcut. A tool-invariance objective (several fill tools on
+both ring and far controls) addresses both readings; the expected headroom is the TELEA control denial among found
+lesions (main test 12.9% vs 2.7% on LaMa).
