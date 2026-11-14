@@ -51,3 +51,26 @@ Among cases whose unedited image the model scores present (s > 0), the share sco
 
 Everything else in the report (ESG site, restored and partial views, the four other models, the base model's
 probes) is descriptive and is reported whichever branch is taken. Results go into `docs/RESULTS_LOG.md`.
+
+## Amendment (14 November 2026, after the first run; thresholds and rules unchanged)
+
+**What happened.** The single-turn score failed its validity check: sign(s) agreed with the recipe's agent answers
+on 63% of dev views (rule: 80%). Cause: the "present" reply includes the box coordinates and is about 11 nats less
+probable than the "absent" reply on every image, unedited lesions included (mean log-prob -48 vs -37), so s < 0
+almost everywhere (the recipe "found" 23% of unedited lesions by this score; its agent finds about 85% of unedited lesions on the main test). The
+threshold-based quantities of that run are therefore meaningless; the stage was invalid, as the rule says.
+
+**Rerun, as pre-registered: the agent's generated answers** (one greedy episode per view, the benchmark prompt), for
+the recipe and the base model (the two the rule needs), then CMCC (descriptive). The rule is applied unchanged with
+these definitions: a view is "denied" when the agent does not say the finding is present (absent, refer, clarify or
+no answer, as the benchmark counts it); "found" = the agent says present on the unedited image; the output score for
+AUROC is the agent's probability of its answer, signed (+p for present, -p for absent, about 0 for refer). The
+validity check becomes: the recipe's generated answers on the dev views agree with its stage-B answers (same model,
+same views; a determinism check). The linear-probe results of the first run stand (they use only view labels, not
+the score) and are reused.
+
+**Seen before this amendment** (so declared): the within-case changes of the invalid score (same reply text within a
+case, differences only). For every model the same-site ring lowered the score about as much as the far control edit
+(recipe: 3% vs 1% of the erasure's drop on LaMa, 14% vs 22% on TELEA; ring minus control intervals include 0 for the
+recipe), half erasures lowered it by 24-29% of an erasure, and TELEA edits anywhere lowered it by 13-40% of an
+erasure (CMCC 2-5%). These are descriptive and do not enter the decision.

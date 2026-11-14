@@ -143,3 +143,31 @@ class TestStage0(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestGenerated(unittest.TestCase):
+    def test_answer_score_and_generation(self):
+        from medscope.fw.stage0 import answer_score, generate_answers, read_answers
+        from medscope.rewards import load_config, with_vocab
+        from tests.test_screen_b import Yes
+        q = "Is there a polyp?"
+        self.assertGreater(answer_score({"action": "answer", "answer": "Yes", "answer_prob": 0.9}, q), 0)
+        self.assertLess(answer_score({"action": "answer", "answer": "No", "answer_prob": 0.9}, q), -0.5)
+        self.assertLess(answer_score({"action": "refer"}, q), 0)
+        self.assertGreater(answer_score({"action": "answer", "answer": "Yes", "answer_prob": 0.9}, q),
+                           answer_score({"action": "answer", "answer": "Yes", "answer_prob": 0.6}, q))
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            views = load_views(build_dataset(d, n_cases=4))
+            dev = dev_views(views, [], n_cases=3, n_neg=0, out_dir=d / "dev")
+            extra = new_views(dev, d / "s0", lama=telea_inpaint)
+            cfg = with_vocab(load_config(), views)
+            pol = Yes()
+            a = generate_answers(pol, dev + extra, cfg, d / "a.jsonl", batch_size=4, log=lambda m: None)
+            self.assertEqual(len(a), len(dev + extra))
+            self.assertTrue(all(r["s"] > 0 for r in a.values()))
+            n = pol.n
+            generate_answers(pol, dev + extra, cfg, d / "a.jsonl", log=lambda m: None)
+            self.assertEqual(pol.n, n)
+            summ = model_summary(read_answers(d / "a.jsonl"))
+            self.assertEqual(summ["lama"]["denial_ring"], 0.0)

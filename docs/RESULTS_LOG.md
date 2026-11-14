@@ -1254,3 +1254,14 @@ citation re-checked before use). Synthesis and plan in `docs/FRAMEWORK.md`. Chec
   untested (the stage-1 arm trained on erasures without controls already denied 47% of TELEA controls).
 `docs/FRAMEWORK_STAGE0.md` fixes the test before any score: same-site ring edits with the lesion intact, restored
 and half erasures, six models, probes on hidden features, validation images only (notebook 44).
+
+## 2026-11-14 — framework stage 0, first run (notebook 44): invalid by its own check; generated-answer rerun
+
+The single-turn decision log-odds failed the pre-registered check (63% agreement with the agent's answers, rule 80%):
+the "present" reply carries box coordinates and is ~11 nats less probable on every image, so its sign is meaningless
+(my design error; the check caught it). Valid without a threshold, descriptive only: within a case, the same-site ring
+lowers every model's score about as much as the far control edit (no sign of a site shortcut; recipe ring minus
+control -0.34 [-0.78, 0.08] nats on LaMa, +0.89 [-0.23, 1.89] on TELEA); half erasures lower it by about a quarter
+of an erasure (graded); TELEA edits anywhere lower it by 13-40% of an erasure, least for CMCC (2-5%). Linear probes:
+erased vs ring separable at AUROC 0.90 (LaMa) and 0.85 (TELEA, trained on LaMa) in the recipe, 0.87/0.83 in the
+untrained base model. Amendment in `docs/FRAMEWORK_STAGE0.md`; rerun with generated answers in notebook 44b.

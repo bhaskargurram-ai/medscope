@@ -29,11 +29,14 @@ def main() -> None:
     ap.add_argument("--negs", type=int, default=80)
     ap.add_argument("--dev-dir", required=True, help="the screening dev folder (TELEA views are reused or made there)")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--stage", choices=["views", "score", "analyse", "all"], default="all")
+    ap.add_argument("--stage", choices=["views", "score", "analyse", "generate", "analyse_gen", "all"], default="all")
     ap.add_argument("--base-model", default="Qwen/Qwen3.5-4B")
     ap.add_argument("--model", action="append", default=[], help="name=adapter (empty adapter = the base model)")
     ap.add_argument("--layers", default="4,8,12,16,20,24,28,32")
     ap.add_argument("--hidden-dir", default=None, help="where hidden features go (default OUT/hidden; local disk is faster)")
+    ap.add_argument("--gen-model", action="append", default=[],
+                    help="name=adapter for the generated-answer rerun (docs/FRAMEWORK_STAGE0.md, amendment)")
+    ap.add_argument("--batch-size", type=int, default=12)
     ap.add_argument("--probes", default=None, help="screening stage B probes.jsonl (the agent's answers, to check the score)")
     args = ap.parse_args()
 
@@ -48,9 +51,9 @@ def main() -> None:
     layers = [int(x) for x in args.layers.split(",")]
     hidden_root = Path(args.hidden_dir) if args.hidden_dir else out / "hidden"
 
-    if args.stage in ("views", "all", "score"):
+    if args.stage in ("views", "all", "score", "generate"):
         lama = None
-        if args.stage != "score":
+        if args.stage not in ("score", "generate"):
             from medscope.data.inpaint import lama_inpaint
             lama = lama_inpaint
         if lama is None:
@@ -64,7 +67,7 @@ def main() -> None:
             kinds[k] = kinds.get(k, 0) + 1
         print(f"dev: {len(dev)} views; new: {len(extra)} {kinds}")
     from medscope.fw.stage0 import scoreable
-    all_views = [v for v in dev + ([] if args.stage == "analyse" else extra) if scoreable(v, originals)]
+    all_views = [v for v in dev + ([] if args.stage in ("analyse", "analyse_gen") else extra) if scoreable(v, originals)]
     print(f"scoreable views (yes/no questions): {len(all_views)}")
 
     if args.stage in ("score", "all"):
@@ -113,6 +116,54 @@ def main() -> None:
         (out / "stage0.md").write_text(md)
         (out / "stage0.json").write_text(json.dumps({"summary": summ, "probes": probes, "decision": decision,
                                                      "agreement_n": n_agree}, indent=1, default=float))
+        print(md)
+
+    if args.stage == "generate":
+        import torch
+
+        from medscope.fw.stage0 import generate_answers
+        from medscope.rewards import load_config, with_vocab
+        from medscope.train.hf_policy import HFPolicy
+        cfg = with_vocab(load_config(), views + negs)
+        for spec in args.gen_model:
+            name, _, adapter = spec.partition("=")
+            if adapter and not Path(adapter).exists():
+                print(f"{name}: adapter {adapter} not found, skipped")
+                continue
+            print(f"== {name} ({adapter or 'no adapter'})")
+            policy = HFPolicy(args.base_model, adapter=adapter or None, max_new_tokens=384)
+            generate_answers(policy, all_views, cfg, out / f"answers_{name}.jsonl", batch_size=args.batch_size)
+            del policy
+            gc.collect()
+            torch.cuda.empty_cache()
+
+    if args.stage == "analyse_gen":
+        from medscope.fw.analysis import agreement, decide, model_summary, report, within_case, within_report
+        from medscope.fw.stage0 import read_answers, read_scores
+        from medscope.screen.probes import read_probes
+        summ, ans = {}, {}
+        for spec in args.gen_model:
+            name = spec.partition("=")[0]
+            a = read_answers(out / f"answers_{name}.jsonl")
+            if a:
+                ans[name], summ[name] = a, model_summary(a)
+        if "recipe" not in summ:
+            raise SystemExit("no recipe answers yet")
+        by_id = {v.view_id: v for v in dev}
+        agree, n_agree = agreement(ans["recipe"], read_probes(args.probes) if args.probes else {}, by_id)
+        print(f"generated answers vs the same model's answers in screening stage B: {agree:.3f} on {n_agree} views")
+        old = json.loads((out / "stage0.json").read_text()) if (out / "stage0.json").exists() else {}
+        probes = (old.get("probes") or {})
+        decision = decide(summ, probes.get("recipe"), agree)
+        md = report(summ, probes.get("recipe"), decision).replace(
+            "Single-turn score agrees with the recipe's agent answers",
+            "Rerun with the agent's generated answers (amendment); they agree with the same model's stage-B answers")
+        md = md.replace("(validation dev set)", "(validation dev set; generated answers)")
+        logodds = {m.partition("=")[0]: read_scores(out / f"scores_{m.partition('=')[0]}.jsonl") for m in args.model}
+        md += "\n" + within_report({k: within_case(v) for k, v in logodds.items() if v})
+        (out / "stage0_gen.md").write_text(md)
+        (out / "stage0_gen.json").write_text(json.dumps({"summary": summ, "decision": decision, "agreement_n": n_agree},
+                                                        indent=1, default=float))
         print(md)
 
 

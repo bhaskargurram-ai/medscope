@@ -249,3 +249,67 @@ def score_views(policy, views: list[View], originals: dict[str, View], out_path:
 
 def case_seed(text: str) -> int:
     return int(hashlib.sha1(text.encode()).hexdigest()[:8], 16)
+
+
+# ---- generated agent answers (the amendment of 14 November: the single-turn score failed its check) ------------------
+
+GEN_VERSION = "g1"
+
+
+def answer_score(reply: Optional[dict], question: str) -> float:
+    """A signed score from the agent's own answer: +p when it says present, -p when it says absent (p = the
+    probability of its answer tokens), -0.001 when it refers, asks for another image or gives no answer. Its sign is
+    the decision; within a sign, larger means more confident in 'present'."""
+    from ..screen.stage_a import says_present
+    sp = says_present(reply, question)
+    if sp is None:
+        return -1e-3
+    p = reply.get("answer_prob")
+    p = 0.5 if p is None else float(p)
+    return max(p, 1e-3) if sp else -max(p, 1e-3)
+
+
+def generate_answers(policy, views: list[View], cfg: dict, out_path: str | Path, batch_size: int = 12,
+                     log: Callable[[str], None] = print) -> dict[str, dict]:
+    """The agent's answer on every view (one episode each, greedy, as the benchmark), resumable; each row carries the
+    stage-0 fields (variant, tool, s) so the same analysis applies."""
+    from ..agent.episode import run_episodes
+    from ..screen.probes import says
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    have = _read_gen(out)
+    out.write_text("".join(json.dumps(r) + "\n" for r in have.values()))
+    todo = [v for v in views if v.view_id not in have]
+    log(f"stage 0 answers: {len(have)} done, {len(todo)} to run")
+    t0 = time.time()
+    with open(out, "a") as f:
+        for b in range(0, len(todo), batch_size):
+            chunk = todo[b:b + batch_size]
+            eps = run_episodes(policy, chunk, cfg, sample=False, images=[load_image(v.image_path) for v in chunk])
+            for v, e in zip(chunk, eps):
+                variant, tool = variant_of(v)
+                rep = says(e)
+                f.write(json.dumps({"view_id": v.view_id, "case_id": v.case_id, "variant": variant, "tool": tool,
+                                    "version": GEN_VERSION, "s": answer_score(rep, v.question), "reply": rep}) + "\n")
+            f.flush()
+            done = b + len(chunk)
+            rate = (time.time() - t0) / done
+            log(f"  answers {done}/{len(todo)}, {rate:.2f}s per view, ~{rate * (len(todo) - done) / 60:.0f} min left")
+    return _read_gen(out)
+
+
+def _read_gen(path: str | Path) -> dict[str, dict]:
+    p = Path(path)
+    out = {}
+    if p.exists():
+        for line in p.read_text().splitlines():
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if r.get("version") == GEN_VERSION:
+                out[r["view_id"]] = r
+    return out
+
+
+read_answers = _read_gen

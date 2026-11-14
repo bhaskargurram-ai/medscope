@@ -3987,6 +3987,60 @@ runtime.unassign()
     ]
 
 
+def nb44b_fw_stage0_gen() -> list[dict]:
+    """Notebook 44b: stage 0 rerun with the agent's generated answers (docs/FRAMEWORK_STAGE0.md, amendment)."""
+    B = lambda t: t.replace('@BASE@', BASE)  # noqa: E731
+    return [md("""
+# MedScope 44b: framework stage 0 rerun with the model's real answers
+
+Notebook 44's quick score failed its own pre-registered check (the "present" reply was penalised for its length,
+my design error), so, as the plan says, stage 0 is decided on the agent's **generated answers**: the recipe and the
+untrained base model answer every view (same-site ring edits, restored and half erasures, the LaMa and TELEA
+erasures and controls), then CMCC for comparison. Validation images only.
+
+**Needs:** notebook 44 finished (its views are reused). An A100 (or L4/G4), about 1.5 hours (the last model, CMCC,
+is only descriptive: you can stop after the recipe and base and still run the last two cells). Run all; nothing to
+set. If the session ends, run all again: it continues where it stopped.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4),
+        code(B(r"""
+plan = git('log', '--format=%H %ci', '--', 'docs/FRAMEWORK_STAGE0.md', cwd='/content/medscope').stdout.strip().splitlines()
+print('stage 0 plan (with amendment), latest commit:', plan[0])
+import torch
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+print(torch.cuda.get_device_name(0) if GPU_GB else 'no GPU', f'({round(GPU_GB)} GB)')
+if GPU_GB < 20:
+    raise SystemExit('This GPU is too small (T4 or none). Runtime > Change runtime type > A100 (or L4), then run all again.')
+SB, S0 = f'{RESULTS}/screen_b', f'{RESULTS}/fw_stage0'
+assert os.path.exists(f'{S0}/views.json'), 'run notebook 44 first'
+MODELS = [('recipe', f'{ADAPTERS}/v4_s1/final'), ('base', ''), ('nocf', f'{ADAPTERS}/v4q_nocf_s0/final'),
+          ('erasures_only', f'{ADAPTERS}/v4q_tgt_s0/final'), ('cmcc', f'{ADAPTERS}/v4q_cmccn_s0/final'),
+          ('replay_control', f'{ADAPTERS}/v4q_sftc_s0/final')]
+GEN = [('recipe', f'{ADAPTERS}/v4_s1/final'), ('base', ''), ('cmcc', f'{ADAPTERS}/v4q_cmccn_s0/final')]
+BS = 24 if GPU_GB >= 70 else 12 if GPU_GB >= 35 else 6
+ARGS = (f'--views {VAL_V4} --negatives {VAL_NEG_V4} --cases 200 --negs 80 --dev-dir {SB}/dev --out {S0} '
+        f'--base-model @BASE@ --probes {SB}/probes.jsonl --batch-size {BS} '
+        + ' '.join(f'--model {n}={a}' for n, a in MODELS) + ' ' + ' '.join(f'--gen-model {n}={a}' for n, a in GEN))
+""")),
+        md("## 1. The agent's answers on every view: recipe, base, then CMCC (the long part)"),
+        code(r"""
+sh(f'python scripts/fw_stage0.py {ARGS} --stage generate')
+"""),
+        md("## 2. The reading (CPU, a minute)"),
+        code(r"""
+sh(f'python scripts/fw_stage0.py {ARGS} --stage analyse_gen')
+"""),
+        publish("MedScope report - 44b framework stage 0 generated answers", """
+    ('Stage 0, generated answers', read_text(f'{RESULTS}/fw_stage0/stage0_gen.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 def nb43_reader_verified() -> list[dict]:
     """Notebook 43: the reader-verified analysis (docs/READER_VERIFIED.md), CPU only."""
     return [md("""
@@ -4134,6 +4188,7 @@ NOTEBOOKS = {
     "42b_screen_stage_b.ipynb": nb42b_screen,
     "43_reader_verified.ipynb": nb43_reader_verified,
     "44_framework_stage0.ipynb": nb44_fw_stage0,
+    "44b_framework_stage0_generated.ipynb": nb44b_fw_stage0_gen,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

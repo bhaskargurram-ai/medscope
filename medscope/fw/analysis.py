@@ -254,3 +254,51 @@ def report(summ: dict[str, dict], probes: Optional[dict], decision: dict) -> str
             lines.append(f"\nRead-out gap ({which} features, TELEA erased vs ring): best probe {f(g['best_probe'])} vs "
                          f"output {f(g['output'])} -> gap {f(g['gap'])} (rule: >= {READOUT_GAP}).")
     return "\n".join(lines) + "\n"
+
+
+# ---- within-case differences of the single-turn score (descriptive; the reply text is identical within a case) -------
+
+def within_case(scores: dict[str, dict]) -> dict:
+    """Per tool and variant: mean of s(view) - s(original) over cases (bootstrap 95% interval) and as a share of the
+    erasure's drop; paired concordance P(s(v) > s(erased)) within a case."""
+    t = table(scores)
+    out: dict = {}
+    for tool in ("lama", "telea"):
+        cases = [d for d in t.values() if "original" in d and f"{tool}/erased" in d]
+        drop_e = [d[f"{tool}/erased"] - d["original"] for d in cases]
+        me = float(np.mean(drop_e)) if drop_e else float("nan")
+        r: dict = {"n": len(cases), "erased_drop": me}
+        for v in ("control", "ring", "restored", "partial"):
+            k = f"{tool}/{v}"
+            ds = [d[k] - d["original"] for d in cases if k in d]
+            if not ds:
+                continue
+            m = float(np.mean(ds))
+            lo, hi = bootstrap_ci([(x,) for x in ds], lambda xs: float(np.mean([x[0] for x in xs])))
+            conc = float(np.mean([d[k] > d[f"{tool}/erased"] for d in cases if k in d]))
+            r[v] = {"drop": m, "ci": (lo, hi), "share_of_erasure": m / me if me else float("nan"), "above_erased": conc}
+        pairs = [(d[f"{tool}/ring"] - d["original"], d[f"{tool}/control"] - d["original"]) for d in cases
+                 if f"{tool}/ring" in d and f"{tool}/control" in d]
+        if pairs:
+            diff = [a - b for a, b in pairs]
+            r["ring_minus_control"] = {"mean": float(np.mean(diff)),
+                                       "ci": bootstrap_ci([(x,) for x in diff], lambda xs: float(np.mean([x[0] for x in xs])))}
+        out[tool] = r
+    return out
+
+
+def within_report(w: dict[str, dict]) -> str:
+    f = lambda x: "-" if x is None or x != x else f"{x:.2f}"  # noqa: E731
+    lines = ["## Descriptive: within-case changes of the single-turn score (not used for the decision)", "",
+             "s(view) - s(original) in nats, same reply text within a case; 'share' = as a fraction of the erasure's "
+             "drop; 'above erased' = share of cases where the view still scores higher than the erasure.", "",
+             "| Model | tool | erasure drop | control | ring | restored | partial | ring - control [95% CI] | ring above erased |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for m, by in w.items():
+        for tool, r in by.items():
+            cell = lambda v: (f"{f(r[v]['drop'])} ({f(r[v]['share_of_erasure'])})" if v in r else "-")  # noqa: E731
+            rc = r.get("ring_minus_control")
+            rcs = f"{f(rc['mean'])} [{f(rc['ci'][0])}, {f(rc['ci'][1])}]" if rc else "-"
+            lines.append(f"| {m} | {tool} | {f(r['erased_drop'])} | {cell('control')} | {cell('ring')} | {cell('restored')} | "
+                         f"{cell('partial')} | {rcs} | {f(r['ring']['above_erased']) if 'ring' in r else '-'} |")
+    return "\n".join(lines) + "\n"
