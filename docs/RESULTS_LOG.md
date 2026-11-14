@@ -1221,3 +1221,20 @@ Pack 2, two trainee readers: 10 reader-clean erasures (neither reader saw the fi
   erased-lesion claims as partly correct perception of imperfect erasures, not only question-driven hallucination.
 - Consequences: the preprint headline must be corrected (v2); the erasure criterion and the clean-image count
   (pack 3, senior readers) decide what can be claimed.
+
+## 2026-11-14 — reader-verified analysis, confound checks: the headline holds where erasure is reader-supported
+
+The first reading (previous entry) over-read 10 images. Checks added to `scripts/reader_verified.py`:
+- **Group mix:** the 10 reader-clean erasures are mostly colonoscopy (4); the 13 residual ones mostly chest X-ray,
+  breast ultrasound and brain MRI (11). 4 of the 13 residual ones ask "Is there an abnormality ...?", where another
+  finding in the image makes "yes" correct.
+- **Same cases:** frontier models that found the lesion on the unedited image still claim it after erasure in 30%
+  (19/63) of reader-clean cases, 54% of split cases and 85% of residual cases. Erasure quality matters, and clean
+  erasures still draw claims.
+- **Whole main test, colonoscopy (the imaging type readers judged erasure clean for):** frontier models pooled claim
+  the erased finding on **45%** of 83 erased colonoscopy images while finding **96%** of unedited colonoscopy
+  lesions. Other types: brain MRI 46%, breast ultrasound 71%, chest X-ray 60%, SLAKE 49%.
+- **Reading:** the 10-image pre-registered check is under-powered (its rule was not met); the larger, reader-supported
+  colonoscopy subset supports the headline that frontier models claim erased findings. The non-colonoscopy rates mix
+  real claims with residual evidence and broad "abnormality" questions; that caveat belongs in the next revision,
+  no retraction is indicated.
