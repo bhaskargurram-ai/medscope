@@ -1190,3 +1190,16 @@ for the recipe alone, up to 0.706 for boosted trees on direct reader + specialis
 0.773). The stored agents add no information that separates an erased lesion from a present one beyond what the
 recipe already has; they allow better-calibrated abstention. Combining existing signals is closed; stage B needs new
 evidence. (The "V" column of the first report also marked "no verifier" combiners; fixed.)
+
+## 2026-11-14 — screening stage B (notebook 42b): 142 policies with new image evidence, 0 pass
+
+Validation dev set (200 cases, LaMa and TELEA erasures, 80 lesion-free images; `results/screen_b/screen_b.md`).
+Probes: altered copies, close-up and control close-up, cautious prompt, answer-token probability, a second model
+(Qwen2.5-VL-7B), segmenter score. **No policy passed on half A.** As in stage A, learned combiners and votes raised
+net utility a lot (half B, TELEA: 0.444 for the recipe, up to 0.686) by abstaining and saying "absent" more, while
+ESG on the TELEA erasures did not rise (recipe 0.600; most combiners 0.55-0.61; the single largest 0.642 at a
+cut-off that failed elsewhere). On LaMa erasures ESG reached 0.737, a gap that does not carry over to TELEA.
+Stages A and B together: 270 policies screened, none passed. No cheap inference-time evidence separates an erased
+lesion from a present one better than the recipe. One likely reason, from the reader study: physicians still see the
+finding on about 40% of erasures, so the "erased = absent" label is itself noisy outside colonoscopy, which caps
+how far ESG can rise and how small a real gain can be measured.
