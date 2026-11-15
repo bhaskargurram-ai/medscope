@@ -1,0 +1,1043 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2025_conference,times}
+\iclrfinalcopy % preprint: author shown, no line numbers
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{adjustbox}
+
+%%%%%%%%% TITLE - PLEASE UPDATE TITLE HERE
+\title{Measuring and Attributing Evidence Sensitivity in Medical Vision--Language Models via Symmetric Counterfactual Controls}
+
+\author{Bhaskar Gurram\\
+Independent Researcher\\
+\texttt{gurrambhaskar.ai@gmail.com}
+}
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\begin{filecontents*}{\jobname.bib}
+@article{gurram2026medscope,
+  author = {Gurram, Bhaskar},
+  title = {Seeing Is Not Believing: Counterfactual Lesion Erasure Teaches a Small Medical Vision--Language Agent to Report Only What the Image Shows},
+  journal = {arXiv preprint arXiv:2611.13006},
+  year = {2026}
+}
+@article{lau2018vqarad,
+  author = {Lau, Jason J. and Gayen, Soumya and Ben Abacha, Asma and Demner-Fushman, Dina},
+  title = {A dataset of clinically generated visual questions and answers about radiology images},
+  journal = {Scientific Data},
+  volume = {5},
+  pages = {180251},
+  year = {2018}
+}
+@inproceedings{liu2021slake,
+  author = {Liu, Bo and Zhan, Li-Ming and Xu, Li and Ma, Lin and Yang, Yan and Wu, Xiao-Ming},
+  title = {{SLAKE}: A Semantically-Labeled Knowledge-Enhanced Dataset for Medical Visual Question Answering},
+  booktitle = {IEEE International Symposium on Biomedical Imaging (ISBI)},
+  pages = {1650--1654},
+  year = {2021}
+}
+@article{he2020pathvqa,
+  author = {He, Xuehai and Zhang, Yichen and Mou, Luntian and Xing, Eric and Xie, Pengtao},
+  title = {{PathVQA}: 30000+ Questions for Medical Visual Question Answering},
+  journal = {arXiv preprint arXiv:2003.10286},
+  year = {2020}
+}
+@inproceedings{agrawal2018vqacp,
+  author = {Agrawal, Aishwarya and Batra, Dhruv and Parikh, Devi and Kembhavi, Aniruddha},
+  title = {Don't Just Assume; Look and Answer: Overcoming Priors for Visual Question Answering},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages = {4971--4980},
+  year = {2018}
+}
+@inproceedings{li2023pope,
+  author = {Li, Yifan and Du, Yifan and Zhou, Kun and Wang, Jinpeng and Zhao, Wayne Xin and Wen, Ji-Rong},
+  title = {Evaluating Object Hallucination in Large Vision-Language Models},
+  booktitle = {Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  pages = {292--305},
+  year = {2023}
+}
+@article{xia2024cares,
+  author = {Xia, Peng and Chen, Ze and Tian, Juanxi and Gong, Yangrui and Hou, Ruibo and Xu, Yue and Wu, Zhenbang and Fan, Zhiyuan and Zhou, Yiyang and Zhu, Kangyu and others},
+  title = {{CARES}: A Comprehensive Benchmark of Trustworthiness in Medical Vision Language Models},
+  journal = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year = {2024}
+}
+@inproceedings{yan2024probmed,
+  author = {Yan, Qianqi and He, Xuehai and Yue, Xiang and Wang, Xin Eric},
+  title = {Worse than Random? {An} Embarrassingly Simple Probing Evaluation of Large Multimodal Models in Medical {VQA}},
+  booktitle = {Findings of the Association for Computational Linguistics: ACL 2025},
+  year = {2025}
+}
+@article{gu2024medvh,
+  author = {Gu, Zishan and Yin, Changchang and Liu, Fenglin and Zhang, Ping},
+  title = {{MedVH}: Towards Systematic Evaluation of Hallucination for Large Vision Language Models in the Medical Context},
+  journal = {arXiv preprint arXiv:2407.02730},
+  year = {2024}
+}
+@article{chang2024medheval,
+  author = {Chang, Aofei and Huang, Le and Bhatia, Parminder and Kass-Hout, Taha and Ma, Fenglong and Xiao, Cao},
+  title = {{MedHEval}: Benchmarking Hallucinations and Mitigation Strategies in Medical Large Vision-Language Models},
+  journal = {arXiv preprint arXiv:2503.02157},
+  year = {2025}
+}
+@article{chen2024medhallmark,
+  author = {Chen, Jiawei and Yang, Dingkang and Wu, Tong and Jiang, Yue and Hou, Xiaolu and Li, Mingcheng and Wang, Shunli and Xiao, Dongling and Li, Ke and Zhang, Lihua},
+  title = {Detecting and Evaluating Medical Hallucinations in Large Vision Language Models},
+  journal = {arXiv preprint arXiv:2406.10185},
+  year = {2024}
+}
+@inproceedings{agarwal2020towards,
+  author = {Agarwal, Vedika and Shetty, Rakshith and Fritz, Mario},
+  title = {Towards Causal {VQA}: Revealing and Reducing Spurious Correlations by Invariant and Covariant Semantic Editing},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages = {9690--9698},
+  year = {2020}
+}
+@inproceedings{rong2022road,
+  author = {Rong, Yao and Leemann, Tobias and Borisov, Vadim and Kasneci, Gjergji and Kasneci, Enkelejda},
+  title = {A Consistent and Efficient Evaluation Strategy for Attribution Methods},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  pages = {18770--18795},
+  year = {2022}
+}
+@inproceedings{suvorov2022lama,
+  author = {Suvorov, Roman and Logacheva, Elizaveta and Mashikhin, Anton and Remizova, Anastasia and Ashukha, Arsenii and Silvestrov, Aleksei and Kong, Naejin and Goka, Harshith and Park, Kiwoong and Lempitsky, Victor},
+  title = {Resolution-robust Large Mask Inpainting with {Fourier} Convolutions},
+  booktitle = {IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+  pages = {2149--2159},
+  year = {2022}
+}
+@article{telea2004image,
+  author = {Telea, Alexandru},
+  title = {An Image Inpainting Technique Based on the Fast Marching Method},
+  journal = {Journal of Graphics Tools},
+  volume = {9},
+  number = {1},
+  pages = {23--34},
+  year = {2004}
+}
+@inproceedings{rombach2022high,
+  author = {Rombach, Robin and Blattmann, Andreas and Lorenz, Dominik and Esser, Patrick and Ommer, Bj{\"o}rn},
+  title = {High-Resolution Image Synthesis with Latent Diffusion Models},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages = {10684--10695},
+  year = {2022}
+}
+@inproceedings{perez2024radedit,
+  author = {P{\'e}rez-Garc{\'\i}a, Fernando and Bond-Taylor, Sam and Sanchez, Pedro P. and van Overschelde, Boris and Lungren, Matthew P. and Hyland, Stephanie L. and Castro, Daniel C. and Alvarez-Valle, Javier and Ilse, Maximilian},
+  title = {{RadEdit}: Stress-Testing Biomedical Vision Models via Diffusion Image Editing},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year = {2024}
+}
+@inproceedings{healmedvqa2024,
+  author = {Nguyen, Dung and Ho, Minh Khoi and Ta, Huy and Nguyen, Thanh Tam and Chen, Qi and Rav, Kumar and Dang, Quy Duong and Ramchandre, Satwik and Phung, Son Lam and Liao, Zhibin and To, Minh-Son and Verjans, Johan and Nguyen, Phi Le and Phan, Vu Minh Hieu},
+  title = {Localizing Before Answering: A Hallucination Evaluation Benchmark for Grounded Medical Multimodal {LLMs}},
+  booktitle = {International Joint Conference on Artificial Intelligence (IJCAI)},
+  note = {arXiv:2505.00744},
+  year = {2025}
+}
+@article{rafailov2023dpo,
+  author = {Rafailov, Rafael and Sharma, Archit and Mitchell, Eric and Manning, Christopher D. and Ermon, Stefano and Finn, Chelsea},
+  title = {Direct Preference Optimization: Your Language Model is Secretly a Reward Model},
+  journal = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume = {36},
+  year = {2023}
+}
+@inproceedings{zhu2024mmedpo,
+  author = {Zhu, Kangyu and Xia, Peng and Li, Yun and Zhu, Hongtu and Wang, Sheng and Yao, Huaxiu},
+  title = {{MMedPO}: Aligning Medical Vision-Language Models with Clinical-Aware Multimodal Preference Optimization},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  series = {PMLR},
+  volume = {267},
+  pages = {80207--80222},
+  year = {2025}
+}
+@inproceedings{svco2024,
+  author = {Wu, Shengguang and Sun, Fan-Yun and Wen, Kaiyue and Haber, Nick},
+  title = {Symmetrical Visual Contrastive Optimization: Aligning Vision-Language Models with Minimal Contrastive Images},
+  booktitle = {Annual Meeting of the Association for Computational Linguistics (ACL)},
+  year = {2025}
+}
+@inproceedings{wu2025empo,
+  author = {Wu, Jiulong and Shi, Zhengliang and Wang, Shuaiqiang and Huang, Jizhou and Yin, Dawei and Yan, Lingyong and Cao, Min and Zhang, Min},
+  title = {Mitigating Hallucinations in Large Vision-Language Models via Entity-Centric Multimodal Preference Optimization},
+  booktitle = {Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year = {2025}
+}
+@inproceedings{jiang2025mfpo,
+  author = {Jiang, Songtao and Zhang, Yan and Chen, Ruizhe and Hu, Tianxiang and Jin, Yeying and He, Qinglin and Feng, Yang and Wu, Jian and Liu, Zuozhu},
+  title = {Modality-Fair Preference Optimization for Trustworthy {MLLM} Alignment},
+  booktitle = {International Joint Conference on Artificial Intelligence (IJCAI)},
+  pages = {403--411},
+  year = {2025}
+}
+@article{shao2024deepseekmath,
+  author = {Shao, Zhihong and Wang, Peiyi and Zhu, Qihao and Xu, Runxin and Song, Junxiao and Bi, Xiao and Zhang, Haowei and Zhang, Mingchuan and Li, Y. K. and Wu, Y. and others},
+  title = {{DeepSeekMath}: Pushing the Limits of Mathematical Reasoning in Open Language Models},
+  journal = {arXiv preprint arXiv:2402.03300},
+  year = {2024}
+}
+@inproceedings{geifman2017selective,
+  author = {Geifman, Yonatan and El-Yaniv, Ran},
+  title = {Selective Classification for Deep Neural Networks},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume = {30},
+  year = {2017}
+}
+@inproceedings{alain2016understanding,
+  author = {Alain, Guillaume and Bengio, Yoshua},
+  title = {Understanding Intermediate Layers Using Linear Classifier Probes},
+  booktitle = {International Conference on Learning Representations (ICLR) Workshop},
+  year = {2017}
+}
+@inproceedings{jha2020kvasir,
+  author = {Jha, Debesh and Smedsrud, Pia H. and Riegler, Michael A. and Halvorsen, P{\aa}l and de Lange, Thomas and Johansen, Dag and Johansen, H{\aa}vard D.},
+  title = {{Kvasir-SEG}: A Segmented Polyp Dataset},
+  booktitle = {International Conference on Multimedia Modeling (MMM)},
+  pages = {451--462},
+  year = {2020}
+}
+@article{borgli2020hyperkvasir,
+  author = {Borgli, Hanna and Thambawita, Vajira and Smedsrud, Pia H. and Hicks, Steven and Jha, Debesh and Eskeland, Sigrun L. and Randel, Kristin Ranheim and Pogorelov, Konstantin and Lux, Mathias and Nguyen, Duc Tien Dang and others},
+  title = {{HyperKvasir}, a comprehensive multi-class image and video dataset for gastrointestinal endoscopy},
+  journal = {Scientific Data},
+  volume = {7},
+  pages = {283},
+  year = {2020}
+}
+@article{liu2020chestxdet,
+  author = {Lian, Jie and Liu, Jingyu and Zhang, Shu and Gao, Kai and Liu, Xiaoqing and Zhang, Dingwen and Yu, Yizhou},
+  title = {A Structure-Aware Relation Network for Thoracic Diseases Detection and Segmentation},
+  journal = {IEEE Transactions on Medical Imaging},
+  year = {2021}
+}
+@article{al2020dataset,
+  author = {Al-Dhabyani, Walid and Gomaa, Mohammed and Khaled, Hussien and Fahmy, Aly},
+  title = {Dataset of breast ultrasound images},
+  journal = {Data in Brief},
+  volume = {28},
+  pages = {104863},
+  year = {2020}
+}
+@article{buda2019association,
+  author = {Buda, Mateusz and Saha, Ashirbani and Mazurowski, Maciej A.},
+  title = {Association of genomic subtypes of lower-grade gliomas with shape features automatically extracted by a deep learning algorithm},
+  journal = {Computers in Biology and Medicine},
+  volume = {109},
+  pages = {218--225},
+  year = {2019}
+}
+\end{filecontents*}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+%%%%%%%%% ABSTRACT %%%%%%%%%
+Medical vision--language models (VLMs) asked closed clinical questions (e.g., ``Is there a polyp?'') can achieve high accuracy by relying on the question prior rather than inspecting image pixels, while current hallucination benchmarks and unverified counterfactual image edits fail to separate true visual discrimination from editing shortcuts or shifts in the answer threshold. We introduce a Counterfactual Evidence Framework that combines: (1) symmetric counterfactual views pairing target lesion removal with shape- and tool-matched random-location controls, same-site ring controls, restored and partial-erasure views, degraded views, and natural negatives; (2) evaluation on held-out inpainting tools (TELEA and Stable Diffusion); (3) metrics separating discrimination (Evidence Sensitivity Gap, ESG, and AUROC) from denial thresholds alongside an information-theoretic abstention ceiling; (4) blinded physician reader verification; and (5) layer-wise hidden-state representation probes. Across 507 main-test cases (1,115 views), nine frontier VLMs (\texttt{gpt-6-sol}, \texttt{gpt-6-astra}, \texttt{gpt-6.1-sol}, \texttt{Claude Fable 5.1}, \texttt{Claude Opus 5.5}, \texttt{Claude Sonnet 5.5}, \texttt{gemini-4-argon}, \texttt{gemini-3.1-pro-preview}, and \texttt{gemini-3.8-flash}) claim 41.1\% to 61.6\% of erased lesions (ESG 0.269 to 0.470), whereas our reference agent \texttt{MedScope-4B}---trained on \texttt{Qwen3.5-4B} with automatically constructed counterfactual trajectories---claims 9.6\% (ESG 0.758, Net Utility 0.732; $p \le 0.001$ in all 27 primary comparisons). Blinded physician readers support automated erasure in colonoscopy (where frontier models still claim 45\% of erased lesions vs.\ 1\% for \texttt{MedScope-4B}), but still call a finding present on 54.7\% of pooled erased reads across all sources, which bounds what unverified automated erasure can certify. Finally, across 12 pre-registered training or system arms (including DPO, counterfactual consistency losses, GRPO, vision-encoder LoRA, multi-agent verifiers, and tool-family training) and 270 decision policies screened under a pass rule fixed in advance, every apparent utility gain comes from shifting the answer threshold rather than improving held-out discrimination; linear probes find no read-out gap, pointing to perception as the remaining limit. We also give a transparent post-hoc account of a 0/48 pneumothorax failure on an external cohort.
+%%%%%%%%% ABSTRACT %%%%%%%%%
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+%%%%%%%%% INTRODUCTION %%%%%%%%%
+Medical vision--language models (VLMs) deployed as clinical assistants are routinely asked closed diagnostic questions such as \emph{``Is there a polyp?''} or \emph{``Is there a breast mass?''}. In the image--text distributions on which these models are trained, a question that names a specific clinical finding acts as strong statistical evidence that the finding is present. Consequently, a model can achieve high apparent accuracy by answering from the question prior rather than inspecting the image pixels. In clinical workflows, however, confidently reporting a finding that is absent from the image is one of the most dangerous errors an assistant can make.
+
+Standard medical visual question answering (VQA) benchmarks---such as VQA-RAD \citep{lau2018vqarad}, SLAKE \citep{liu2021slake}, and PathVQA \citep{he2020pathvqa}---predominantly query findings that are present in the image, rewarding models that lean on the question. Existing medical and general VLM hallucination benchmarks (including POPE \citep{li2023pope}, CARES \citep{xia2024cares}, ProbMed \citep{yan2024probmed}, MedVH \citep{gu2024medvh}, MedHEval \citep{chang2024medheval}, and Med-HallMark \citep{chen2024medhallmark}) perturb the question or answer options while holding the image fixed. Because the visual input does not vary, static-image benchmarks cannot determine whether a correct \emph{``No''} response stems from inspecting the pixels or from a language prior over the question. Testing whether an answer genuinely depends on visual evidence requires image pairs that differ only in the presence of the clinical finding. While such pairs cannot be acquired clinically, constructing them via automated image editing introduces three fundamental, largely unaddressed confounds:
+\begin{enumerate}[leftmargin=*,nosep]
+    \item \textbf{Edit-artifact and location shortcuts.} A model evaluated or trained on inpainted images may learn to detect \emph{that an image was edited}---or \emph{where} it was edited relative to the queried anatomy---rather than whether the lesion is present.
+    \item \textbf{Abstention and threshold shifts masquerading as discrimination.} A model or post-hoc decision rule can reduce false claims and increase aggregate clinical utility simply by answering \emph{``absent''} or \emph{``refer''} more often, without any improvement in its ability to distinguish an erased lesion from an intact one. Published mitigation methods rarely separate evidence discrimination from shifts in the answer threshold.
+    \item \textbf{Unverified counterfactual labels.} Automated lesion erasure may leave residual or secondary clinical signs of the pathology, yet counterfactual evaluations in medical imaging almost never verify with physicians whether the finding is truly gone.
+\end{enumerate}
+
+We hypothesize that evidence sensitivity---whether a model's answer follows the visible evidence rather than the question---can be measured and attributed rigorously only with a framework that (a) varies the image while holding the question fixed, (b) controls every property of the edit except the presence of the finding (matching the inpainting tool, mask shape, and edit site), (c) evaluates on editing tools never seen during training, (d) verifies the erasures with blinded physicians, and (e) separates genuine discrimination from shifts in the answer threshold.
+
+To this end, we introduce a \textbf{Counterfactual Evidence Framework} built around five core components, alongside a trained reference agent (\textbf{\texttt{MedScope-4B}}) built with it:
+\begin{itemize}[leftmargin=*,nosep]
+    \item \textbf{Counterfactual views with symmetric and same-site controls.} From public segmentation datasets across colonoscopy, chest X-ray, breast ultrasound, brain MRI, and SLAKE CT/MRI \citep{liu2021slake,jha2020kvasir,borgli2020hyperkvasir,liu2020chestxdet,al2020dataset,buda2019association}, we pair each original lesion image with a \emph{target removal} (the dilated lesion mask inpainted with LaMa \citep{suvorov2022lama}) and a \emph{random-removal control} (the exact same dilated mask shape moved elsewhere on tissue and inpainted with the same tool, leaving all lesion pixels intact), alongside degraded views and unedited lesion-free \emph{natural negatives}. To test whether denials follow the edit's location rather than the lesion's absence, we introduce a \emph{same-site ring control} that inpaints an area-matched ring starting 2 pixels outside the lesion while leaving the lesion intact, complemented by restored and partial-erasure views.
+    \item \textbf{Metrics separating evidence discrimination from threshold, plus an abstention ceiling.} We define the Evidence Sensitivity Gap ($\text{ESG} = P(\text{absent or refer} \mid \text{target removal}) - P(\text{absent or refer} \mid \text{random removal})$), which is zero for any constant policy or any policy that reacts equally to both edits, and we report discrimination (AUROC of erased vs.\ control and erased vs.\ ring views) separately from denial rates and clinical utility. By the data-processing inequality, we show an \emph{abstention ceiling}: for any decision policy $\pi$ acting on signals $S$, $\text{ESG}(\pi) \le \text{TV}(S \mid \text{erasure}, S \mid \text{control})$. Post-hoc abstention rules therefore cannot raise ESG beyond the separation already present in their input signals, even when they raise net utility via referral rewards.
+    \item \textbf{Held-out editing tools.} While training uses only LaMa and Poisson tissue transplant, evaluation tests transfer to unseen classical PDE inpainting (TELEA \citep{telea2004image}) and Stable Diffusion inpainting \citep{rombach2022high}, as well as tool-family training variants.
+    \item \textbf{Blinded physician verification and hidden-state representation probes.} Two trainee physicians blindly rate whether images were edited and whether the clinical finding is present, allowing us to re-score models on reader-clean erasures. In parallel, layer-wise linear probes \citep{alain2016understanding} on the model's hidden states test whether internal representations separate erased from intact lesions better than the model's final answers (a read-out gap).
+    \item \textbf{Pre-registration and a staged screening funnel.} Every confirmatory check---spanning twelve trained or multi-agent system arms and a split-validation screening funnel of 270 decision policies---had its endpoints, matched controls, and pass criteria committed to a public repository prior to execution.
+\end{itemize}
+
+Applying this framework yields four main contributions:
+\begin{enumerate}[leftmargin=*,nosep]
+    \item \textbf{A rigorous measurement framework for evidence sensitivity in medical VLMs} that unifies matched random-site and same-site ring controls, symmetric natural negatives, held-out editing tools, blinded physician label verification, threshold-independent discrimination metrics, a formal abstention ceiling, and representation probes.
+    \item \textbf{An empirical diagnosis of frontier VLMs vs.\ counterfactual training.} Evaluated through an identical agent loop with zoom and contrast-window tools, nine frontier VLMs (\texttt{gpt-6-sol}, \texttt{gpt-6-astra}, \texttt{gpt-6.1-sol}, \texttt{Claude Fable 5.1}, \texttt{Claude Opus 5.5}, \texttt{Claude Sonnet 5.5}, \texttt{gemini-4-argon}, \texttt{gemini-3.1-pro-preview}, and \texttt{gemini-3.8-flash}) detect real lesions well ($\text{CCR } 0.829\text{--}0.888$) but claim $41.1\%\text{--}61.6\%$ of erased findings ($\text{ESG } 0.269\text{--}0.470$) across every prompting condition tested. In contrast, our 4B reference agent (\texttt{MedScope-4B}, trained on automatically generated counterfactual trajectories) achieves an ESG of $0.758$ and claims only $9.6\%$ of erased findings ($p \le 0.001$ in all 27 primary comparisons). In colonoscopy---where blinded physicians' reads support the erasure---frontier models still claim $45\%$ of erased polyps while \texttt{MedScope-4B} claims $1\%$.
+    \item \textbf{A pre-registered negative map showing that post-training refinements shift thresholds rather than discrimination.} Across twelve pre-registered training or system arms---including removal-based Direct Preference Optimization (DPO), Control-Matched Counterfactual Consistency (CMCC), Group Relative Policy Optimization (GRPO), vision-encoder LoRA, counterfactual multi-agent verification, and tool-family training---and 270 decision and test-time-evidence policies screened under a pre-registered pass rule, every method that improved utility did so by shifting the answer threshold toward conservatism or referral rather than improving evidence discrimination on held-out tools. Layer-wise linear probes reveal no read-out gap ($\le 0.028$ AUROC difference between hidden states and outputs on held-out TELEA edits) and show that the untrained base model's hidden states already separate erased from intact lesions nearly as well as the trained model's ($0.83\text{--}0.87$ vs.\ $0.85\text{--}0.90$). This points to perception ($15\%\text{--}20\%$ of real lesions missed on unedited images) rather than the training objective as the remaining limit.
+    \item \textbf{A transparent account of benchmark and model failures.} Our blinded reader study reveals that while physicians cannot tell edited from unedited images ($\text{AUC } 0.54\text{--}0.55$), they still call a finding present on $54.7\%$ of pooled erased reads ($13/32$ erased images by majority) over all sources, colonoscopy included, with most residual calls outside colonoscopy; this places a ceiling on what automated erasure can certify without reader checks. Furthermore, confirmatory testing on a fresh external cohort exposes a complete failure of \texttt{MedScope-4B} on pneumothorax ($0/48$ detected), which we trace post hoc to severe positive-case under-representation in stage-1 training ($4$ positive images) compounded by stage-3 conservatism.
+\end{enumerate}
+%%%%%%%%% INTRODUCTION %%%%%%%%%
+
+\section{Related Work}
+\label{sec:related_work}
+%%%%%%%%% RELATED WORK %%%%%%%%%
+We situate our work across four technical areas: medical VQA and hallucination benchmarks, counterfactual image editing and removal-based attribution, post-training alignment and multi-agent verification for VLMs, and selective prediction and representation probing.
+
+\subsection{Medical VQA and Hallucination Benchmarks}
+\label{subsec:rw_benchmarks}
+Standard medical VQA benchmarks---most notably VQA-RAD \citep{lau2018vqarad}, SLAKE \citep{liu2021slake}, and PathVQA \citep{he2020pathvqa}---have driven rapid progress in multimodal clinical reasoning. However, because their closed-ended questions predominantly query abnormalities that are present in the image, models can achieve strong benchmark scores by exploiting language priors that associate the mention of a clinical finding in the prompt with a positive answer. In natural-image VQA, question-prior benchmarks such as VQA-CP \citep{agrawal2018vqacp} exposed similar shortcut learning by re-splitting datasets so that question-type priors invert between training and testing.
+
+To evaluate truthfulness and hallucination in vision--language models more directly, a wave of static-image hallucination benchmarks has been introduced, ranging from POPE \citep{li2023pope} in the general domain to medical-specific evaluations including CARES \citep{xia2024cares}, ProbMed \citep{yan2024probmed}, MedVH \citep{gu2024medvh}, MedHEval \citep{chang2024medheval}, and Med-HallMark \citep{chen2024medhallmark}. These benchmarks probe object or finding hallucination by holding the image fixed while perturbing the question (e.g., querying absent findings, swapping attributes, or testing adversarial question phrasings) or modifying the candidate answer options. While valuable for auditing question-level robustness, static-image perturbations share a fundamental limitation: when a model correctly answers \emph{``No''} to an absent finding, they cannot distinguish whether the model inspected the visual evidence or simply relied on a language prior over the modified question. In contrast, our Counterfactual Evidence Framework holds the clinical question fixed and systematically varies the visual evidence across original, target-erased, random-site control, same-site ring control, and natural lesion-free views.
+
+\subsection{Counterfactual Image Editing and Removal-Based Evaluation}
+\label{subsec:rw_counterfactual}
+Testing causal sensitivity to visual features requires comparing model behavior before and after targeted image interventions. In natural-image VQA, invariant and covariant counterfactual image edits \citep{agarwal2020towards} demonstrated that erasing or masking relevant objects often fails to change model predictions, whereas irrelevant background edits can flip answers. In the broader explainability literature, removal-based evaluation frameworks such as ROAD (Remove and Debias) \citep{rong2022road} established that naive region removal or inpainting leaks label information through editing artifacts, allowing classifiers to infer what was removed from the geometry or texture of the imputed patch.
+
+Recently, counterfactual image editing has been adapted to medical imaging. RadEdit \citep{perez2024radedit} introduced diffusion-based chest X-ray editing to stress-test biomedical vision models against synthetic artifact and pathology shifts, and HEAL-MedVQA \citep{healmedvqa2024} evaluated medical VQA models with a visual perturbation test that swaps the queried anatomical region of a chest X-ray, and proposed the localise-then-answer model LobA. Despite these advances, existing medical counterfactual evaluations leave three critical confounds unresolved: (1) they lack symmetric control edits on the same image and held-out editing tools at test time, making it impossible to separate sensitivity to the missing lesion from sensitivity to inpainting artifacts or edit locations; (2) they do not control for same-site editing around the lesion boundary; and (3) they omit blinded physician reader studies to verify whether automated erasure actually removes all clinical signs of the pathology. Our framework directly addresses each of these gaps by pairing target erasures with shape- and tool-matched random-site and same-site ring controls, applying adversarial texture filtering, evaluating on unseen inpainting mechanisms (TELEA \citep{telea2004image} and Stable Diffusion \citep{rombach2022high}), and auditing erasure validity with a blinded two-physician reader study.
+
+\subsection{Preference Optimization, Consistency Training, and Multi-Agent Verification}
+\label{subsec:rw_alignment}
+A growing body of work seeks to mitigate VLM hallucinations through post-training alignment, contrastive or consistency losses, and test-time verification. In the medical domain, MMedPO \citep{zhu2024mmedpo} constructs preference pairs by injecting noise into lesion regions and applies preference optimization, reporting gains primarily on standard accuracy metrics. In the general VLM literature, minimal-pair preference training methods---including S-VCO \citep{svco2024}, EMPO \citep{wu2025empo}, and MFPO \citep{jiang2025mfpo}---align models using paired images or contrasting visual views via Direct Preference Optimization (DPO) \citep{rafailov2023dpo} or related objectives. Concurrently, reinforcement learning approaches such as Group Relative Policy Optimization (GRPO) \citep{shao2024deepseekmath} and multi-agent verification pipelines (which decompose reading into specialized proposer, segmenter, and verifier agents) have been proposed to improve reasoning fidelity and self-correction.
+
+A recurring limitation across these post-training and multi-agent mitigation studies is that they evaluate success using aggregate accuracy, hallucination rates, or utility without controlling for shifts in the model's answer or abstention threshold. A method that makes a model uniformly more conservative---saying \emph{``absent''} or \emph{``refer''} more frequently across all inputs---will reduce false claims on erased lesions and often improve cost-weighted utility, even if its underlying ability to discriminate an erased lesion from an intact control-edited lesion is unchanged or degraded. By evaluating removal-based DPO, Control-Matched Counterfactual Consistency (CMCC), GRPO, vision-encoder LoRA, and counterfactual multi-agent readers under pre-registered protocols that separate discrimination (ESG and AUROC against matched controls) from denial rates, we show that these alignment and verification mechanisms primarily shift the answer threshold rather than improving held-out visual discrimination.
+
+\subsection{Abstention, Selective Prediction, and Representation Probing in VLMs}
+\label{subsec:rw_abstention}
+In safety-critical clinical deployments, models are often equipped with selective prediction or abstention policies---evaluated via risk--coverage curves (AURC) \citep{geifman2017selective} or clinical cost matrices---that refer uncertain or degraded cases to human clinicians. While abstention and test-time evidence aggregation (e.g., combining predictions across image augmentations, crops, or secondary models) are effective tools for managing clinical risk, their impact on counterfactual evidence sensitivity is rarely analyzed theoretically. We formalize an abstention ceiling via the data-processing inequality, proving that no post-hoc decision rule acting on a fixed set of signals can achieve an ESG exceeding the total-variation distance between the target-erased and control-edited signal distributions, and we screen 270 decision policies in a split-validation funnel whose flat ESG is consistent with this ceiling.
+
+Finally, when a VLM fails to reflect visual evidence in its answers, a central mechanistic question is whether the failure lies in visual perception (the vision encoder and early multimodal representations fail to register the lesion) or in answer read-out (the internal hidden states encode the lesion's presence, but the language head overrides it with the question prior). Linear probing of hidden representations across transformer layers \citep{alain2016understanding} has been widely used to localize knowledge and perceptual features in foundation models. By applying layer-wise linear probes to both the last prompt token and pooled image tokens across seen and unseen editing tools, we find no read-out gap, and we find that the untrained base model's hidden states separate erased from intact lesions nearly as well as the trained model's; the remaining limit is therefore not in the read-out.
+%%%%%%%%% RELATED WORK %%%%%%%%%
+
+\section{Methodology}
+\label{sec:method}
+%%%%%%%%% METHOD %%%%%%%%%
+Our methodology comprises the Counterfactual Evidence Framework---which constructs paired visual interventions, formalizes threshold-independent discrimination metrics, bounds post-hoc abstention, and probes internal representations---and the training and evaluation of our reference agent, \texttt{MedScope-4B}. An overview of the complete pipeline is shown in Figure~\ref{fig:framework_overview}. This work extends an earlier version of this study \citep{gurram2026medscope} (arXiv:2611.13006, v1.0, 8 November 2026) with same-site ring controls, held-out tool diagnostics, a 270-policy screening funnel, a blinded physician reader study, and hidden-state linear probes.
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{figures/fig1_framework.pdf}
+\end{center}
+\vspace{-0.3cm}
+\caption{The Counterfactual Evidence Framework (schematic; no patient images). (A) Views built from one case with an expert lesion mask, all asked the same question: the original; the erasure ($E$, dilated mask inpainted); a control edit of the same shape and tool elsewhere ($C_{\text{far}}$); the same-site ring control ($C_{\text{ring}}$, an area-matched ring 2\,px outside the lesion, used in Stage~0 with restored and half-erased views, not drawn); degraded views; and unedited lesion-free images, with the expected action under each. (B) Every model, frontier, open or trained, runs the same agent loop with the same prompt, tools and images. (C) What the framework reports. The bottom strip gives the main-test headline numbers (Table~\ref{tab:main_results}).}
+\label{fig:framework_overview}
+\vspace{-0.2cm}
+\end{figure}
+
+\subsection{Counterfactual Views and Symmetric Controls}
+\label{subsec:method_views}
+We construct counterfactual episodes from public medical segmentation datasets where each case consists of an image $I$ of height $h$ and width $w$, an expert binary lesion mask $M$ (excluding lesions smaller than $20\text{ px}$ or exceeding $20\%$ of the image area), and a clinical question $Q$ whose ground-truth answer depends on the presence of the segmented lesion. To isolate visual evidence while controlling for editing artifacts and anatomical location, we construct five core view types per case:
+\begin{enumerate}[leftmargin=*,nosep]
+    \item \textbf{Original ($O$):} The unmodified image $I$. Expected action: correct positive answer with a bounding box localizing the lesion.
+    \item \textbf{Target removal ($E$):} The lesion mask $M$ is morphologically dilated by $5\text{ px}$ ($M_{\text{dil}}$) and inpainted using LaMa \citep{suvorov2022lama}. Expected action: explicit absent answer (\emph{``No''} to \emph{``Is there\dots?''}, \emph{``Yes''} to \emph{``Is \dots\ healthy?''}, or \emph{``No abnormality''} to open queries).
+    \item \textbf{Random-removal control ($C_{\text{far}}$):} The identical dilated mask shape $M_{\text{dil}}$ is translated to a random foreground tissue location that does not intersect $M_{\text{dil}}$ and is inpainted with the exact same tool. No pixel within the true lesion $M$ is altered. Expected action: the original positive answer and lesion bounding box.
+    \item \textbf{Degraded view ($D$):} The image is corrupted via Gaussian blur ($\sigma = \max(h,w)/40$), additive Gaussian noise ($\sigma = 60$), $8\times$ down/up-sampling, severe JPEG compression, motion blur, or substitution with an image of a different anatomical modality. Expected action: \texttt{clarify}.
+    \item \textbf{Natural negative ($N$):} An unedited lesion-free image from the same modality and source, assigned the exact same reward structure as target removal $E$. Including $N$ ensures that a shortcut policy that simply answers \emph{``absent''} whenever it detects an inpainting artifact cannot succeed on unedited healthy images.
+\end{enumerate}
+
+\textbf{Training-only views and held-out editing tools.} During training, we additionally construct \emph{lesion-insertion} views (copying a real segmented lesion into a healthy training image) and apply a second erasure mechanism---\emph{tissue transplant} (Poisson-blended healthy tissue from the same image)---to half of the training cases. To test whether evidence sensitivity transfers to unseen editing mechanisms, test-set target removals and random-removal controls are regenerated on the exact same masks using two held-out inpainting tools never seen in training: classical partial differential equation inpainting (\textbf{TELEA} \citep{telea2004image}) and \textbf{Stable Diffusion} inpainting \citep{rombach2022high}. We also evaluate a Stage-1 \emph{tool-family} training variant in which each training case's erasure and control edit are generated with one tool sampled from $\{\text{LaMa}, \text{blur fill}, \text{mean fill with noise}, \text{shuffled pixels}\}$.
+
+\textbf{Same-site ring controls and graded evidence.} Because $C_{\text{far}}$ edits tissue away from the lesion while $E$ edits at the lesion, a model could theoretically learn a location-conditioned shortcut (\emph{``edited at the queried anatomical site means absent''}). To test this directly, we introduce three site-matched views in Stage 0 of our framework: (i) the \textbf{Same-Site Ring Control ($C_{\text{ring}}$)}, where the inpainting tool fills an area-matched ring starting $2\text{ px}$ outside the lesion boundary while leaving all lesion pixels intact; (ii) the \textbf{Restored view ($R$)}, formed by taking the erased view $E$ and restoring the lesion's original pixels; and (iii) the \textbf{Partial erasure ($P$)}, where exactly half of the lesion mask is erased with LaMa to provide graded visual evidence.
+
+\textbf{Automated quality control.} All edited views pass through a strict, automated quality control pipeline without human intervention: (1) the erased region's contrast against a surrounding $6\text{--}14\text{ px}$ ring must be $\le \max(1.0, 0.35 \times \text{contrast}_{\text{before}})$, and a trained edit detector must score the region below $0.5$; (2) zero lesion pixels may change in $C_{\text{far}}$; (3) near-duplicate images across splits are prevented via $64$-bit difference hashing and pixel correlation across all $6,849$ unedited images; and (4) views undergo adversarial filtering until a texture classifier separates target from random edits at $\text{AUC} \le 0.60$ ($0.56$ on the main test set; a hand-crafted shortcut classifier on training views reached $\text{AUC } 0.59$).
+
+\subsection{Evidence Sensitivity Metrics, Cost Matrix, and Abstention Ceiling}
+\label{subsec:method_metrics}
+Let a model or decision policy $\pi$ map a view and question $(V, Q)$ to a terminal action $a \in \{\text{claim}, \text{absent}, \text{refer}, \text{clarify}\}$. We define the primary metric, the \textbf{Evidence Sensitivity Gap (ESG)}, as the difference in denial/referral probability between target removal and the matched random-removal control:
+\begin{equation}
+\label{eq:esg}
+\text{ESG}(\pi) = P\big(a \in \{\text{absent}, \text{refer}\} \mid E\big) - P\big(a \in \{\text{absent}, \text{refer}\} \mid C_{\text{far}}\big).
+\end{equation}
+By construction, $\text{ESG}(\pi) = 0$ for any constant policy (always claiming, always denying, or always referring) and, in expectation, for any policy that ignores the image or reacts identically to both edits. We also report \textbf{Strict ESG} (counting explicit $\text{absent}$ answers only) and the site-matched gap $\text{ESG}_{\text{site}} = P(a \in \{\text{absent}, \text{refer}\} \mid E) - P(a \in \{\text{absent}, \text{refer}\} \mid C_{\text{ring}})$.
+
+Alongside ESG, we report: \textbf{Erased-lesion claims} $P(a = \text{claim} \mid E)$; \textbf{Healthy-image claims} $P(a = \text{claim} \mid N)$; \textbf{covered-and-correct rate (CCR)}, the share of answerable views ($O \cup C_{\text{far}}$) answered correctly; \textbf{Grounded accuracy}, the fraction of answerable views answered correctly with a predicted bounding box achieving $\text{IoU} \ge 0.3$ against $M$; \textbf{Area Under the Risk--Coverage Curve (AURC)} \citep{geifman2017selective} for selective prediction; and \textbf{Net Utility}, the mean reward across all views under a pre-specified clinical cost matrix (Table~\ref{tab:cost_matrix}). A correct answer on $O \cup C_{\text{far}}$ with box $\text{IoU} \ge 0.3$ earns a $+0.5$ grounding bonus (boxes covering $>50\%$ of the image earn no bonus), unparseable outputs score $-1.0$, and each tool call beyond the first incurs a $-0.05$ penalty.
+
+\begin{table}[t]
+\caption{Pre-specified clinical cost matrix defining per-view rewards and the model selection objective. A $+0.5$ grounding bonus is added on Original and Random-removal views when the predicted bounding box achieves $\text{IoU} \ge 0.3$ (with area $\le 50\%$ of the image).}
+\label{tab:cost_matrix}
+\vspace{-0.2cm}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{View Type} & \textbf{Correct / Absent} & \textbf{Wrong / Claims Finding} & \textbf{Refer} & \textbf{Clarify} \\
+\midrule
+Original ($O$), Random removal ($C_{\text{far}}$) & $+1.0$ & $-2.0$ ($-4.0$ critical) & $-0.3$ & $-0.3$ \\
+Target removal ($E$), Natural negative ($N$) & $+1.0$ & $-2.0$ & $+0.5$ & $-0.5$ \\
+Degraded ($D$) & $+0.25$ & $-2.0$ & $0.0$ & $+0.5$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+\vspace{-0.2cm}
+\end{table}
+
+\textbf{Separating discrimination from threshold and the Abstention Ceiling.} Because ESG and Net Utility evaluate discrete decisions at a fixed operating point, we separately compute threshold-free non-parametric discrimination---$\text{AUROC}_{\text{far}}$ ($E$ vs.\ $C_{\text{far}}$) and $\text{AUROC}_{\text{site}}$ ($E$ vs.\ $C_{\text{ring}}$)---alongside raw denial rates and within-case single-turn decision log-odds shifts $\Delta s(V) = s(V) - s(O)$, where $s(x) = \log p(\text{present reply} \mid x) - \log p(\text{absent reply} \mid x)$ evaluated on identical reply tokens within each case. Furthermore, we formalize why post-hoc abstention or test-time evidence combiners cannot create evidence sensitivity beyond their inputs:
+
+\textbf{Proposition 1 (Abstention Ceiling).} \emph{Let $S = f(V, Q)$ be any set of signals extracted from view $V$ and question $Q$ (e.g., model logits, confidence scores, or multi-agent outputs), and let $\pi: S \to \{\text{claim}, \text{absent}, \text{refer}, \text{clarify}\}$ be any deterministic or randomized decision policy operating solely on $S$. Let $D = \mathbb{I}[\pi(S) \in \{\text{absent}, \text{refer}\}]$. Then}
+\begin{equation}
+\label{eq:abstention_ceiling}
+\text{ESG}(\pi) = P(D = 1 \mid E) - P(D = 1 \mid C_{\text{far}}) \le \text{TV}\big(P(S \mid E),\, P(S \mid C_{\text{far}})\big),
+\end{equation}
+\emph{where $\text{TV}(P, Q) = \sup_{A} |P(A) - Q(A)|$ is the total-variation distance.}
+
+\emph{Proof.} For the binary random variable $D = g(S)$, $|P(D=1 \mid E) - P(D=1 \mid C_{\text{far}})| = \text{TV}(P(D \mid E), P(D \mid C_{\text{far}}))$. By the data-processing inequality for $f$-divergences (and specifically total variation) applied to the Markov chain $V \to S \to D$, $\text{TV}(P(D \mid E), P(D \mid C_{\text{far}})) \le \text{TV}(P(S \mid E), P(S \mid C_{\text{far}}))$. $\square$
+
+Consequently, post-hoc abstention rules on existing signals $S$ cannot raise ESG above the separation already encoded in $S$, even though they can substantially raise Net Utility by routing uncertain cases to the $+0.5$ referral reward on $E$ and $N$.
+
+\subsection{Reference Agent (\texttt{MedScope-4B}) and Pre-Registered Methods Tested}
+\label{subsec:method_agent}
+\textbf{Agent protocol and architecture.} In every episode, the model receives the image (PNG, long side $\le 768\text{ px}$) and question under an identical multi-turn protocol allowing at most $3$ tool calls. At each turn, the model emits brief reasoning followed by one tagged JSON action: \texttt{zoom} (integer bounding box $[x_1, y_1, x_2, y_2] \in [0, 1000]^4$ on the original image, returning a cropped view), \texttt{window} (intensity center and width in $[0, 255]$, returning a contrast-adjusted view), \texttt{answer} (final text answer, optional evidence bounding box, and confidence), \texttt{refer} (image is usable but finding is indeterminate), or \texttt{clarify} (image is degraded/unusable or depicts the wrong anatomy).
+
+Our reference agent, \texttt{MedScope-4B}, is built on \texttt{Qwen3.5-4B} with a frozen vision encoder and LoRA adapters ($\text{rank } 16$, $\alpha = 32$, dropout $0.05$) applied to all linear layers of the language model. Training trajectories are synthesized automatically from dataset labels alone: trajectories invoke \texttt{zoom} on a jittered box around the lesion (mandatory when the lesion covers $<2\%$ of the image), invoke \texttt{window} on $30\%$ of greyscale images, and emit the expected terminal action with concise template reasoning. Half of the training questions are rephrased using four training paraphrases, while three distinct paraphrases are held out for testing. \texttt{MedScope-4B} is trained in three stages:
+\begin{itemize}[leftmargin=*,nosep]
+    \item \textbf{Stage 1 (Counterfactual SFT):} Supervised fine-tuning on $16,000$ counterfactual and control views for one epoch ($3,706$ optimizer steps) at learning rate $2\times 10^{-4}$.
+    \item \textbf{Stage 2 (Rejection-Sampling Fine-Tuning):} Sampling $k=4$ rollouts per view at temperature $T=1.2$, retaining the highest-reward successful trajectory (repeating hard views $\times 3$), and fine-tuning at learning rate $5\times 10^{-5}$.
+    \item \textbf{Stage 3 (General-VQA Replay):} Fine-tuning on $5,000$ views mixing MedScope counterfactual trajectories with standard training-split questions from VQA-RAD \citep{lau2018vqarad}, SLAKE \citep{liu2021slake}, and PathVQA \citep{he2020pathvqa} at learning rate $5\times 10^{-5}$.
+\end{itemize}
+Under our pre-registered selection rule (committed 1 November 2026 before any v4 data or model existed), Stage 3 is selected over Stage 2 if validation net utility satisfies $U_3 \ge U_2 - 0.02$ and healthy-image claims satisfy $H_3 \le H_2 + 0.02$. On the $540$-case validation set ($1,473$ views), $(U, H)$ progressed from $(0.585, 13.6\%)$ in Stage 1 to $(0.610, 12.7\%)$ in Stage 2 and $(0.613, 7.7\%)$ in Stage 3; Stage 3 was thus locked as \texttt{MedScope-4B} and evaluated once on all test sets without post-hoc tuning.
+
+\textbf{Pre-registered competing methods, multi-agent verifiers, and probes.} To test whether popular post-training alignment or test-time verification techniques improve evidence discrimination beyond Stage-1 counterfactual SFT, we evaluate twelve pre-registered training or system arms against matched controls:
+(1) \textbf{Check C1}: matched vs.\ unmatched control edit geometry and tool;
+(2) \textbf{Checks C2 \& C3}: removal-based DPO \citep{rafailov2023dpo} applied either after standard non-counterfactual SFT or on top of the counterfactual recipe;
+(3) \textbf{Check C4 (Control-Matched Counterfactual Consistency, CMCC)}: a paired-view consistency objective optimizing
+\begin{equation}
+\label{eq:cmcc}
+\mathcal{L}_{\text{CMCC}} = \mathcal{L}_{\text{traj}} + 0.5 \cdot \text{softplus}\big(2 - (s(C_{\text{far}}) - s(E))\big) + 0.5 \cdot \big(s(O) - s(C_{\text{far}})\big)^2 + 0.5 \cdot \mathcal{L}_{\text{first-action}},
+\end{equation}
+tested across three seed pairs against a matched-compute replay-only control;
+(4) higher adapter capacity (\textbf{LoRA rank 64}) and \textbf{Vision Encoder LoRA} at learning rates $2\times 10^{-4}$ and $2\times 10^{-5}$;
+(5) \textbf{GRPO} \citep{shao2024deepseekmath} trained directly on the cost-matrix reward for $150$ steps;
+(6) \textbf{Counterfactual Multi-Agent Readers (v10 and v11)} combining a direct reader, a question-blind reader, a dedicated lesion segmenter, an erase-and-re-ask counterfactual verifier, and a trained arbiter (trained in-sample in v10 and on out-of-sample reports in v11);
+(7) a split-validation screening funnel of \textbf{270 decision policies} (128 Stage-A policies over stored agent/multi-agent outputs and 142 Stage-B policies incorporating test-time image augmentations, crops, token probabilities, \texttt{Qwen2.5-VL-7B}, and segmenter scores); and
+(8) \textbf{Stage-1 Tool-Family training} with and without CMCC.
+Finally, we conduct a \textbf{blinded two-physician reader study} ($128$ main-test views across $O, E, C_{\text{far}}, N$) and train $5$-fold case-grouped \textbf{logistic regression linear probes} \citep{alain2016understanding} on hidden states (last prompt token and mean image tokens across $8$ layers) to compare internal feature separation against behavioral output AUROC.
+%%%%%%%%% METHOD %%%%%%%%%
+
+\section{Experiments}
+\label{sec:experiments}
+%%%%%%%%% EXPERIMENTS %%%%%%%%%
+
+\subsection{Datasets, Baselines, and Statistical Protocol}
+\label{subsec:exp_setup}
+\textbf{Datasets.} Training, validation, and internal main-test splits are constructed from five public sources: SLAKE \citep{liu2021slake} (CT and MRI of several body regions), Kvasir-SEG \citep{jha2020kvasir} supplemented with HyperKvasir \citep{borgli2020hyperkvasir} normal landmarks (colonoscopy), ChestX-Det \citep{liu2020chestxdet} from NIH ChestX-ray14 (chest X-ray), BUSI \citep{al2020dataset} (breast ultrasound), and TCGA-LGG \citep{buda2019association} (brain MRI FLAIR). After quality checks, training comprises $1,508$ SLAKE and colonoscopy cases plus $1,792$ chest X-ray, breast ultrasound, and brain MRI cases, alongside $690$ unedited lesion-free images. Validation contains $540$ cases ($1,473$ views). The internal \textbf{main test set} contains $507$ cases ($219$ with expert lesion masks and $288$ lesion-free natural negatives), yielding $1,115$ total views ($219$ original, $219$ target removal, $219$ random removal, $170$ degraded, and $288$ natural negatives), split strictly by patient ID (ChestX-Det, TCGA-LGG) or near-copy perceptual groups (SLAKE, Kvasir-SEG, BUSI).
+
+To evaluate out-of-distribution generalization and prevent overfitting, we test on six additional cohorts (summarized in Table~\ref{tab:datasets_overview}): \textbf{External centres} ($169$ cases from CVC-ClinicDB, QaTa-COV19, BUS-BRA, and BraTS-Africa 2023), \textbf{Fresh internal} ($76$ unused ChestX-Det patients), \textbf{Fresh external} ($316$ cases from BraTS 2023 meningioma, BUS-UCLM, SIIM-ACR pneumothorax, and ETIS-LaribPolypDB), \textbf{Held-out wordings} ($373$ main-test cases with three unseen question paraphrases), \textbf{Standard VQA} ($1,051$ test items from VQA-RAD \citep{lau2018vqarad}, SLAKE English \citep{liu2021slake}, and PathVQA \citep{he2020pathvqa}), and \textbf{Held-out editing tools} ($125$ and $219$ main-test cases remade with unseen TELEA \citep{telea2004image} and Stable Diffusion \citep{rombach2022high} inpainting). A $64$-bit difference-hash audit across all $6,849$ unedited images confirmed that exactly one image recurred across splits (a lesion-free ChestX-Det validation image matching one SIIM fresh-external case; excluding it alters fresh-external ESG by $+0.002$, CCR by $+0.003$, and net utility by $+0.007$).
+
+\begin{table}[t]
+\caption{Summary of the internal main test set (top) and the six external, confirmatory, and stress-test evaluation cohorts (bottom). $^{\dagger}$Lesion-free images built for the fresh external set; $316$ cases were evaluated in total.}
+\label{tab:datasets_overview}
+\vspace{-0.2cm}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Cohort / Source} & \textbf{Imaging Modality or Composition} & \textbf{Masked} & \textbf{Lesion-Free} & \textbf{Total Cases (Views)} \\
+\midrule
+SLAKE & CT / MRI (near-copy split) & 17 & 90 & 107 \\
+Kvasir-SEG + HyperKvasir & Colonoscopy (near-copy split) & 83 & 91 & 174 \\
+ChestX-Det & Chest X-ray (patient split) & 41 & 50 & 91 \\
+BUSI & Breast ultrasound (near-copy split) & 42 & 15 & 57 \\
+TCGA-LGG & Brain MRI FLAIR (patient split) & 36 & 42 & 78 \\
+\textbf{Main Test Total} & \textbf{5 modalities (170 degraded views)} & \textbf{219} & \textbf{288} & \textbf{507 (1,115)} \\
+\midrule
+External centres & CVC-ClinicDB (40), QaTa-COV19 (20), & 119 & 50 & 169 \\
+ & BUS-BRA (45), BraTS-Africa 2023 (64) & & & \\
+Fresh internal & Unused ChestX-Det test patients & 36 & 40 & 76 \\
+Fresh external & BraTS meningioma (82), BUS-UCLM (99), & 168 & 150$^{\dagger}$ & 316 \\
+ & SIIM pneumothorax (96), ETIS-Larib (39) & & & \\
+Held-out wordings & Main test with 3 test-only paraphrases & -- & -- & 373 \\
+Standard VQA & VQA-RAD (451), SLAKE (300), PathVQA (300) & -- & -- & 1,051 \\
+Held-out editing tools & TELEA, Stable Diffusion, Transplant & 125 / 219 & -- & 125 / 219 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+\vspace{-0.2cm}
+\end{table}
+
+\textbf{Baselines and statistical protocol.} We compare \texttt{MedScope-4B} against nine frontier VLMs evaluated via their public APIs under provider default settings on 31 October 2026 (OpenAI \texttt{gpt-6-sol}, \texttt{gpt-6-astra}, \texttt{gpt-6.1-sol}; Anthropic \texttt{Claude Fable 5.1}, \texttt{Claude Opus 5.5}, \texttt{Claude Sonnet 5.5}; and Google \texttt{gemini-4-argon}, \texttt{gemini-3.1-pro-preview}, and \texttt{gemini-3.8-flash}), six open-weight VLMs run locally in \texttt{bfloat16} with greedy decoding (\texttt{Qwen3.5-4B} base, \texttt{MedGemma 1.5 4B}, \texttt{Lingshu-7B}, \texttt{HuatuoGPT-Vision-7B}, \texttt{Qwen2.5-VL-7B}, and \texttt{Qwen3-VL-8B}), and three trivial constant policies (stored per-view transcripts and scored outputs are in the public repository). All $95\%$ confidence intervals are computed via $2,000$ case-clustered bootstrap resamples (resampling all views of a case together; resampling whole patients or near-copy groups widens intervals by $\le 0.01$ on the main test and $\le 0.03$ on fresh external). Two-tailed paired bootstrap $p$-values across the $27$ primary comparisons (ESG, erased-lesion claims, and net utility against the nine frontier models) are evaluated against a Bonferroni-corrected threshold of $\alpha = 0.05/27$. Each training stage used one NVIDIA A100 40 GB GPU for about $4\text{ h}$ (later pilots used an A100 80 GB and an RTX PRO 6000 96 GB) (PyTorch 2.11, Transformers 5.22.1, PEFT 0.21.2); frontier API runs on the main test cost US\$132, and all 48 API runs cost US\$373 total.
+
+\subsection{Main Benchmark Results and Frontier Model Robustness}
+\label{subsec:exp_main}
+Table~\ref{tab:main_results} and Figure~\ref{fig:frontier_vs_medscope_main}A present the main benchmark results across all $507$ cases ($1,115$ views). While all nine frontier VLMs achieve high answerable accuracy ($\text{CCR } 0.829\text{--}0.888$), they exhibit severe vulnerability to the question prior when visual evidence is removed, falsely claiming the queried lesion on $41.1\%$ (\texttt{gemini-4-argon}) to $61.6\%$ (\texttt{gemini-3.8-flash}) of target-erased views, yielding modest ESG scores between $0.269$ and $0.470$. In contrast, \texttt{MedScope-4B} achieves an ESG of $0.758$ $[0.701, 0.815]$, reduces erased-lesion claims to $9.6\%$ $[6.1, 13.7]$ and healthy-image claims to $7.6\%$ $[4.8, 10.9]$, maintains a competitive CCR of $0.849$, and reaches a Net Utility of $0.732$ $[0.649, 0.813]$. Furthermore, \texttt{MedScope-4B} correctly asks to \texttt{clarify} on all $170/170$ degraded views.
+
+\begin{table}[t]
+\caption{Main test performance across $507$ cases ($1,115$ views) under the identical multi-turn agent protocol. Erased \% denotes false finding claims on $219$ target-erased views; Healthy \% denotes false claims on $288$ unedited lesion-free views; CCR is measured over $438$ answerable views ($O \cup C_{\text{far}}$). Bracketed ranges for \texttt{MedScope-4B} indicate $95\%$ case-clustered bootstrap confidence intervals.}
+\label{tab:main_results}
+\vspace{-0.2cm}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Model} & \textbf{CCR} $\uparrow$ & \textbf{ESG} $\uparrow$ & \textbf{Erased \%} $\downarrow$ & \textbf{Healthy \%} $\downarrow$ & \textbf{Net Utility} $\uparrow$ \\
+\midrule
+\textbf{MedScope-4B (Ours)} & 0.849 & \textbf{0.758} [0.701, 0.815] & \textbf{9.6} [6.1, 13.7] & \textbf{7.6} [4.8, 10.9] & \textbf{0.732} [0.649, 0.813] \\
+\midrule
+gemini-4-argon & 0.874 & 0.470 & 41.1 & 9.0 & 0.565 \\
+Claude Sonnet 5.5 & 0.870 & 0.402 & 48.4 & 16.7 & 0.381 \\
+gemini-3.1-pro-preview & 0.849 & 0.384 & 51.6 & 26.7 & 0.306 \\
+gpt-6-sol & 0.829 & 0.342 & 51.6 & 25.7 & 0.261 \\
+Claude Fable 5.1 & 0.856 & 0.342 & 52.1 & 23.3 & 0.255 \\
+Claude Opus 5.5 & 0.863 & 0.329 & 53.9 & 23.6 & 0.358 \\
+gpt-6.1-sol & \textbf{0.888} & 0.324 & 58.9 & 30.9 & 0.276 \\
+gpt-6-astra & 0.886 & 0.306 & 58.9 & 27.8 & 0.309 \\
+gemini-3.8-flash & 0.868 & 0.269 & 61.6 & 27.8 & 0.263 \\
+\midrule
+Lingshu-7B & 0.527 & 0.416 & 32.0 & 12.5 & $-0.249$ \\
+Qwen3.5-4B (base) & 0.758 & 0.338 & 42.0 & 19.4 & 0.134 \\
+Qwen3-VL-8B & 0.553 & 0.297 & 12.8 & 12.5 & 0.186 \\
+MedGemma 1.5 4B & 0.674 & 0.283 & 54.3 & 24.0 & $-0.255$ \\
+HuatuoGPT-Vision-7B & 0.498 & 0.265 & 30.1 & 22.9 & $-0.426$ \\
+Qwen2.5-VL-7B & 0.144 & 0.146 & 5.5 & 24.7 & $-0.742$ \\
+\midrule
+Always claims finding & 1.000 & 0.000 & 100.0 & 100.0 & $-0.478$ \\
+Always says absent & 0.000 & 0.000 & 0.0 & 0.0 & $-0.848$ \\
+Always refers & 0.000 & 0.000 & 0.0 & 0.0 & 0.110 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+\vspace{-0.2cm}
+\end{table}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{figures/fig2_main_test.pdf}
+\end{center}
+\vspace{-0.3cm}
+\caption{Main test ($507$ cases, $1{,}115$ views). (A) ESG against the share of the $219$ erased views on which each model claims the finding: \texttt{MedScope-4B} (bars: $95\%$ bootstrap intervals), the nine frontier VLMs, the six open VLMs and the trivial policies (ESG $0$). Lower claims alone are not better: \texttt{Qwen2.5-VL-7B} claims least among the open models ($5.5\%$) but answers almost nothing correctly (CCR $0.144$, ESG $0.146$). (B) By imaging type, \texttt{MedScope-4B} against the three flagships: ESG (top) and erased-lesion claims as a fraction (bottom); values in Appendix Table~\ref{tab:modality_breakdown}.}
+\label{fig:frontier_vs_medscope_main}
+\vspace{-0.2cm}
+\end{figure}
+
+In paired bootstrap comparisons against each of the nine frontier models, \texttt{MedScope-4B} improves ESG by $+0.288$ to $+0.489$ (vs.\ \texttt{gemini-4-argon}: $+0.288$ $[0.208, 0.367]$, all $p < 0.001$), lowers erased-lesion claims by $-0.315$ to $-0.521$ (all $p < 0.001$), and increases Net Utility by $+0.168$ to $+0.477$ (all $p \le 0.001$), surviving Bonferroni correction across all $27$ primary tests. CCR differences between \texttt{MedScope-4B} and the frontier models range from $-0.039$ to $+0.021$ ($p \ge 0.12$; confidence intervals reach $-0.09$, so formal equivalence is not established), and healthy-image claims are significantly lower than eight of nine frontier models ($p \le 0.001$; vs.\ \texttt{gemini-4-argon} $-0.014$, $p = 0.59$). Relative to its untrained \texttt{Qwen3.5-4B} base model, \texttt{MedScope-4B} improves ESG by $+0.420$ $[0.338, 0.498]$ (and by $+0.475$ over untrained \texttt{MedGemma 1.5 4B}). Crucially, Table~\ref{tab:main_results} illustrates why erased-lesion claims cannot be evaluated without matched controls: ranking models by erased claims alone produces a \textbf{ranking reversal} that prefers \texttt{Qwen2.5-VL-7B} ($5.5\%$ erased claims) over \texttt{MedScope-4B} ($9.6\%$), even though \texttt{Qwen2.5-VL-7B} achieves this solely by defaulting to \emph{``absent''} on nearly all inputs ($\text{CCR } 0.144$, $\text{ESG } 0.146$, Net Utility $-0.742$).
+
+As shown in Figure~\ref{fig:frontier_vs_medscope_main}B (and Appendix Table~\ref{tab:modality_breakdown}), \texttt{MedScope-4B} outperforms the frontier flagships across all five imaging modalities, achieving an ESG / erased-claim fraction / net utility of $0.95 / 0.01 / 1.06$ on Colonoscopy (vs.\ $0.40\text{--}0.69$ ESG and $0.31\text{--}0.58$ erased claims for flagships), $0.75 / 0.14 / 0.75$ on Brain MRI, $0.74 / 0.14 / 0.78$ on Breast Ultrasound, $0.51 / 0.17 / 0.40$ on Chest X-ray (where \texttt{Claude Opus 5.5} drops to $-0.05$ ESG), and $0.47 / 0.12 / 0.22$ on SLAKE CT/MRI.
+
+\textbf{Prompting, reasoning, tool-use, and lesion-size robustness.} To test whether frontier false claims stem from prompt phrasing or sub-optimal inference settings, we re-evaluated \texttt{gemini-4-argon}, \texttt{Claude Opus 5.5}, and \texttt{gpt-6-astra} on a $150$-case subset across six regimes: Default, Cautious prompt, Solved in-context examples, Highest reasoning budget, Highest image resolution setting, and a Plain free-text prompt without tools (Figure~\ref{fig:readers_robustness}B1 and Appendix Table~\ref{tab:robustness_prompts}). Across all six conditions, frontier models continue to claim $36.8\%$ to $66.2\%$ of erased lesions ($\text{ESG } 0.250\text{--}0.500$), whereas \texttt{MedScope-4B} achieves $0.750$ ESG and $7.4\%$ erased claims ($p \le 0.001$ on ESG and $p \le 0.034$ on utility in every condition). Furthermore, \texttt{MedScope-4B} is invariant to held-out question wordings ($373$ cases; net utility change $+0.006$ $[-0.033, 0.041]$) and ranks first under all five alternative clinical cost matrices tested. Refusing tool calls (\texttt{zoom} and \texttt{window}) at test time leaves \texttt{MedScope-4B} ESG unchanged ($0.753$ vs.\ $0.758$, $p = 0.92$) while reducing net utility by $0.092$ ($p = 0.003$) and CCR by $0.053$: the tools add accuracy on real lesions rather than evidence sensitivity. Stratified by lesion-area quartiles (Figure~\ref{fig:readers_robustness}B2), \texttt{MedScope-4B} ESG scales monotonically from $0.545$ in Q1 ($18.2\%$ erased claims on the smallest lesions) to $0.741$ (Q2), $0.836$ (Q3), and $0.909$ in Q4 ($1.8\%$ erased claims), whereas the three flagships stay within ESG $0.20\text{--}0.56$ in every quartile. One notable limitation is selective prediction: \texttt{MedScope-4B}'s verbalized confidence (emitted via short template reasoning) ranks errors less effectively than frontier models, yielding a higher AURC of $0.065$ vs.\ $0.020\text{--}0.033$.
+
+\subsection{Active Ingredients of Counterfactual Training and Held-Out Editing Tools}
+\label{subsec:exp_ablations_tools}
+To isolate what drives \texttt{MedScope-4B}'s evidence sensitivity, we conduct Stage-1 training ablations (Figure~\ref{fig:heldout_tools_and_ablations}C and Appendix Table~\ref{tab:ablations_and_factorial}A), a $2\times 2$ factorial decomposition of training views (Figure~\ref{fig:heldout_tools_and_ablations}B and Appendix Table~\ref{tab:ablations_and_factorial}B), and transfer evaluations on unseen inpainting tools (Figure~\ref{fig:heldout_tools_and_ablations}A and Appendix Table~\ref{tab:heldout_tools}).
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{figures/fig3_tools_ablations.pdf}
+\end{center}
+\vspace{-0.3cm}
+\caption{Editing tools and training ablations. (A) ESG on $125$ main-test cases whose erasures and control edits were remade with each tool on the same masks: two training tools (LaMa, tissue transplant) and two held-out tools (TELEA, Stable Diffusion). (B) $2\times 2$ factorial of training-only components (Stage~1, seed~0): share of $125$ intact lesions denied after a TELEA edit elsewhere in the image, with main-test ESG in brackets; control edits, not lesion insertions, remove the ``edited means absent'' shortcut. (C) Main-test ESG of Stage-1 arms (mean $\pm$ sd over three seeds where marked): blue, with counterfactual (CF) views; vermilion, without; green, without CF views followed by removal-based DPO (check C2); the MedGemma rows replicate the recipe on a second architecture.}
+\label{fig:heldout_tools_and_ablations}
+\vspace{-0.2cm}
+\end{figure}
+
+\textbf{Counterfactual views vs.\ label priors.} Removing counterfactual views from Stage-1 SFT causes ESG to collapse from $0.741 \pm 0.019$ to $0.279 \pm 0.107$ across three seeds (per-seed differences $+0.525, +0.539, +0.324$, all $p < 0.001$; external centres ESG $0.622 \pm 0.030$ vs.\ $0.389 \pm 0.043$) and increases erased-lesion claims from $13.2\%$ to $67.6\%$ (Appendix Table~\ref{tab:ablations_and_factorial}A). To verify that this gain is not merely an artifact of exposing the model to more negative (\emph{``absent''}) labels during training, we trained an arm without counterfactual views but matched the exact proportion of \emph{``absent''} answers using natural lesion-free images; this arm achieved only $0.215$ ESG ($73.5\%$ erased claims; paired difference $+0.521$ $[0.440, 0.600]$). Replicating the Stage-1 recipe on a medical-specialized architecture, \texttt{MedGemma 1.5 4B}, similarly boosts ESG from $0.283$ (untrained) and $0.374$ (SFT without counterfactuals) to $0.721$ ($+0.347$ $[0.276, 0.425]$). Stages 2 and 3 provide modest polishing over Stage 1 on the main test (net utility $+0.040$, $p = 0.15$; ESG $+0.023$, $p = 0.39$) while halving healthy-image claims on validation ($13.6\% \to 7.7\%$).
+
+\textbf{How control edits suppress the ``edited means absent'' shortcut.} In the $2\times 2$ factorial ablation (Figure~\ref{fig:heldout_tools_and_ablations}B and Appendix Table~\ref{tab:ablations_and_factorial}B), training on target erasures alone achieves strong main-test ESG ($0.708$) and low erased claims ($6.8\%$). However, when evaluated on $125$ cases where an unseen tool (TELEA) performs a control edit elsewhere on the image while leaving the lesion intact, the erasures-only model falsely denies $43.2\%$ of intact lesions---having learned the shortcut that \emph{any inpainted image has no lesion}. Including random-location control edits during training cuts this false denial rate by more than half, to $16.0\%$ (control edits only) and $23.2\%$ (full recipe).
+
+\textbf{Transfer to held-out editing tools and edit visibility.} Across the $125$-case multi-tool benchmark (Figure~\ref{fig:heldout_tools_and_ablations}A and Appendix Table~\ref{tab:heldout_tools}A), \texttt{MedScope-4B} maintains strong evidence sensitivity on both seen tools (LaMa $0.752$, Transplant $0.720$) and unseen held-out tools (TELEA $0.664$, Stable Diffusion $0.640$), outperforming every frontier flagship on every tool ($\Delta\text{ESG } +0.10$ to $+0.48$, all $p \le 0.049$). Notably, \texttt{gemini-4-argon}'s erased claims drop from $32.8\%$ on LaMa to $8.8\%$ on TELEA because it detects TELEA's smooth PDE fills as editing artifacts. Auditing edit visibility directly, a supervised ResNet-18 separates $C_{\text{far}}$ from $O$ at $\text{AUC } 0.83$ $[0.80, 0.87]$, and a linear probe on the frozen vision encoder's pooled features separates them at $\text{AUC } 0.60$ $[0.58, 0.63]$ (while separating $E$ from $C_{\text{far}}$ at $0.86$ $[0.83, 0.89]$). Zero-shot, however, \texttt{gemini-4-argon} and \texttt{gpt-6.1-sol} separate $C_{\text{far}}$ from $O$ near chance ($\text{AUC } 0.52\text{--}0.55$, while separating $E$ from $O$ at $0.70\text{--}0.75$). On the $61/219$ erasures that \texttt{gemini-4-argon} explicitly rates as unedited, \texttt{MedScope-4B} claims the lesion in only $15\%$ of cases ($8\%$ on visibly edited ones) compared to $41\%\text{--}64\%$ for the nine frontier models.
+
+Examining where held-out ESG is lost across all $219$ cases for the Stage-1 recipe (Appendix Table~\ref{tab:heldout_tools}B) reveals distinct failure modes by generator: on LaMa, false control denial when the unedited lesion was found is only $2.7\%$ ($5/186$), so the remaining ESG gap comes from \emph{perception} ($33/219$ real lesions missed on $O$); on TELEA, loss is driven by \emph{edit-induced denial} of intact lesions ($12.9\%$, $24/186$, including $13$ breast ultrasound cases); and on Stable Diffusion, $41/45$ false claims on $E$ point their bounding boxes at the erased site. Diffusion erasures were not reader-checked, so these sites may hold residual or regenerated lesion-like tissue; we cannot tell which.
+
+\subsection{Pre-Registered Negative Map: Threshold Shifts vs.\ Discrimination}
+\label{subsec:exp_negative_map}
+A central question of our study is whether post-training alignment, consistency losses, multi-agent verification, or test-time decision policies can push evidence discrimination beyond counterfactual SFT. Figure~\ref{fig:threshold_vs_discrimination_map} and Appendix Table~\ref{tab:negative_map_summary} synthesize our pre-registered checks (C1--C4), post-preprint training pilots, tool-family training, and the 270-policy screening funnel (numeric breakdowns in Appendix Tables~\ref{tab:negative_map_summary}, \ref{tab:app_c1_c3}, \ref{tab:app_c4_cmcc}, and \ref{tab:app_tool_family}).
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{figures/fig4_negative_map.pdf}
+\end{center}
+\vspace{-0.3cm}
+\caption{The negative map. (A) Each trained or system arm against its matched comparator: change in erased-lesion claims (x) and in sensitivity on intact lesions (y), in percentage points. Arms that claim more also find more, so the points follow the diagonal: the operating point moves. Held-out tools are TELEA and Stable Diffusion pooled ($219$ cases); tool-family arms are on validation TELEA views; rank-64 and vision-LoRA arms on the main test. C4 CMCC and tool-family replay nearly coincide. (B) Change in ESG for every arm with a recorded ESG difference (filled: $95\%$ interval recorded; open: point estimate only). Every recorded interval includes zero, and the point estimates lie between $-0.054$ and $+0.041$. GRPO and multi-agent v10 have no recorded ESG difference on these sets and appear only in A. Values in Appendix Tables~\ref{tab:negative_map_summary}--\ref{tab:app_tool_family}.}
+\label{fig:threshold_vs_discrimination_map}
+\vspace{-0.2cm}
+\end{figure}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{figures/fig5_stage0_probes.pdf}
+\end{center}
+\vspace{-0.3cm}
+\caption{Stage~0 on validation data (Stage-1 recipe, seed~0; untrained base model). (A) Share of intact lesions denied after each view, among cases whose unedited image the model answers present ($143$ recipe, $127$ base); the erased view is shown for reference. Partial erasure was built with LaMa only, and the restored and partial views for the recipe only. (B) Cross-validated AUROC of linear probes on the recipe's hidden states (erased vs.\ ring control) by layer, for the mean of the image tokens and the last prompt token; dotted lines give the AUROC of the recipe's own answers. (C) Within-case change of the single-turn log-odds relative to the unedited view (nats); this score failed its validity check as a cross-case score (Section~\ref{sec:discussion}) but is valid within a case.}
+\label{fig:stage0_probes}
+\vspace{-0.2cm}
+\end{figure}
+
+Across all twelve trained or system arms (Appendix Table~\ref{tab:negative_map_summary}), every modification moved the operating point---claims on erased lesions and sensitivity on intact lesions rose or fell together (Figure~\ref{fig:threshold_vs_discrimination_map}A)---without separating erased from intact lesions better than its matched comparator (Figure~\ref{fig:threshold_vs_discrimination_map}B):
+\begin{itemize}[leftmargin=*,nosep]
+    \item \textbf{DPO and Consistency Losses (C2--C4):} Applying removal-based DPO after non-counterfactual SFT (C2) yields no ESG improvement over our recipe on fresh external data ($0.355 \pm 0.015$ vs.\ $0.381 \pm 0.018$; single-seed difference $+0.012$ $[-0.053, 0.077]$), achieving lower erased claims ($12.9 \pm 7.9\%$ vs.\ $20.0 \pm 4.0\%$) only by sacrificing lesion sensitivity ($0.485 \pm 0.086$ vs.\ $0.587 \pm 0.026$). Applying DPO on top of the counterfactual recipe (C3) degrades held-out-tool ESG ($0.595$ vs.\ $0.649$) and increases erased claims by $+8.0$ percentage points ($24.4\%$ vs.\ $16.3\%$). Similarly, the paired-view CMCC loss (C4, Eq.~\ref{eq:cmcc}) fails its pre-registered test across three seed pairs: by penalizing differences between $O$ and $C_{\text{far}}$, it shifts all endpoints toward answering \emph{``present''}, increasing CCR ($+0.030$, $p=0.004$) but significantly inflating fresh-external erased claims ($+0.073$, $p<0.001$) and main-test healthy claims ($+0.052$, $p<0.001$).
+    \item \textbf{Adapter Capacity, Vision LoRA, and GRPO:} Increasing LoRA rank to $64$ induces a positive response bias on SIIM pneumothorax (claiming $25/48$ present, $21/48$ erased, and $12/48$ healthy; SIIM ESG $0.042$). Unfreezing the vision encoder with LoRA at $\text{lr } 2\times 10^{-4}$ causes catastrophic collapse ($\text{ESG} = 0.000$ on every dataset, answering purely from question text: always claiming tumours/masses/``lesions'' and always denying polyps/effusions), while lowering the vision learning rate to $2\times 10^{-5}$ makes the model uniformly more conservative (fresh-external CCR drops $-0.071$ to $0.488$, $p=0.03$; pneumothorax $7/48$ vs.\ $10/48$; main-test erased claims $6.8\%$ vs.\ $11.9\%$). GRPO (150 steps on the cost-matrix reward) raises net utility on held-out tools (about $+0.056$) and on fresh external data ($+0.124$, ESG $+0.083$), but misses its pre-declared go signal on erased-lesion claims ($+0.022$ against the control on held-out tools); the main-test healthy-image guard passed ($+0.021$), while fresh-external healthy-image claims rose by $+0.054$. GRPO makes the model answer more, finding more real lesions and adding a few false claims.
+    \item \textbf{Multi-Agent Verification (v10, v11) and Tool-Family Training:} In the 5-agent verification pipeline, ablations show that only the dedicated lesion segmenter contributes positively (removing it costs $-0.055$ to $-0.066$ net utility); although the erase-and-re-ask verifier withdraws $\sim 80\%$ of claims after erasing their box and keeps $\sim 95\%$ after a control edit, the direct reader rarely emits a bounding box on false claims ($20/219$), leaving the verifier inactive. Version v10 collapses on external CCR ($0.513$ vs.\ $0.769$ on external centres; $0.378$ vs.\ $0.560$ on fresh external; $3/48$ on pneumothorax), while v11 achieves the highest main-test utility ($0.809$) only because its verifier uses the main test's own LaMa inpainter---on held-out tools, v11 yields $\Delta\text{ESG} = -0.002$ and increases erased claims by $+0.061$. Likewise, training Stage 1 with a family of four editing tools (Appendix Table~\ref{tab:app_tool_family}) fails to transfer to unseen TELEA ($\Delta\text{ESG} +0.017$ and $+0.011$, both non-significant).
+    \item \textbf{Decision policies (270):} In our split-validation screening funnel (Appendix Table~\ref{tab:negative_map_summary} bottom), 19 of 128 Stage-A decision policies on stored outputs passed Half A, but \textbf{0 confirmed on Half B}. In Stage B, \textbf{0 of 142 policies} combining test-time image augmentations (mirror, crop, contrast), close-ups, first-token answer probabilities (which decouple the binary presence/absence token from the bounding-box coordinate tokens), \texttt{Qwen2.5-VL-7B}, and segmenter scores passed even Half A: while combiners raised TELEA net utility from $0.444$ to $0.686$ by abstaining/referring more often, ESG remained at $0.55\text{--}0.61$ (vs.\ $0.600$ for the recipe). This is consistent with Proposition~1; we did not estimate the total-variation distance itself, so it is not a test of the bound.
+\end{itemize}
+
+\subsection{Same-Site Ring Controls, Representation Probes, Physician Verification, and Generalization Failures}
+\label{subsec:exp_probes_readers_failures}
+\textbf{Stage-0 same-site ring controls and hidden-state linear probes.} Figure~\ref{fig:stage0_probes} and Appendix Table~\ref{tab:ring_and_probes} evaluate whether the Stage-1 recipe relies on edit-location shortcuts or suffers from an answer read-out gap on the validation cohort ($179$ lesion cases with yes/no questions and $80$ lesion-free images). On seen LaMa edits (Appendix Table~\ref{tab:ring_and_probes}A), intact-lesion denial on the $2\text{ px}$ same-site ring control ($0.077$) is statistically indistinguishable from far-control denial ($0.042$; difference $+0.035$ $[-0.021, 0.091]$), and $\text{AUROC}_{\text{site}}$ ($0.845$) matches $\text{AUROC}_{\text{far}}$ ($0.853$). On unseen TELEA edits, ring denial rises to $0.203$ vs.\ $0.126$ on far controls ($+0.077$ $[0.000, 0.154]$), meeting the pre-registered flag ($\ge 0.10$, $\ge +0.05$ over far, and $\ge +0.05$ over base). However, a post-hoc paired comparison on the $112$ cases detected unedited by both the recipe and the untrained base model reveals that the site-specific interaction---$(\text{ring} - \text{far})_{\text{recipe}} - (\text{ring} - \text{far})_{\text{base}}$---is only $+0.018$ $[-0.080, 0.116]$, with TELEA ring denials concentrated almost entirely in chest X-rays ($12/17$ vs.\ $0/33$ breast ultrasound, $2/34$ colonoscopy, $0/24$ brain MRI). Thus, counterfactual training roughly doubles general sensitivity to unfamiliar PDE artifacts wherever they occur ($12.5\%$ vs.\ $6.2\%$ on ring; $8.9\%$ vs.\ $4.5\%$ on far) rather than inducing a site-specific shortcut. Restoring the lesion pixels ($R$) returns denial to $0.070$ (LaMa) and $0.140$ (TELEA), and partial $50\%$ erasure ($P$) yields an intermediate denial rate of $0.196$ (and intermediate log-odds shift of $-4.05\text{ nats}$ vs.\ $-14.10\text{ nats}$ for full erasure; Figure~\ref{fig:stage0_probes}C).
+
+Linear probes on hidden states (Figure~\ref{fig:stage0_probes}B and Appendix Table~\ref{tab:ring_and_probes}B) show that on held-out TELEA $E$ vs.\ $C_{\text{ring}}$, the best layer-wise probe achieves $\text{AUROC } 0.852$ (image tokens) and $0.816$ (last token) compared to the recipe's behavioral output AUROC of $0.824$---a read-out gap of $+0.028$ and $-0.008$, well below the pre-registered $0.05$ threshold. Moreover, the untrained base model's hidden states already separate $E$ from $C_{\text{ring}}$ at $\text{AUROC } 0.870$ (LaMa) and $0.831$ (TELEA). So the model's answers use about as much separation as its hidden states hold (no read-out gap), and the untrained base model's hidden states are nearly as separable as the trained model's. The probes were on the language model's hidden states, not on the vision encoder, so they do not locate the limit inside the encoder; together with the $20.1\%$ of unedited validation lesions the recipe misses on $O$, they point to perception rather than the read-out as the remaining limit.
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=\textwidth]{figures/fig6_readers_robustness.pdf}
+\end{center}
+\vspace{-0.3cm}
+\caption{Reader study and robustness. (A1) Share of the $128$ main-test images ($32$ per kind) on which each blinded trainee physician (R1 internal medicine, R2 radiology; one year each) called the finding present. Edited and unedited images were not told apart (AUC $0.54$ and $0.55$). (A2) Erased and lesion-free images by source, both readers' reads pooled; the dashed line is the pre-registered $10\%$ residual criterion. Only in colonoscopy does the erased rate fall to the lesion-free rate. (A3) Stored model replies re-scored on reader-clean ($10$), majority-clean ($19$) and residual ($13$) erasures: frontier models pooled, open models and \texttt{MedScope-4B} pooled, and \texttt{MedScope-4B} alone ($0/10$ clean, $4/13$ residual; its majority-clean count was not computed). (B1) ESG of the three flagships on the same $150$ cases under six conditions (\texttt{Claude Opus 5.5} has no highest-image run); dashed: \texttt{MedScope-4B} under its default protocol. (B2) ESG by lesion-area quartile (share of the image) for \texttt{MedScope-4B} and the three flagships.}
+\label{fig:readers_robustness}
+\vspace{-0.2cm}
+\end{figure}
+
+\textbf{Blinded physician reader verification.} Figure~\ref{fig:readers_robustness}A and Appendix Table~\ref{tab:reader_study} report the results of our two-reader study on $128$ main-test images ($32$ each of $O, E, C_{\text{far}}, N$; CT denotes ``cannot tell''). First, physicians cannot distinguish edited ($E \cup C_{\text{far}}$) from unmodified ($O \cup N$) images: edit detection AUCs are $0.54$ (R1) and $0.55$ (R2) with only slight inter-reader agreement on edit status ($\text{Cohen's }\kappa = 0.10$). Second, however, readers report a clinical finding present on $35/64$ ($54.7\%$ $[41.7, 67.2]$) of pooled erased reads and $13/32$ ($40.6\%$ $[23.7, 59.4]$) of erased images by majority ($\kappa = 0.47$ on finding presence), failing our pre-specified $\le 10\%$ residual criterion. Stratified by modality (Figure~\ref{fig:readers_robustness}A2), automated LaMa erasure is \textbf{supported by the readers for colonoscopy} (finding called on $1/6$ R1 and $2/6$ R2 erased views vs.\ $2/6$ and $0/6$ on unedited lesion-free images), whereas substantial residual or secondary signs persist in breast ultrasound ($6/7 \mid 4/7$ erased vs.\ $5/7 \mid 1/7$ healthy), chest X-ray ($5/6 \mid 4/6$ vs.\ $4/6 \mid 3/6$), brain MRI ($3/7 \mid 5/7$ vs.\ $1/7 \mid 1/7$), and SLAKE ($4/6 \mid 1/6$ vs.\ $4/6 \mid 2/6$). Among the $13$ majority-residual erased images, $4$ ask the generic question \emph{``Is there an abnormality?''} (where any other abnormality in the image makes ``yes'' a correct answer), while the remaining $9$ ask lesion-specific questions. The readers did not give reasons, so why they still saw the finding on these $9$ is open; surrounding cues or incomplete mask coverage are hypotheses, not observations.
+
+Re-scoring stored model outputs on reader-partitioned subsets (Figure~\ref{fig:readers_robustness}A3) supports the main comparison and qualifies it: across the $10$ strictly reader-clean erasures (mostly colonoscopy), the nine frontier models pooled claim the finding on $26\%$ $[10, 42]$ of cases ($30\%$, $19/63$, when conditioned on having detected the lesion on the unedited image; the pre-registered lower bound $>20\%$ was not met due to the small $n=10$ sample), $36\%$ on the $19$ majority-clean erasures, and $82\%$ on the $13$ residual erasures (whereas open-weight and MedScope models pooled claim $12\%$ on reader-clean, $19\%$ on majority-clean, and $40\%$ on residual erasures). \texttt{MedScope-4B} claims $0/10$ reader-clean erasures and $4/13$ residual erasures, while detecting $56/63$ ($88.9\%$) reader-confirmed lesions and making $0/16$ false claims on reader-confirmed healthy images. On the full main-test colonoscopy cohort ($83$ cases)---the imaging type for which the readers supported the erasures---frontier models pooled claim $45\%$ of erased polyps while detecting $96\%$ of unedited ones (vs.\ $1\%$ erased claims for \texttt{MedScope-4B}).
+
+\textbf{External generalization and the SIIM pneumothorax failure.} Appendix Table~\ref{tab:generalization_and_pneumo}A reports out-of-distribution generalization. On \textbf{External centres} ($169$ cases), \texttt{MedScope-4B} achieves an ESG of $0.597$ vs.\ $0.277\text{--}0.412$ for the frontier flagships (CVC-ClinicDB $0.85$, BraTS-Africa $0.71$, BUS-BRA $0.58$, but QaTa-COV19 $0.05$ because diffuse COVID-19 opacities erase poorly). On \textbf{Fresh internal} ($76$ ChestX-Det cases), \texttt{MedScope-4B} leads on ESG ($0.472$ vs.\ $0.000\text{--}0.083$) and net utility ($0.402$ vs.\ $-0.023$ to $0.219$). On \textbf{Standard VQA} ($1,051$ cases, whose training splits were seen in Stage-3 replay), \texttt{MedScope-4B} outperforms base \texttt{Qwen3.5-4B} across all three benchmarks (closed / open / overall accuracy: VQA-RAD $0.741 / 0.230 / 0.514$ vs.\ $0.657 / 0.260 / 0.481$; SLAKE $0.881 / 0.644 / 0.730$ vs.\ $0.826 / 0.424 / 0.570$; PathVQA $0.801 / 0.125 / 0.477$ vs.\ $0.545 / 0.021 / 0.293$).
+
+However, on the confirmatory \textbf{Fresh external} cohort ($316$ cases), \texttt{MedScope-4B} trails \texttt{gemini-4-argon} in net utility ($-0.053$ vs.\ $0.310$; difference $-0.363$ $[-0.496, -0.233]$) and CCR ($0.476$ vs.\ $0.741$). Stratifying by source reveals that while \texttt{MedScope-4B} performs competitively on BUS-UCLM ($\text{CCR/utility } 0.73 / 0.67$ vs.\ $0.71 / 0.55$), ETIS-Larib ($0.69 / 0.38$ vs.\ $0.97 / 0.75$), and BraTS meningioma ($0.53 / -0.03$ vs.\ $0.62 / 0.09$), it suffers a complete failure on \textbf{SIIM-ACR pneumothorax} ($\text{CCR } 0.00$, utility $-1.10$ vs.\ $0.66 / -0.06$ for \texttt{gemini-4-argon}), answering a confident \emph{``No''} (probability $\approx 1.0$) on all $48$ pneumothorax films. A post-hoc audit (Appendix Table~\ref{tab:generalization_and_pneumo}B) shows that resolution does not explain the final model's miss: \texttt{MedScope-4B} calls pneumothorax present on $0\%$ of films both on the $256\text{-px}$ copies and on the $42$ films recovered at original resolution, whereas Stage~1 with counterfactual views reached $19\%$ and $40\%$ and Stage~2 $40\%$ at original resolution. The likely cause is training coverage: only $54$ of $\sim 7{,}000$ Stage-1 chest X-ray training views named pneumothorax, trained to answer \emph{``No''} $80\%$ of the time, from only $4$ pneumothorax lesion images, and validation held no pneumothorax lesion images, so Stage-3 replay could remove what earlier stages had without any validation penalty. Asked \emph{``Is there an abnormality?''}, \texttt{MedScope-4B} answers \emph{``Yes''} on $35/42$ pneumothorax films vs.\ $28/48$ SIIM negatives (Fisher's exact $p = 0.012$): it registers something on these films, but this does not show that it identifies the pneumothorax.
+%%%%%%%%% EXPERIMENTS %%%%%%%%%
+
+\section{Discussion and Limitations}
+\label{sec:discussion}
+%%%%%%%%% DISCUSSION %%%%%%%%%
+
+\subsection{What Counterfactual Evaluation Can and Cannot Certify}
+\label{subsec:disc_certify}
+Our blinded physician reader study delivers a dual lesson for counterfactual evaluation in medical imaging. On the one hand, for focal mucosal lesions in colonoscopy, automated inpainting with LaMa reduces physician finding calls to the level of unedited healthy tissue ($1/6$ and $2/6$ vs.\ $2/6$ and $0/6$), supporting that the visual evidence is removed. In this reader-validated regime, nine frontier VLMs still claim $45\%$ of $83$ erased polyps while detecting $96\%$ of unedited ones---and claim $30\%$ of reader-clean erasures whose unedited counterpart they correctly detected---strong evidence that frontier models often answer such questions from the question rather than the pixels.
+
+On the other hand, across all sources (colonoscopy included), physicians still call a finding present on $54.7\%$ of pooled erased reads ($40.6\%$ of erased images by majority), even though they cannot tell edited from unedited images ($\text{AUC } 0.54\text{--}0.55$); most of these residual calls fall outside colonoscopy, and in diffuse disease such as COVID-19 opacities erasure works poorly (QaTa-COV19 $\text{ESG } 0.05$). The readers did not say what they saw. Plausible sources are secondary signs outside the mask (mass effect, oedema, pleural asymmetry, acoustic shadowing) or incomplete mask coverage, but these are hypotheses; $4$ of the $13$ majority-residual images ask the generic abnormality question and $9$ name a specific lesion. Because counterfactual training labels every erased view ``absent'', training on unverified erasures outside colonoscopy may teach a model to discount whatever residual evidence remains (though \texttt{MedScope-4B} still claims $4/13$ residual erasures vs.\ $0/10$ reader-clean ones). Furthermore, held-out editing tools introduce generator-specific failure modes: TELEA's smooth PDE patches trigger $12.9\%$ false denials on intact lesions, whereas $41/45$ false claims on Stable Diffusion erasures point at the inpainted site, which may hold residual or regenerated tissue (these erasures were not reader-checked). Consequently, unverified automated ESG cannot be treated as a pure measure of hallucination in isolation; counterfactual benchmarks must pair target erasures with symmetric controls, held-out generators, and physician reader checks.
+
+\subsection{Implications of the Pre-Registered Negative Map and the Perception Limit}
+\label{subsec:disc_negative_map}
+Across twelve pre-registered training or multi-agent arms and $270$ screened decision policies, every intervention that appeared to improve clinical utility or reduce erased-lesion claims did so by shifting the operating threshold---trading sensitivity on present lesions for conservatism or referral rewards---without improving held-out evidence discrimination over matched controls. Our layer-wise linear probes are consistent with this: the read-out gap between hidden representations and behavioral answers on held-out TELEA edits is at most $+0.028$ AUROC, and the untrained \texttt{Qwen3.5-4B} base model's hidden states already separate erased from intact lesions nearly as well as the trained recipe's ($0.83\text{--}0.87$ vs.\ $0.85\text{--}0.90$). The answers therefore do not leave usable separation unread, and the remaining limit is \textbf{perception}: $15\%\text{--}20\%$ of real lesions are missed on unedited images, and every miss also lowers ESG. At the same time, naively unfreezing the vision encoder during LoRA fine-tuning either collapses the model to text-only priors ($\text{lr } 2\times 10^{-4}$) or merely shifts the threshold toward conservatism ($\text{lr } 2\times 10^{-5}$). Methodologically, these results demonstrate that without pre-registered matched controls, threshold-independent metrics, and split-validation funnels, threshold shifts and referral gaming are easily misattributed as breakthroughs in multimodal grounding.
+
+\textbf{Limitations.} Beyond residual findings in automated erasures and the perception limit, our study has four concrete limitations: (1) as exposed by the $0/48$ SIIM pneumothorax failure, counterfactual training on a skewed label distribution ($80\%$ \emph{``No''} on $54$ pneumothorax queries and only $4$ positive images) combined with Stage-3 replay can extinguish lexical sensitivity to rare findings (dropping detection from $40\%$ in Stages 1--2 at original resolution to $0\%$ in Stage 3) without triggering the validation selection rule ($U_3 \ge U_2 - 0.02$) when the validation set lacks positive coverage ($0$ validation positives) for that pathology; (2) our clinical cost matrix was fixed prior to experimentation rather than elicited from practicing clinicians for specific workflows; (3) the physician reader study, while blinded and stratified, covers a modest sample ($128$ views, yielding $10$ strictly reader-clean erasures) with two trainee physicians (internal medicine and radiology, $1\text{ year}$ each) and did not evaluate Stable Diffusion erasures; and (4) \texttt{MedScope-4B} exhibits poorer verbalized confidence calibration for selective prediction ($\text{AURC } 0.065$) than frontier models ($0.020\text{--}0.033$), and raw single-turn decision log-odds $s(V)$ cannot be used directly as a zero-threshold confidence score across cases because positive replies include bounding-box coordinate tokens that make them $\sim 11\text{ nats}$ less likely than short absent replies on every image ($63\%$ agreement with generated answers vs.\ the pre-registered $80\%$ validity requirement; while decoupling the binary answer token via first-token answer probabilities in Stage B of the screening funnel or training linear probes on frozen hidden states avoids this length penalty, neither raised held-out ESG in our screens).
+%%%%%%%%% DISCUSSION %%%%%%%%%
+
+\section{Conclusion}
+\label{sec:conclusion}
+%%%%%%%%% CONCLUSION %%%%%%%%%
+We have presented the Counterfactual Evidence Framework to measure and attribute whether medical vision--language models answer closed clinical questions from visible pixel evidence or from question priors. By uniting shape- and tool-matched random-site and same-site ring controls, symmetric natural negatives, held-out inpainting tools, threshold-free discrimination metrics, a data-processing abstention ceiling, blinded physician verification, and hidden-state linear probes, our study establishes three principal conclusions. First, nine frontier VLMs claim $41.1\%$ to $61.6\%$ of erased findings across diverse prompting regimes---including $45\%$ in reader-validated colonoscopy---whereas training a 4B reference agent (\texttt{MedScope-4B}) on automatically constructed counterfactual trajectories reduces erased claims to $9.6\%$ and raises ESG to $0.758$. Second, across twelve pre-registered post-training and multi-agent interventions and $270$ decision policies, apparent improvements over counterfactual SFT stem from shifting the answer or abstention threshold rather than improving visual discrimination, and representation probes find no read-out gap, pointing to perception as the remaining limit. Third, our physician reader study and external pneumothorax failure audit demonstrate that rigorous counterfactual evaluation requires verifying automated erasures for residual clinical signs and ensuring positive validation coverage across all target pathologies.
+
+\section*{Reproducibility Statement}
+All pre-registration documents (including the 1 November 2026 Stage-3 selection rule, the 8 November 2026 preprint v1.0 arXiv:2611.13006 baseline \citep{gurram2026medscope}, and the pre-registered protocols for Checks C1--C4, Stage 0 ring controls, Stage 1 tool-family training, the 270-policy screening funnel, and post-preprint pilots), source code, automated quality-control scripts, physician reader study interfaces, and exact stored per-view outputs across all open-weight checkpoints and public frontier API runs (evaluated 31 October 2026 under provider default settings) are publicly available at \url{https://github.com/bhaskargurram-ai/medscope}. Complete per-modality, per-seed, and per-arm numeric tables are provided in the Appendix.
+%%%%%%%%% CONCLUSION %%%%%%%%%
+
+\bibliography{\jobname}
+\bibliographystyle{iclr2025_conference}
+
+%%%%%%%%% Appendix %%%%%%%%%
+\newpage
+\appendix
+
+\section{Pre-Registration Protocol, Cost Matrices, and Screening Funnel Details}
+\label{app:prereg_and_funnel}
+
+\subsection{Pre-Registration Timeline and Decision Rules}
+All confirmatory experiments in this study followed pre-registered protocols committed to the public repository (\url{https://github.com/bhaskargurram-ai/medscope}) before the corresponding models or test outputs were generated:
+\begin{enumerate}[leftmargin=*,nosep]
+    \item \textbf{Reference Agent Selection Rule (Committed 1 November 2026):} Prior to generating v4 data or training \texttt{MedScope-4B}, Stage 3 (general-VQA replay) was pre-specified to be selected over Stage 2 (rejection-sampling fine-tuning) if and only if validation net utility satisfied $U_3 \ge U_2 - 0.02$ and validation healthy-image claims satisfied $H_3 \le H_2 + 0.02$ across the $540$ validation cases ($1,473$ views). Observed validation values were $(U_1, H_1) = (0.585, 13.6\%)$, $(U_2, H_2) = (0.610, 12.7\%)$, and $(U_3, H_3) = (0.613, 7.7\%)$. Stage 3 met both criteria and was evaluated once on every test cohort without subsequent modification.
+    \item \textbf{Confirmatory Checks C1--C4:} Pre-registered to test matched vs.\ unmatched control edit geometry/tool (C1), the Stage-1 counterfactual recipe against non-counterfactual SFT followed by removal-based DPO across three seeds (C2), adding removal-based DPO on top of the Stage-1 recipe (C3), and Control-Matched Counterfactual Consistency (CMCC) against a matched-compute replay-only control across three seed pairs (C4), with main-test healthy-image claims and fresh-external erased-lesion claims serving as pre-specified safety guards.
+    \item \textbf{Post-Preprint Extensions (arXiv:2611.13006 v1.0, 8 November 2026):} Following v1.0 of the preprint \citep{gurram2026medscope}, we pre-registered the Stage-0 site-matched ring control shortcut rule (flagging a site-specific shortcut if the recipe's ring denial is $\ge 0.10$, $\ge 0.05$ above its far-control denial, and $\ge 0.05$ above the base model's ring denial), the $0.05$ read-out gap threshold on linear hidden-state probes, the $\le 10\%$ residual finding criterion and $>20\%$ reader-clean frontier claim bound for the blinded physician reader study, the Stage-1 tool-family training pass rule ($\Delta\text{TELEA ESG} \ge +0.03$, $\Delta\text{TELEA control denial} \le -0.03$, $\Delta\text{LaMa ESG} \ge -0.02$, $\Delta\text{found unedited} \ge -0.03$, and $\Delta\text{lesion-free claims} \le +0.03$), and the split-validation pass rule for the $270$ decision policies.
+\end{enumerate}
+
+\subsection{Alternative Clinical Cost Matrices and Abstention Ceiling Details}
+To ensure that \texttt{MedScope-4B}'s Net Utility advantage over frontier and open-weight baselines is not an artifact of the specific reward weights in Table~\ref{tab:cost_matrix}, we re-scored all models under five cost matrices: the published one with the wrong-answer penalty at $-2$, $-1$ and $-0.5$, and two referral variants (referral on lesion-free images paid $0$; referral paid $-0.3$ on every view). \texttt{MedScope-4B} ranked first among all compared models under all five. The trivial always-refer policy scores $+0.110$ under the published matrix, $-0.118$ when referral on lesion-free images pays $0$, and $-0.300$ when referral pays $-0.3$ everywhere.
+
+Under Proposition~1 (Section~\ref{subsec:method_metrics}), any post-hoc decision rule $\pi(S)$ mapping signal vector $S$ to discrete actions satisfies $\text{ESG}(\pi) \le \text{TV}(P(S \mid E), P(S \mid C_{\text{far}}))$. In our 270-policy screening funnel on the validation set (split into equal halves A and B), a policy passed only if it achieved $\Delta\text{Net Utility} \ge +0.03$, $\Delta\text{ESG} \ge +0.02$, $\Delta\text{CCR} \ge -0.03$, and $\Delta\text{lesion-free claims} \le +0.03$ on Half A and confirmed on Half B:
+\begin{itemize}[leftmargin=*,nosep]
+    \item \textbf{Stage A (128 policies on stored outputs):} Combined the stored outputs of the Stage-1 recipe, the question-blind reader, the dedicated lesion segmenter, and the erase-and-re-ask verifier using threshold rules, regularized logistic regression, gradient-boosted decision trees, and confidence referral bands. While $19/128$ policies passed on Half A, $0/19$ confirmed on Half B (best Half-B utility rose from $0.539$ to $0.706$ by cutting erased claims from $11.2\%$ to $3.9\%$ at the cost of CCR dropping from $0.773$ to $0.727$, with $\Delta\text{ESG} \le +0.026$).
+    \item \textbf{Stage B (142 policies on new test-time evidence):} Incorporated three test-time altered image copies (horizontal mirror, center crop, contrast adjustment), a high-resolution close-up of the claimed region paired with an equal-area control close-up, a cautious prompt re-ask, first-token answer probabilities, a secondary VLM (\texttt{Qwen2.5-VL-7B}), and the lesion segmenter score. Exactly $0/142$ policies passed even on Half A: on unseen TELEA views, combiners raised net utility from $0.444$ up to $0.686$ via increased referral/abstention, while ESG remained between $0.55$ and $0.61$ compared to $0.600$ for the unmodified recipe.
+\end{itemize}
+
+\section{Complete Per-Arm Numeric Tables, Log-Odds Analysis, and Reader Study Protocol}
+\label{app:detailed_tables}
+
+\subsection{Stage-1 Ablations, Held-Out Tools, Negative Map, Ring Controls, Reader Study, and External Generalization}
+Tables~\ref{tab:ablations_and_factorial} through \ref{tab:generalization_and_pneumo} provide the complete numeric results for the Stage-1 training ablations, the $2\times 2$ factorial decomposition, the held-out inpainting tools evaluation, the pre-registered negative map summary, the Stage-0 same-site ring controls and hidden-state linear probes, the blinded physician reader study, and the external generalization and SIIM pneumothorax breakdown discussed in Section~\ref{sec:experiments}.
+
+\begin{table}[h]
+\caption{Stage-1 counterfactual training ablations ($507$ main-test cases; 3-seed arms reported as $\text{mean} \pm \text{sd}$) and the $2\times 2$ factorial ablation of training-only components (Stage 1, seed 0) evaluating false denial of intact lesions when unseen TELEA edits occur elsewhere on the image ($125$ cases).}
+\label{tab:ablations_and_factorial}
+\begin{center}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+\textbf{A. Stage-1 Training Arm (Main Test, $n=507$)} & \textbf{CCR} $\uparrow$ & \textbf{ESG} $\uparrow$ & \textbf{Erased \%} $\downarrow$ & \textbf{Healthy \%} $\downarrow$ & \textbf{Net Utility} $\uparrow$ \\
+\midrule
+Qwen3.5-4B, with counterfactual views (3 seeds) & $0.871 \pm 0.022$ & $0.741 \pm 0.019$ & $13.2 \pm 3.2$ & $13.9 \pm 4.0$ & $0.684 \pm 0.021$ \\
+Qwen3.5-4B, without CF views (3 seeds) & $0.955 \pm 0.008$ & $0.279 \pm 0.107$ & $67.6 \pm 11.9$ & $35.9 \pm 3.9$ & $0.341 \pm 0.090$ \\
+Without CF, ``absent'' share matched (seed 0) & $0.945$ & $0.215$ & $73.5$ & $31.6$ & $0.321$ \\
+Erasures only (seed 0) & $0.788$ & $0.708$ & $6.8$ & $5.9$ & $0.667$ \\
+Control edits only, matched (seed 0) & $0.897$ & $0.744$ & $15.1$ & $11.8$ & $0.727$ \\
+Control edits only, unmatched (seed 0) & $0.904$ & $0.753$ & $15.1$ & $12.5$ & $0.739$ \\
+Without CF, then removal-based DPO (3 seeds) & $0.903 \pm 0.014$ & $0.661 \pm 0.037$ & $24.2 \pm 5.3$ & $19.4 \pm 4.3$ & $0.637 \pm 0.033$ \\
+\midrule
+MedGemma 1.5 4B, with CF views & $0.806$ & $0.721$ & $7.8$ & $5.9$ & $0.698$ \\
+MedGemma 1.5 4B, without CF views & $0.947$ & $0.374$ & $57.5$ & $31.6$ & $0.409$ \\
+MedGemma 1.5 4B, untrained & $0.674$ & $0.283$ & $54.3$ & $24.0$ & $-0.255$ \\
+\bottomrule
+\end{tabular}%
+}
+
+\vspace{0.2cm}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{cc|cccc|c}
+\toprule
+\multicolumn{2}{c|}{\textbf{B. $2\times 2$ Factorial (Seed 0)}} & \multicolumn{4}{c|}{\textbf{Main Test ($n=507$)}} & \textbf{Unseen TELEA ($n=125$)} \\
+\textbf{Control Edits} & \textbf{Insertions} & \textbf{CCR} $\uparrow$ & \textbf{ESG} $\uparrow$ & \textbf{Erased \%} $\downarrow$ & \textbf{Healthy \%} $\downarrow$ & \textbf{Denies Intact Lesion \%} $\downarrow$ \\
+\midrule
+no & no (erasures only) & $0.788$ & $0.708$ & $6.8$ & $5.9$ & $43.2$ \\
+no & yes & $0.806$ & $0.735$ & $7.3$ & $11.1$ & $43.2$ \\
+yes & no & $0.897$ & $0.744$ & $15.1$ & $11.8$ & $\mathbf{16.0}$ \\
+yes & yes (full recipe) & $0.847$ & $0.735$ & $11.9$ & $9.4$ & $\mathbf{23.2}$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\caption{Generalization across seen training inpainting tools (LaMa, Tissue Transplant) and unseen held-out tools (TELEA, Stable Diffusion) on $125$ main-test cases (top; reported as $\text{ESG} \;/\; \text{Erased-lesion claims \%}$), and diagnostic breakdown of where the Stage-1 recipe's ESG is lost across $219$ pooled main-test cases (bottom).}
+\label{tab:heldout_tools}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{A. Model ($n=125$ cases)} & \textbf{LaMa (Seen)} & \textbf{Transplant (Seen)} & \textbf{TELEA (Unseen)} & \textbf{Diffusion (Unseen)} \\
+\midrule
+\textbf{MedScope-4B} & \textbf{0.752} / \textbf{7.2} & \textbf{0.720} / \textbf{8.0} & \textbf{0.664} / \textbf{7.2} & \textbf{0.640} / \textbf{17.6} \\
+gemini-4-argon & 0.536 / 32.8 & 0.488 / 32.8 & 0.560 / 8.8 & 0.392 / 40.0 \\
+Claude Opus 5.5 & 0.376 / 45.6 & 0.264 / 56.8 & 0.296 / 41.6 & 0.352 / 46.4 \\
+gpt-6-astra & 0.312 / 55.2 & 0.240 / 64.0 & 0.256 / 60.8 & 0.256 / 61.6 \\
+\midrule
+Stage 1, full recipe & 0.720 / 12.0 & 0.744 / 8.0 & 0.696 / 7.2 & 0.568 / 24.8 \\
+Stage 1, control edits only & 0.712 / 17.6 & 0.736 / 9.6 & 0.768 / 7.2 & 0.704 / 16.0 \\
+Stage 1, insertions only & 0.696 / 6.4 & 0.664 / 4.8 & 0.512 / 5.6 & 0.600 / 11.2 \\
+Stage 1, erasures only & 0.688 / 7.2 & 0.656 / 4.8 & 0.544 / 2.4 & 0.712 / 4.8 \\
+Stage 1, without CF views & 0.272 / 69.6 & 0.200 / 76.8 & 0.144 / 83.2 & 0.232 / 73.6 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+
+\vspace{0.2cm}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+\textbf{B. Tool ($n=219$, Stage-1 Recipe)} & \textbf{Denies $E$} & \textbf{Denies $C_{\text{far}}$} & \textbf{ESG} & \textbf{Denies $C_{\text{far}}$ (Found on $O$)} & \textbf{Erased Claims at Site} \\
+\midrule
+LaMa (training) & 0.881 & 0.146 & 0.735 & 0.027 (5/186) & 9/22 \\
+TELEA (held out) & 0.918 & 0.219 & 0.699 & 0.129 (24/186; 13 breast US) & 11/13 \\
+Stable Diffusion (held out) & 0.743 & 0.152 & 0.592 & 0.043 (7/162) & 41/45 \\
+\bottomrule
+\end{tabular}%
+}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\caption{Summary of pre-registered checks (C1--C4), post-preprint training and multi-agent pilots, Stage-1 tool-family training, and the $270$-policy validation screening funnel. Every intervention shifts the answer/abstention threshold along the sensitivity--specificity trade-off without passing pre-registered criteria for improved held-out discrimination. $^{\ast}$Held-out comparisons against the replay-only control; CCR guards against the Stage-1 recipe.}
+\label{tab:negative_map_summary}
+\begin{center}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llp{6.0cm}l}
+\toprule
+\textbf{Arm / Check} & \textbf{Control Baseline} & \textbf{Key Empirical Result (Held-Out Tools / External)} & \textbf{Verdict} \\
+\midrule
+\textbf{C1}: Matched vs.\ unmatched ctrl & Unmatched ctrl & Main ESG $0.744$ vs.\ $0.753$; Held-out ESG $0.749$ vs.\ $0.761$ (within seed noise; unmatched has bias on SIIM) & Inconclusive \\
+\textbf{C2}: Recipe vs.\ No-CF + DPO & No-CF + DPO (3s) & Fresh-ext ESG $0.381 \pm 0.018$ vs.\ $0.355 \pm 0.015$ (DPO trades lower sensitivity $0.485$ vs.\ $0.587$ for fewer erased claims) & No difference \\
+\textbf{C3}: Recipe + removal DPO & Stage-1 Recipe & Held-out ESG drops $0.649 \to 0.595$; erased claims rise $16.3\% \to 24.4\%$ ($+0.080$ $[0.046, 0.118]$) & \textbf{Fails} \\
+\textbf{C4}: CMCC consistency loss & Replay ctrl (3s) & Pooled held-out ESG $+0.020$ ($p=0.143$); shifts all endpoints to ``present'' (fresh-ext erased $+0.073$, $p<0.001$) & \textbf{Fails} \\
+\midrule
+Adapter capacity (LoRA $r=64$) & Stage-1 Recipe & Main ESG $0.731$ vs.\ $0.735$; calls $25/48$ SIIM pneumothorax but $21/48$ erased \& $12/48$ healthy (SIIM ESG $0.042$) & No go (bias) \\
+Vision Encoder LoRA ($\text{lr } 2\text{e-}4$) & Stage-1 Recipe & $\text{ESG} = 0.000$ on every set; collapses to answering from question text alone & \textbf{Collapse} \\
+Vision Encoder LoRA ($\text{lr } 2\text{e-}5$) & Stage-1 Recipe & Main ESG $0.776$, but fresh-ext CCR drops $0.560 \to 0.488$ ($-0.071$, $p=0.03$); erased $6.8\%$ (more conservative) & No go \\
+GRPO on cost matrix (150 steps) & Replay ctrl & Held-out utility $+0.056$, erased $+0.022$; go signal on erased claims missed; fresh-ext utility $+0.124$, ESG $+0.083$, healthy claims $+0.054$ & Narrowly missed \\
+Multi-Agent Reader v10 & Replay ctrl$^{\ast}$ & Held-out utility $+0.090$ $[+0.004, +0.180]$; external CCR drops $0.769 \to 0.513$, fresh-ext CCR $0.560 \to 0.378$ & No go \\
+Multi-Agent Reader v11 & Replay ctrl$^{\ast}$ & Main utility $0.809$ (uses LaMa verifier), but held-out ESG $-0.002$, erased claims $+0.061$ $[+0.027, +0.096]$ & No go \\
+Tool-family replay (Stage 1) & Replay ctrl & Val TELEA ESG $0.665$ vs.\ $0.648$ ($+0.017$ $[-0.034, 0.067]$); LaMa ESG $-0.022$; TELEA ctrl denial $-0.021$ & \textbf{Fails} (rules 1--3) \\
+Tool-family + CMCC (Stage 1) & Replay ctrl & Val TELEA ESG $0.659$ vs.\ $0.648$ ($+0.011$); lesion-free claims $+0.075$ $[0.013, 0.150]$; ring denial $+0.061$ & \textbf{Fails} (rules 1,2,5) \\
+\midrule
+\textbf{Stage A}: 128 stored-output rules & Validation split A/B & $19/128$ pass Half A, $\mathbf{0/19}$ confirm on Half B (utility $0.539 \to 0.706$ via referral, $\Delta\text{ESG} \le +0.026$) & \textbf{0 confirmed} \\
+\textbf{Stage B}: 142 test-time combiners & Validation split A/B & $\mathbf{0/142}$ pass Half A (TELEA utility $0.444 \to 0.686$ by abstaining; ESG stays $0.55\text{--}0.61$ vs.\ $0.600$ recipe) & \textbf{0 confirmed} \\
+\bottomrule
+\end{tabular}%
+}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\caption{Stage-0 site-matched control evaluation (top; denial rates among validation cases found on the unedited image: $n=143$ Recipe, $n=127$ Base) and $5$-fold cross-validated AUROC of layer-wise logistic regression linear probes on hidden states (bottom; trained on LaMa views across $8$ layers).}
+\label{tab:ring_and_probes}
+\begin{center}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llccccccccccc}
+\toprule
+\textbf{A. Model} & \textbf{Tool} & \textbf{Found $O$} & \textbf{Far} & \textbf{Ring} & \textbf{Rest.} & \textbf{Part.} & \textbf{Erased} & \textbf{Ring$-$Far} & $\textbf{ESG}_{\text{far}}$ & $\textbf{ESG}_{\text{site}}$ & $\textbf{AUC}_{\text{far}}$ & $\textbf{AUC}_{\text{site}}$ \\
+\midrule
+Recipe & LaMa & 0.799 & 0.042 & 0.077 & 0.070 & 0.196 & 0.867 & $+0.035$ & 0.665 & 0.648 & 0.853 & 0.845 \\
+Recipe & TELEA & 0.799 & 0.126 & 0.203 & 0.140 & -- & 0.923 & $+0.077$ & 0.654 & 0.642 & 0.847 & 0.824 \\
+Base & LaMa & 0.709 & 0.023 & 0.047 & -- & -- & -- & $+0.023$ & -- & -- & -- & -- \\
+Base & TELEA & 0.709 & 0.070 & 0.116 & -- & -- & -- & $+0.047$ & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}%
+}
+
+\vspace{0.2cm}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+\textbf{B. Linear Probe Task} & \textbf{Test Tool} & \textbf{Recipe (Last Token)} & \textbf{Recipe (Image Tokens)} & \textbf{Base (Last Token)} & \textbf{Base (Image Tokens)} \\
+\midrule
+Erased ($E$) vs.\ Ring ($C_{\text{ring}}$) & LaMa & 0.898 & 0.901 & 0.829 & 0.870 \\
+Erased ($E$) vs.\ Ring ($C_{\text{ring}}$) & TELEA & 0.816 & 0.852 & 0.808 & 0.831 \\
+Erased ($E$) vs.\ Far ($C_{\text{far}}$) & LaMa & 0.898 & 0.887 & 0.827 & 0.853 \\
+Erased ($E$) vs.\ Far ($C_{\text{far}}$) & TELEA & 0.812 & 0.851 & 0.771 & 0.804 \\
+Ring ($C_{\text{ring}}$) vs.\ Original ($O$) & LaMa & 0.618 & 0.629 & 0.573 & 0.617 \\
+Ring ($C_{\text{ring}}$) vs.\ Original ($O$) & TELEA & 0.802 & 0.761 & 0.633 & 0.707 \\
+\bottomrule
+\end{tabular}%
+}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\caption{Blinded physician reader study across $128$ main-test views ($32$ per view type: $O, E, C_{\text{far}}, N$) evaluated in randomized order by two trainee physicians: R1 (internal medicine, 1 year) and R2 (radiology, 1 year).}
+\label{tab:reader_study}
+\begin{center}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccccc|cccc}
+\toprule
+ & \multicolumn{5}{c|}{\textbf{Image Called ``Edited''}} & \multicolumn{4}{c}{\textbf{Clinical Finding Called ``Yes''}} \\
+\textbf{Reader} & \textbf{Erased} & \textbf{Ctrl} & \textbf{Unmod.} & \textbf{AUC Edit} & \textbf{AUC $E$/$C$} & \textbf{Unmod.\ $O$} & \textbf{Erased $E$} & \textbf{Ctrl $C_{\text{far}}$} & \textbf{Healthy $N$} \\
+\midrule
+R1 (Int.\ Med.) & 12/32 & 3/32 & 11/64 & 0.54 & 0.64 & 29/32 & 19/32 & 31/32 & 16/32 \\
+R2 (Radiology) & 19/32 & 12/32 & 28/64 & 0.55 & 0.61 & 26/32 (3 CT) & 16/32 (8 CT) & 27/32 & 7/32 (9 CT) \\
+\bottomrule
+\end{tabular}%
+}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\caption{Generalization across external centres ($169$ cases), fresh internal ($76$ cases), and fresh external ($316$ cases) cohorts (top), and post-hoc diagnostic breakdown of the SIIM-ACR pneumothorax failure across training stages and image resolutions ($42$ cases recovered at original resolution; bottom).}
+\label{tab:generalization_and_pneumo}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{llccccc}
+\toprule
+\textbf{A. Evaluation Cohort} & \textbf{Model} & \textbf{CCR} $\uparrow$ & \textbf{ESG} $\uparrow$ & \textbf{Erased \%} $\downarrow$ & \textbf{Healthy \%} $\downarrow$ & \textbf{Net Utility} $\uparrow$ \\
+\midrule
+External centres ($169$) & \textbf{MedScope-4B} & 0.727 & \textbf{0.597} & \textbf{11.8} & \textbf{4.0} & 0.530 \\
+ & gemini-4-argon & 0.950 & 0.370 & 58.8 & 18.0 & \textbf{0.544} \\
+ & Claude Opus 5.5 & \textbf{0.966} & 0.412 & 53.8 & 30.0 & \textbf{0.544} \\
+ & gpt-6-astra & 0.945 & 0.277 & 66.4 & 24.0 & 0.424 \\
+\midrule
+Fresh internal ($76$) & \textbf{MedScope-4B} & 0.681 & \textbf{0.472} & \textbf{19.4} & \textbf{12.5} & \textbf{0.402} \\
+ & gemini-4-argon & 0.639 & 0.056 & 61.1 & \textbf{12.5} & 0.048 \\
+ & Claude Opus 5.5 & 0.653 & 0.000 & 63.9 & 25.0 & $-0.023$ \\
+ & gpt-6-astra & \textbf{0.847} & 0.083 & 75.0 & 17.5 & 0.219 \\
+\midrule
+Fresh external ($316$) & \textbf{MedScope-4B} & 0.476 & 0.393 & \textbf{8.3} & \textbf{4.7} & $-0.053$ \\
+ & gemini-4-argon & \textbf{0.741} & \textbf{0.435} & 31.5 & 9.5 & \textbf{0.310} \\
+ & Claude Opus 5.5 & 0.696 & 0.292 & 42.3 & 18.9 & 0.056 \\
+ & gpt-6-astra & 0.634 & 0.268 & 35.7 & 34.5 & $-0.106$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+
+\vspace{0.2cm}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcc}
+\toprule
+\textbf{B. SIIM Pneumothorax Detection ($n=42$)} & \textbf{256-px Copy Called Present} & \textbf{Original Resolution Called Present} \\
+\midrule
+Qwen3.5-4B (base) & 0\% & 12\% \\
+Stage 1 without counterfactual views & 0\% & 5\% \\
+Stage 1 with counterfactual views & 19\% & 40\% \\
+Stage 2 (rejection sampling) & not run & 40\% \\
+\textbf{MedScope-4B (Stage 3 general-VQA replay)} & \textbf{0\%} & \textbf{0\%} \\
+gemini-4-argon & 69\% & 69\% \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+\end{table}
+
+\subsection{Per-Modality and Prompt-Robustness Breakdowns}
+Tables~\ref{tab:modality_breakdown} and \ref{tab:robustness_prompts} provide the complete numeric data corresponding to Figure~\ref{fig:frontier_vs_medscope_main}B and Figure~\ref{fig:readers_robustness}B1.
+
+\begin{table}[h]
+\caption{Main test performance stratified by imaging modality ($507$ total cases), reported as $\text{ESG} \;/\; \text{Erased-lesion claims fraction} \;/\; \text{Net utility}$.}
+\label{tab:modality_breakdown}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Imaging Modality (Cases)} & \textbf{MedScope-4B} & \textbf{gemini-4-argon} & \textbf{Claude Opus 5.5} & \textbf{gpt-6-astra} \\
+\midrule
+Colonoscopy (174) & \textbf{0.95} / \textbf{0.01} / \textbf{1.06} & 0.69 / 0.31 / 0.83 & 0.57 / 0.40 / 0.53 & 0.40 / 0.58 / 0.40 \\
+Brain MRI (78) & \textbf{0.75} / \textbf{0.14} / \textbf{0.75} & 0.42 / 0.47 / 0.56 & 0.31 / 0.61 / 0.51 & 0.50 / 0.31 / 0.43 \\
+Breast ultrasound (57) & \textbf{0.74} / \textbf{0.14} / \textbf{0.78} & 0.40 / 0.48 / 0.53 & 0.29 / 0.62 / 0.40 & 0.12 / 0.83 / 0.28 \\
+Chest X-ray (91) & \textbf{0.51} / \textbf{0.17} / \textbf{0.40} & 0.20 / 0.49 / 0.21 & $-0.05$ / 0.66 / $-0.12$ & 0.15 / 0.66 / 0.14 \\
+SLAKE CT/MRI (107) & \textbf{0.47} / \textbf{0.12} / 0.22 & 0.35 / 0.41 / \textbf{0.38} & 0.24 / 0.59 / 0.32 & 0.29 / 0.47 / 0.17 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\caption{Robustness of the frontier model comparison across six prompting and inference regimes on the same $150$ main-test cases, reported as $\text{ESG} \;/\; \text{Erased-lesion claims \%}$. On these $150$ cases, \texttt{MedScope-4B} under default settings achieves $\mathbf{0.750 \;/\; 7.4\%}$, outperforming every flagship under every condition on ESG ($p \le 0.001$) and net utility ($p \le 0.034$).}
+\label{tab:robustness_prompts}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Model} & \textbf{Default} & \textbf{Cautious} & \textbf{Solved Ex.} & \textbf{High Reason.} & \textbf{High Image} & \textbf{Plain Prompt} \\
+\midrule
+gemini-4-argon & 0.441 / 41.2 & 0.412 / 42.6 & 0.456 / 36.8 & 0.456 / 39.7 & 0.485 / 38.2 & 0.338 / 52.9 \\
+Claude Opus 5.5 & 0.338 / 54.4 & 0.382 / 44.1 & 0.309 / 52.9 & 0.397 / 51.5 & -- & 0.412 / 38.2 \\
+gpt-6-astra & 0.338 / 52.9 & 0.397 / 47.1 & 0.500 / 38.2 & 0.324 / 58.8 & 0.397 / 51.5 & 0.250 / 66.2 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+\end{table}
+
+\subsection{Complete Numeric Tables for Pre-Registered Checks C1--C4 and Tool-Family Training}
+Tables~\ref{tab:app_c1_c3}, \ref{tab:app_c4_cmcc}, and \ref{tab:app_tool_family} report the full numeric results for Checks C1--C3, Check C4 (CMCC) across all three seed pairs, and Stage-1 tool-family counterfactual training.
+
+\begin{table}[h]
+\caption{Complete numeric results for pre-registered checks C1--C3 (Stage 1, seed 0). Denial \% indicates the percentage of intact lesions denied or referred after a control edit. Held-out tools pool TELEA and Stable Diffusion across $219$ cases.}
+\label{tab:app_c1_c3}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{llccccc}
+\toprule
+\textbf{Evaluation Set} & \textbf{Training Arm} & \textbf{CCR} & \textbf{ESG} & \textbf{Erased \%} & \textbf{Denial \%} & \textbf{Net Utility} \\
+\midrule
+Main test ($507$) & Matched control & 0.897 & 0.744 & 15.1 & 10.5 & 0.727 \\
+ & Unmatched control & 0.904 & 0.753 & 15.1 & 9.1 & 0.739 \\
+ & Recipe & 0.847 & 0.735 & 11.9 & 14.6 & 0.692 \\
+ & No CF, then removal-based DPO & 0.900 & 0.658 & 23.7 & 10.0 & 0.602 \\
+ & Recipe, then removal-based DPO (C3) & 0.872 & 0.753 & 11.4 & 13.2 & 0.700 \\
+\midrule
+Held-out tools ($219$) & Matched control & 0.859 & 0.749 & 11.0 & 13.7 & 0.733 \\
+ & Unmatched control & 0.868 & 0.761 & 10.5 & 12.9 & 0.772 \\
+ & Recipe & 0.810 & 0.649 & 16.3 & 18.8 & 0.566 \\
+ & No CF, then removal-based DPO & 0.895 & 0.666 & 23.4 & 10.0 & 0.644 \\
+ & Recipe, then removal-based DPO (C3) & 0.837 & 0.595 & 24.4 & 16.1 & 0.502 \\
+\midrule
+Fresh external ($316$) & Matched control & 0.488 & 0.405 & 8.3 & 51.2 & $-0.083$ \\
+ & Unmatched control & 0.670 & 0.411 & 27.4 & 31.5 & 0.165 \\
+ & Recipe & 0.560 & 0.381 & 16.7 & 45.2 & 0.061 \\
+ & No CF, then removal-based DPO & 0.461 & 0.369 & 8.9 & 54.2 & $-0.087$ \\
+ & Recipe, then removal-based DPO (C3) & 0.542 & 0.381 & 15.5 & 46.4 & 0.057 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\caption{Complete numeric results for pre-registered check C4: Control-Matched Counterfactual Consistency (CMCC) vs.\ matched-compute replay-only control on pooled held-out tools ($219$ cases) across three seed pairs, plus main-test and fresh-external guard endpoints.}
+\label{tab:app_c4_cmcc}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{llcccc}
+\toprule
+\textbf{Seed / Cohort} & \textbf{Endpoint} & \textbf{CMCC} & \textbf{Control} & \textbf{Difference [95\% CI]} & \textbf{$p$-value} \\
+\midrule
+Seed 0 (Held-out) & Erased-lesion claims & 0.122 & 0.151 & $-0.029$ $[-0.062, +0.002]$ & 0.085 \\
+Seed 1 (Held-out) & Erased-lesion claims & 0.137 & 0.078 & $+0.059$ $[+0.031, +0.089]$ & $<0.001$ \\
+Seed 2 (Held-out) & Erased-lesion claims & 0.120 & 0.115 & $+0.005$ $[-0.029, +0.040]$ & 0.818 \\
+\midrule
+Pooled (Held-out) & Erased-lesion claims & 0.126 & 0.115 & $+0.011$ $[-0.009, +0.030]$ & 0.265 \\
+Pooled (Held-out) & ESG & 0.729 & 0.709 & $+0.020$ $[-0.006, +0.047]$ & 0.143 \\
+Pooled (Held-out) & Control-edit denial & 0.143 & 0.176 & $-0.033$ $[-0.054, -0.012]$ & 0.001 \\
+Pooled (Held-out) & CCR & 0.854 & 0.824 & $+0.030$ $[+0.010, +0.051]$ & 0.004 \\
+Pooled (Held-out) & Net utility & 0.712 & 0.661 & $+0.051$ $[+0.002, +0.100]$ & 0.042 \\
+\midrule
+Guard (Main test) & Healthy-image claims & 0.131 & 0.079 & $+0.052$ $[+0.032, +0.075]$ & $<0.001$ \\
+Guard (Fresh ext.) & Erased-lesion claims & 0.141 & 0.067 & $+0.073$ $[+0.045, +0.106]$ & $<0.001$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\caption{Framework Stage-1 tool-family counterfactual training on validation data (one seed; continuing the Stage-1 recipe on the replay-only control's exact $2,739$ training cases using $\{\text{LaMa}, \text{blur fill}, \text{mean fill with noise}, \text{shuffled pixels}\}$ with far or ring controls). Differences are $\text{arm} - \text{control}$ paired by case with $95\%$ bootstrap CIs. The control ring-denial baseline differs slightly between arms ($0.191$ vs.\ $0.153$) because each comparison restricts to cases found unedited by both models in the pair.}
+\label{tab:app_tool_family}
+\begin{center}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccc}
+\toprule
+\textbf{Validation Quantity} & \textbf{Tool-Family Replay} & \textbf{Tool-Family + CMCC} & \textbf{Replay Control} \\
+\midrule
+Unedited lesions found & $0.821$ ($+0.028$ $[0.000, 0.056]$) & $0.765$ ($-0.028$ $[-0.073, 0.017]$) & $0.793$ \\
+Lesion-free images claimed & $0.025$ ($+0.013$) & $0.087$ ($+0.075$ $[0.013, 0.150]$) & $0.013$ \\
+ESG, LaMa (seen) & $0.637$ ($-0.022$ $[-0.073, 0.028]$) & $0.654$ ($-0.006$) & $0.659$ \\
+ESG, TELEA (held out) & $0.665$ ($+0.017$ $[-0.034, 0.067]$) & $0.659$ ($+0.011$ $[-0.056, 0.084]$) & $0.648$ \\
+Erasure denied, LaMa & $0.821$ ($-0.050$ $[-0.095, -0.006]$) & $0.899$ ($+0.028$) & $0.872$ \\
+Erasure denied, TELEA & $0.899$ ($-0.011$) & $0.950$ ($+0.039$ $[0.000, 0.078]$) & $0.911$ \\
+Control edit denied (found), TELEA & $0.078$ ($-0.021$ $[-0.057, 0.007]$) & $0.107$ ($+0.008$) & $0.099$ \\
+Ring edit denied (found), TELEA & $0.163$ ($-0.028$ $[-0.064, 0.000]$) & $0.214$ ($+0.061$ $[0.023, 0.107]$) & $0.191 \;/\; 0.153$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{center}
+\end{table}
+
+\subsection{Within-Case Decision Log-Odds Analysis and Reader Study Modality Breakdown}
+\textbf{Within-case decision log-odds shifts.} Table~\ref{tab:app_log_odds} reports the descriptive within-case changes of the single-turn decision log-odds $\Delta s(V) = s(V) - s(O)$ (in nats, evaluated on the exact same reply tokens within each case) from Stage 0 of the framework. Note that an earlier pre-registered attempt to use the raw sign of $s(V)$ directly as a zero-threshold classifier failed its validity check ($63\%$ agreement with the agent's generated answers vs.\ the required $80\%$ rule) because the positive (\emph{``present''}) reply includes bounding-box coordinate tokens and is consequently $\sim 11\text{ nats}$ less likely than the short \emph{``absent''} reply on every image. Differencing within each case ($\Delta s(V) = s(V) - s(O)$) cancels this constant token-length penalty: as shown in Table~\ref{tab:app_log_odds}, the Stage-1 recipe reduces log-odds by $-14.10\text{ nats}$ on LaMa erasures vs.\ $-0.09$ on far controls and $-0.43$ on same-site ring controls (and $+0.87$ when lesion pixels are restored), whereas the erasures-only model suffers large negative shifts on unseen TELEA controls ($-4.77$ far, $-3.94$ ring).
+
+\begin{table}[h]
+\caption{Within-case single-turn decision log-odds changes $\Delta s(V) = s(V) - s(O)$ (in nats, using identical reply text within each case).}
+\label{tab:app_log_odds}
+\begin{center}
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{llccccc}
+\toprule
+\textbf{Model Arm} & \textbf{Inpainting Tool} & \textbf{Erasure ($E$)} & \textbf{Far ($C_{\text{far}}$)} & \textbf{Ring ($C_{\text{ring}}$)} & \textbf{Restored ($R$)} & \textbf{Partial ($P$)} \\
+\midrule
+Recipe (Stage 1) & LaMa & $-14.10$ & $-0.09$ & $-0.43$ & $+0.87$ & $-4.05$ \\
+Recipe (Stage 1) & TELEA & $-10.76$ & $-2.41$ & $-1.53$ & $+1.34$ & -- \\
+Base (untrained) & LaMa & $-3.58$ & $-0.07$ & $+0.17$ & $+0.69$ & $-0.41$ \\
+Without CF (Stage 1) & TELEA & $-10.34$ & $-1.37$ & $-0.94$ & $+1.25$ & -- \\
+Erasures only (Stage 1) & TELEA & $-11.88$ & $-4.77$ & $-3.94$ & $-0.62$ & -- \\
+CMCC continuation & TELEA & $-6.08$ & $-0.31$ & $-0.12$ & $+0.57$ & -- \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{center}
+\end{table}
+
+\textbf{Reader study protocol and modality breakdown.} In the blinded reader study, $128$ main-test images ($32$ unmodified lesion $O$, $32$ target-erased $E$, $32$ random-control $C_{\text{far}}$, and $32$ unedited lesion-free $N$) were presented in randomized order via a blinded web interface to two trainee physicians: R1 (internal medicine, 1 year) and R2 (radiology, 1 year). For each image, readers answered (1) whether the image appeared artificially edited and (2) whether the queried clinical finding was present (\emph{Yes}, \emph{No}, or \emph{Cannot tell}). Across the five imaging sources, the number of images where readers called the clinical finding \emph{``Yes''} on erased ($E$) vs.\ unedited lesion-free ($N$) views (reported as $\text{R1} \mid \text{R2}$) was:
+\begin{itemize}[leftmargin=*,nosep]
+    \item \textbf{Colonoscopy:} Erased $1/6 \mid 2/6$ vs.\ Lesion-free $2/6 \mid 0/6$ (erasure supported; whole-main-test pooled frontier models claim $45\%$ of $83$ erased polyps while detecting $96\%$ of unedited ones);
+    \item \textbf{Breast ultrasound:} Erased $6/7 \mid 4/7$ vs.\ Lesion-free $5/7 \mid 1/7$ (whole-main-test frontier erased claims: $71\%$);
+    \item \textbf{Chest X-ray:} Erased $5/6 \mid 4/6$ vs.\ Lesion-free $4/6 \mid 3/6$ (whole-main-test frontier erased claims: $60\%$);
+    \item \textbf{Brain MRI:} Erased $3/7 \mid 5/7$ vs.\ Lesion-free $1/7 \mid 1/7$ (whole-main-test frontier erased claims: $46\%$);
+    \item \textbf{SLAKE CT/MRI:} Erased $4/6 \mid 1/6$ vs.\ Lesion-free $4/6 \mid 2/6$ (whole-main-test frontier erased claims: $49\%$).
+\end{itemize}
+%%%%%%%%% Appendix %%%%%%%%%
+
+\end{document}
