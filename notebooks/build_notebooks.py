@@ -4253,28 +4253,36 @@ except Exception as e:
 def version(n):
     m = re.search(r'gemini-(\d+(?:\.\d+)?)', n)
     return float(m.group(1)) if m else 0.0
-def works(model):
+from google.genai import types
+SEARCH = types.GenerateContentConfig(tools=[types.Tool(google_search=types.GoogleSearch())])
+def works(model, search=False):
+    # the writer must also accept Google Search grounding (PaperOrchestra's literature agent uses it)
     try:
-        client.models.generate_content(model=model, contents='Reply with the single word OK.')
+        client.models.generate_content(model=model, contents='Reply with the single word OK.',
+                                       config=SEARCH if search else None)
         return True
     except Exception as e:
         print(f'  {model}: not usable ({str(e)[:90]})')
         return False
-def first_working(candidates):
+def first_working(candidates, search=False):
     seen = []
     for c in candidates:
         if c not in seen:
             seen.append(c)
-            if works(c):
+            if works(c, search):
                 return c
     return None
-WRITER = first_working(['gemini-3.1-pro-preview', 'gemini-3-pro-preview']
-                       + sorted([n for n in listed if 'pro' in n and 'image' not in n and 'tts' not in n
-                                 and version(n) >= 3], key=version, reverse=True))
-IMAGE = first_working(['gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview']
-                      + sorted([n for n in listed if 'image' in n and version(n) >= 2.5], key=version, reverse=True))
+# current model names from https://ai.google.dev/gemini-api/docs/models (checked 15 Nov 2026):
+# gemini-4-argon is the stable flagship; gemini-3-pro-preview is shut down; preview models usually need billing;
+# stable image models: gemini-3-pro-image (Nano Banana Pro), gemini-nano-banana-2.1, gemini-3.1-flash-image
+WRITER = first_working(['gemini-4-argon', 'gemini-3.1-pro-preview']
+                       + sorted([n for n in listed if ('pro' in n or 'argon' in n) and 'image' not in n
+                                 and 'tts' not in n and version(n) >= 3], key=version, reverse=True), search=True)
+IMAGE = first_working(['gemini-3-pro-image', 'gemini-nano-banana-2.1', 'gemini-3.1-flash-image']
+                      + sorted([n for n in listed if ('image' in n or 'banana' in n) and version(n) >= 2.5],
+                               key=version, reverse=True))
 print('writer / reflection / plotting model:', WRITER, '| image model:', IMAGE)
-assert WRITER, 'no Gemini 3 "pro" model answered with this key; paste the lines above into the chat'
+assert WRITER, 'no writing model (with Google Search) answered with this key; paste the lines above into the chat'
 USE_PLOTTING = IMAGE is not None
 if not USE_PLOTTING:
     print('no image model available: figures will not be generated (the paper will have tables only)')
