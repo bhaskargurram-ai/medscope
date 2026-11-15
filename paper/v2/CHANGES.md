@@ -25,3 +25,12 @@ All 26 items of `paper/orchestra/review_run_20261115.md` are applied.
 - No references to the input log; "texture classifier" for filtering; p <= 0.001; fresh external 150 lesion-free built;
   "stored per-view transcripts"; multi-agent controls = replay-only; "CMCC continuation"; kappa 0.10 = slight; SLAKE CT/MRI.
 - Tables wrapped to fit the text width.
+
+# Changes after the external review of 15 Nov 2026 (docs/reviews/EXTERNAL_REVIEW_RESPONSE.md)
+- Related work: CORAL, PriVE-Bench, Med-CAP and MedCausalX, and how a whole-image swap differs from a matched erasure.
+- New paragraph "Data leakage and patient-level splits" (Section 4.1): split units per source, the sources without
+  patient ids, the cross-set audit, patient/group counts and the patient-level bootstrap.
+- Pneumothorax: the exploratory v4.1 remedy (150 + 150 SIIM training patients; 27% found; failed the selection rule).
+- Perception claim narrowed to this frozen, general-domain encoder (contribution 3, discussion, conclusion).
+- Limitation 5: demographics and acquisition details not compiled.
+- Appendix B: CLAIM 2024 checklist table.
