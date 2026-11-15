@@ -76,7 +76,10 @@ def embed(paths: list[str], model_id: str, batch: int) -> np.ndarray:
         for i in range(0, len(paths), batch):
             imgs = [Image.open(p).convert("RGB") for p in paths[i:i + batch]]
             x = proc(images=imgs, return_tensors="pt").to(dev)
-            out.append(model.get_image_features(**x).float().cpu().numpy())
+            # vision tower + projection directly: get_image_features returns a tensor in older transformers and an
+            # output object in newer ones, so it is not used
+            vo = model.vision_model(pixel_values=x["pixel_values"])
+            out.append(model.visual_projection(vo.pooler_output).float().cpu().numpy())
             if i % (batch * 20) == 0:
                 print(f"  {i}/{len(paths)} images", flush=True)
     return np.concatenate(out)
