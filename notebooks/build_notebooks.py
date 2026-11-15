@@ -4236,7 +4236,13 @@ for n, v in keys.items():
 
 # pick the writing and image models this key can use (PaperOrchestra's defaults first)
 from google import genai
-names = [m.name.split('/')[-1] for m in genai.Client(api_key=keys['GEMINI_API_KEY']).models.list()]
+client = genai.Client(api_key=keys['GEMINI_API_KEY'])     # keep a reference: the listing is read lazily
+try:
+    names = [m.name.split('/')[-1] for m in client.models.list()]
+except Exception as e:                                       # listing failed: use PaperOrchestra's defaults
+    print('could not list models (' + type(e).__name__ + '); using the defaults')
+    names = ['gemini-3.1-pro-preview', 'gemini-3-pro-image-preview']
+print(len(names), 'models available to this key')
 def pick(preferred, must):
     for p in preferred:
         if p in names:
