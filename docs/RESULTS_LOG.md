@@ -1305,3 +1305,19 @@ shuffled pixels (TELEA and diffusion held out), the control far or in a ring aro
 control's exact 2,739 cases, order and settings (`v4q_tfr_s0` replay only, `v4q_tfc_s0` with the paired-view terms)
 against the replay-only control `v4q_sftc_s0` (trainer cmcc-v3, 1,117 lesion-free images). Screen on validation
 answers; rule: TELEA ESG +0.03, TELEA control denial -0.03, guards on LaMa ESG, lesions found and lesion-free claims.
+
+## 2026-11-14 — framework stage 1 screen (notebook 45): neither arm passes; the tool-family line ends
+
+Validation dev set, generated answers, against the replay-only control `v4q_sftc_s0` (paired by case, bootstrap 95%):
+- **Tool-family replay (`v4q_tfr_s0`)**: TELEA ESG +0.017 [-0.034, 0.067]; TELEA control denial (found) -0.021
+  [-0.057, 0.007]; LaMa ESG -0.022 (guard -0.02 missed); erasures denied less (LaMa 82% vs 87%): a shift towards
+  "present" everywhere, not better separation. **Fails** (1, 2, 3).
+- **Tool-family CMCC (`v4q_tfc_s0`)**: TELEA ESG +0.011 [-0.056, 0.084]; TELEA control denial +0.008; erasures
+  denied more (TELEA 95% vs 91%) but ring edits denied more too (TELEA 21.4% vs 15.3%) and lesion-free images claimed
+  more (8.7% vs 1.3%, guard). **Fails** (1, 2, 5).
+- Reference: the recipe against the same control: ESG differences +0.006 on both tools; lesion-free claims 12.5% vs
+  1.3%.
+By the rule in docs/FRAMEWORK_STAGE1.md this line ends and is reported as a negative result. With stage 0 (the
+model's hidden features separate erased from intact images no better than its answers, and the untrained base model's
+features almost as well), this is the eleventh training or inference method whose effect on the held-out tools is a
+change of threshold rather than of separation.
