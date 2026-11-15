@@ -4188,6 +4188,108 @@ runtime.unassign()
     ]
 
 
+def nb46_paper_orchestra() -> list[dict]:
+    """Notebook 46: draft the manuscript with PaperOrchestra (google-research/paper-orchestra) from the study's materials."""
+    return [md("""
+# MedScope 46: draft the full manuscript with PaperOrchestra
+
+PaperOrchestra (Google Research) is a team of writing agents: outline, literature search (Google Search grounding
+plus Semantic Scholar checks), section writing, refinement and figure/diagram generation, ending in a compiled LaTeX
+paper. It writes the paper from two files we give it: `paper/orchestra/raw_materials/idea_sparse.md` (the research
+idea and framework) and `experimental_log.md` (every result, with its caveats), plus a preprint template with your
+name (`paper/orchestra/template`). Nothing in this notebook writes paper text itself.
+
+**Needs:** a CPU runtime is enough (no GPU). Colab secrets: `GEMINI_API_KEY` (required: the agents and the figure
+generator run on Gemini); optional `SEMANTIC_SCHOLAR_API_KEY` (faster, fewer failed citation checks) and
+`OPENAI_API_KEY`. About 30-90 minutes, depending on the API. Output: `MyDrive/medscope/manuscript/<run>/`
+(final_paper.pdf, the LaTeX folder with figures and references.bib, and a zip of it). Run all; nothing to set.
+""" + SECRETS_NOTE),
+        code(SETUP),
+        code(r"""
+# PaperOrchestra itself, LaTeX for compiling, and its Python packages
+import os, subprocess, shutil, time
+PO = '/content/paper-orchestra'
+if not os.path.exists(PO):
+    subprocess.run(['git', 'clone', '-q', '--depth', '1', 'https://github.com/google-research/paper-orchestra', PO], check=True)
+print('PaperOrchestra:', subprocess.run(['git', '-C', PO, 'log', '--oneline', '-1'], capture_output=True, text=True).stdout.strip())
+if shutil.which('pdflatex') is None:
+    print('installing LaTeX (about 3-5 minutes) ...')
+    subprocess.run('apt-get -qq update && apt-get -qq install -y texlive-latex-base texlive-latex-recommended '
+                   'texlive-latex-extra texlive-fonts-recommended texlive-science texlive-bibtex-extra cm-super > /dev/null',
+                   shell=True, check=True)
+print('pdflatex:', shutil.which('pdflatex'), '| bibtex:', shutil.which('bibtex'))
+reqs = [r.strip() for r in open(f'{PO}/requirements.txt') if r.strip() and r.strip() != 'streamlit']
+subprocess.run(['pip', 'install', '-q', '-U', *reqs], check=True)
+print('python packages installed')
+"""),
+        code(r"""
+# API keys from Colab secrets into PaperOrchestra's .env (never printed, never written to Drive)
+keys = {n: (secret(n) or '').strip() for n in ('GEMINI_API_KEY', 'SEMANTIC_SCHOLAR_API_KEY', 'OPENAI_API_KEY')}
+if not keys['GEMINI_API_KEY']:
+    raise SystemExit('Add the Colab secret GEMINI_API_KEY (Secrets panel, key icon) and run all again.')
+with open(f'{PO}/.env', 'w') as f:
+    for n, v in keys.items():
+        f.write(f'{n}={v}\n')
+for n, v in keys.items():
+    os.environ[n] = v
+    print(f'{n}:', 'set' if v else 'not set (optional)' if n != 'GEMINI_API_KEY' else 'MISSING')
+
+# pick the writing and image models this key can use (PaperOrchestra's defaults first)
+from google import genai
+names = [m.name.split('/')[-1] for m in genai.Client(api_key=keys['GEMINI_API_KEY']).models.list()]
+def pick(preferred, must):
+    for p in preferred:
+        if p in names:
+            return p
+    c = sorted([n for n in names if all(m in n for m in must)], reverse=True)
+    return c[0] if c else None
+WRITER = pick(['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-2.5-pro'], ['gemini', 'pro'])
+IMAGE = pick(['gemini-3-pro-image-preview', 'gemini-2.5-flash-image'], ['image'])
+print('writer / reflection / plotting model:', WRITER, '| image model:', IMAGE)
+assert WRITER, 'no Gemini "pro" model is available to this key: ' + ', '.join(names[:30])
+USE_PLOTTING = IMAGE is not None
+if not USE_PLOTTING:
+    print('no image model available: figures will not be generated (the paper will have tables only)')
+"""),
+        code(r"""
+# the study's materials and the preprint template, from the repository
+MAT = '/content/medscope/paper/orchestra/raw_materials'
+TPL = '/content/medscope/paper/orchestra/template'
+for f in ('idea_sparse.md', 'experimental_log.md'):
+    print(f, sum(1 for _ in open(f'{MAT}/{f}')), 'lines')
+RUN = time.strftime('run_%Y%m%d_%H%M')
+OUT = f'/content/po_out/{RUN}'
+DEST = f'{DRIVE}/manuscript/{RUN}'
+os.makedirs(OUT, exist_ok=True)
+print('working folder:', OUT, '| will be copied to:', DEST)
+"""),
+        md("## Run PaperOrchestra (the long part; progress is printed as it goes)"),
+        code(r"""
+cmd = (f'cd {PO} && python paper_writing_cli.py --raw_materials_dir {MAT} --latex_template_dir {TPL} '
+       f'--output_dir {OUT} --use_plotting {str(USE_PLOTTING).lower()} --writer_model_name {WRITER} '
+       f'--reflection_model_name {WRITER} --plotting_model_name {WRITER} '
+       + (f'--image_model_name {IMAGE} ' if IMAGE else '') + '--research_cutoff 2026-11')
+t0 = time.time()
+try:
+    sh(cmd)
+finally:
+    # copy whatever exists to Drive, even if a step failed
+    os.makedirs(DEST, exist_ok=True)
+    subprocess.run(['cp', '-r', f'{OUT}/.', DEST])
+    print(f'copied to {DEST} after {(time.time() - t0) / 60:.0f} min')
+"""),
+        code(r"""
+pdf = f'{DEST}/final_paper.pdf'
+print('PDF:', pdf if os.path.exists(pdf) else 'not produced (see the log above)')
+if os.path.exists(f'{DEST}/latex_writeup'):
+    shutil.make_archive(f'{DEST}/latex_writeup', 'zip', f'{DEST}/latex_writeup')
+    print('LaTeX source zip:', f'{DEST}/latex_writeup.zip')
+for f in sorted(os.listdir(DEST)):
+    print(' ', f)
+"""),
+    ]
+
+
 def nb43_reader_verified() -> list[dict]:
     """Notebook 43: the reader-verified analysis (docs/READER_VERIFIED.md), CPU only."""
     return [md("""
@@ -4338,6 +4440,7 @@ NOTEBOOKS = {
     "44b_framework_stage0_generated.ipynb": nb44b_fw_stage0_gen,
     "44c_framework_stage0_base.ipynb": nb44c_fw_stage0_base,
     "45_framework_stage1_screen.ipynb": nb45_fw_stage1,
+    "46_paper_orchestra.ipynb": nb46_paper_orchestra,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
