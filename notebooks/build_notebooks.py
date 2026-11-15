@@ -4284,6 +4284,22 @@ IMAGE = first_working(['gemini-3-pro-image', 'gemini-nano-banana-2.1', 'gemini-3
 print('writer / reflection / plotting model:', WRITER, '| image model:', IMAGE)
 assert WRITER, 'no writing model (with Google Search) answered with this key; paste the lines above into the chat'
 USE_PLOTTING = IMAGE is not None
+# PaperOrchestra also hard-codes model names inside its code (e.g. gemini-3-flash-preview in the literature agent);
+# replace every one with a model this key can use
+FAST = first_working(['gemini-3.8-flash', 'gemini-3.6-flash'], search=True) or WRITER
+import glob
+swap = {'gemini-3.1-pro-preview': WRITER, 'gemini-3-flash-preview': FAST,
+        'gemini-3-pro-image-preview': IMAGE or WRITER}
+changed = 0
+for f in glob.glob(f'{PO}/**/*.py', recursive=True):
+    src = open(f).read()
+    new = src
+    for old_name, new_name in swap.items():
+        new = new.replace(f'"{old_name}"', f'"{new_name}"').replace(f"'{old_name}'", f"'{new_name}'")
+    if new != src:
+        open(f, 'w').write(new)
+        changed += 1
+print('fast model:', FAST, '| PaperOrchestra files updated:', changed)
 if not USE_PLOTTING:
     print('no image model available: figures will not be generated (the paper will have tables only)')
 """),
