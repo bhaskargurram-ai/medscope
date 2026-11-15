@@ -1321,3 +1321,24 @@ By the rule in docs/FRAMEWORK_STAGE1.md this line ends and is reported as a nega
 model's hidden features separate erased from intact images no better than its answers, and the untrained base model's
 features almost as well), this is the eleventh training or inference method whose effect on the held-out tools is a
 change of threshold rather than of separation.
+
+## 2026-11-15 — review checks R1-R4 (notebooks 47-48; docs/REVIEW_EXPERIMENTS.md)
+
+- **R4, abstention ceiling measured (validation dev set).** Out-of-sample probe TPR - FPR (a lower bound on TV),
+  best layer, erased vs ring: recipe LaMa 0.665 (last) / 0.642 (image) vs its denial gap 0.648; TELEA 0.492 / 0.615
+  vs 0.642. Erased vs control: LaMa 0.659 / 0.637 vs 0.665; TELEA 0.374 / 0.542 vs 0.654. No read-out gap (bound minus
+  gap < 0.05 everywhere). Base model: ring LaMa 0.553 / 0.570 vs gap 0.019; TELEA 0.469 / 0.520 vs 0.130 (54 cases with
+  both answers): the base model's hidden states hold separation its answers do not use; training closes it.
+- **R3, frozen encoders (erasure vs control edit, main test; whole image / crop).** Qwen3.5-4B 0.859/0.898 (LaMa),
+  0.856/0.873 (TELEA), 0.798/0.841 (diffusion); BiomedCLIP 0.812/0.884, 0.799/0.859, 0.781/0.831; DINOv2 0.730/0.823,
+  0.688/0.742, 0.666/0.747; RAD-DINO 0.710/0.764, 0.671/0.645, 0.666/0.669. No alternative better by >= 0.05 (reading
+  not met): no evidence another frozen encoder holds more. Side result: BiomedCLIP erasure vs unedited on diffusion
+  crops +0.074 [0.039, 0.110]. Qwen's encoder detects control edits most (C vs O 0.61-0.75, whole image).
+- **R1, hard-negative swap (CORAL-style), `v4q_hns_s0` vs `v4q_sftc_s0`:** does not pass. TELEA ESG -0.028
+  [-0.073, 0.017], LaMa ESG +0.011, found +0.017, lesion-free claims +0.013. Hard negatives for 2,603 of 2,739 cases;
+  the swapped image was already rejected by ~26 nats (margin 2), so the term rarely acted.
+- **R2, vision LoRA with layer-wise decay (0.1 top, x0.9 per block), `v4_vlrd_s0` vs `v4_s1`:** does not pass.
+  Found +0.017 [-0.034, 0.067] (rule +0.03); ESG LaMa +0.061 [-0.011, 0.134], TELEA +0.034 [-0.028, 0.101];
+  lesion-free claims -0.075 [-0.150, 0.000]; TELEA ring denial +0.075 [0.030, 0.128]. One seed.
+- Paper: new Section 4.6 and Appendix Table (review checks); Fig. 4B gains the two arms; perception and ceiling text
+  updated.

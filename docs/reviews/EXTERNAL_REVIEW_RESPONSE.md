@@ -15,3 +15,12 @@
 | Gated DeltaNet / multi-token prediction analysis | Not related to any claim | Not done |
 
 Experiments R1-R5 are pre-registered in `docs/REVIEW_EXPERIMENTS.md`.
+
+## Results (15 Nov 2026)
+- R1 (CORAL-style swap): no pass; TELEA ESG -0.028 [-0.073, 0.017].
+- R2 (vision LoRA, layer-wise decay): no pass; lesions found +0.017 [-0.034, 0.067].
+- R3 (frozen encoders): Qwen's encoder best on erasure vs control edit everywhere; no alternative better.
+- R4 (ceiling measured): recipe's denial gap equals the probe TV bound (no read-out gap); base model's answers use
+  little of the separation its hidden states hold.
+- R5 (expert readers): pending recruitment.
+Paper: Section 4.6, Appendix Table 4, Fig. 4B.

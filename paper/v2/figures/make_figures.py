@@ -224,6 +224,8 @@ FOREST = [  # label, dESG, lo, hi (None if no interval recorded), set
     ("Vision LoRA 2e-5 vs recipe", 0.041, None, None, "main test"),
     ("Tool-family replay vs replay control", 0.017, -0.034, 0.067, "validation, TELEA"),
     ("Tool-family + CMCC vs replay control", 0.011, -0.056, 0.084, "validation, TELEA"),
+    ("Hard-negative swap vs replay control", -0.028, -0.073, 0.017, "validation, TELEA"),     # review check R1
+    ("Vision LoRA, layer decay vs recipe", 0.034, -0.028, 0.101, "validation, TELEA"),      # review check R2
 ]
 SET_M = {"held-out": ("o", OK["verm"]), "main test": ("s", OK["blue"]), "validation, TELEA": ("D", OK["green"])}
 S0 = {  # denial among cases each model finds unedited (log Table 15)
@@ -284,7 +286,7 @@ def fig4():
             f.plot(d, yy, mk, ms=3.4, mfc="white", mec=c, mew=0.9)
     f.set_yticks(y)
     f.set_yticklabels([r[0] for r in FOREST], fontsize=5.6)
-    f.set_xlim(-0.09, 0.11)
+    f.set_xlim(-0.09, 0.12)
     f.set_xlabel("\u0394 ESG against the matched comparator")
     f.legend(handles=[Line2D([], [], ls="", marker="o", color="0.3", ms=3.4, label="95% CI recorded"),
                       Line2D([], [], ls="", marker="o", mfc="white", mec="0.3", ms=3.4, label="point estimate only")],
