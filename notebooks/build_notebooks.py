@@ -4212,6 +4212,13 @@ PO = '/content/paper-orchestra'
 if not os.path.exists(PO):
     subprocess.run(['git', 'clone', '-q', '--depth', '1', 'https://github.com/google-research/paper-orchestra', PO], check=True)
 print('PaperOrchestra:', subprocess.run(['git', '-C', PO, 'log', '--oneline', '-1'], capture_output=True, text=True).stdout.strip())
+# PaperOrchestra prints the Semantic Scholar key in full; print only its last 4 characters instead
+su = f'{PO}/utils/scholar_utils.py'
+src = open(su).read()
+src = src.replace('print(f"Using S2 API Key: {S2_API_KEY}")',
+                  'print("Using S2 API Key: " + ("..." + S2_API_KEY[-4:] if S2_API_KEY else "none"))')
+open(su, 'w').write(src)
+assert 'Using S2 API Key: {S2_API_KEY}' not in open(su).read()
 if shutil.which('pdflatex') is None:
     print('installing LaTeX (about 3-5 minutes) ...')
     subprocess.run('apt-get -qq update && apt-get -qq install -y texlive-latex-base texlive-latex-recommended '
@@ -4234,25 +4241,40 @@ for n, v in keys.items():
     os.environ[n] = v
     print(f'{n}:', 'set' if v else 'not set (optional)' if n != 'GEMINI_API_KEY' else 'MISSING')
 
-# pick the writing and image models this key can use (PaperOrchestra's defaults first)
+# pick the writing and image models by trying them (the model list can include models this key cannot use)
+import re
 from google import genai
-client = genai.Client(api_key=keys['GEMINI_API_KEY'])     # keep a reference: the listing is read lazily
+client = genai.Client(api_key=keys['GEMINI_API_KEY'])     # keep a reference while it is used
 try:
-    names = [m.name.split('/')[-1] for m in client.models.list()]
-except Exception as e:                                       # listing failed: use PaperOrchestra's defaults
-    print('could not list models (' + type(e).__name__ + '); using the defaults')
-    names = ['gemini-3.1-pro-preview', 'gemini-3-pro-image-preview']
-print(len(names), 'models available to this key')
-def pick(preferred, must):
-    for p in preferred:
-        if p in names:
-            return p
-    c = sorted([n for n in names if all(m in n for m in must)], reverse=True)
-    return c[0] if c else None
-WRITER = pick(['gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-2.5-pro'], ['gemini', 'pro'])
-IMAGE = pick(['gemini-3-pro-image-preview', 'gemini-2.5-flash-image'], ['image'])
+    listed = [m.name.split('/')[-1] for m in client.models.list()]
+except Exception as e:
+    print('could not list models (' + type(e).__name__ + ')')
+    listed = []
+def version(n):
+    m = re.search(r'gemini-(\d+(?:\.\d+)?)', n)
+    return float(m.group(1)) if m else 0.0
+def works(model):
+    try:
+        client.models.generate_content(model=model, contents='Reply with the single word OK.')
+        return True
+    except Exception as e:
+        print(f'  {model}: not usable ({str(e)[:90]})')
+        return False
+def first_working(candidates):
+    seen = []
+    for c in candidates:
+        if c not in seen:
+            seen.append(c)
+            if works(c):
+                return c
+    return None
+WRITER = first_working(['gemini-3.1-pro-preview', 'gemini-3-pro-preview']
+                       + sorted([n for n in listed if 'pro' in n and 'image' not in n and 'tts' not in n
+                                 and version(n) >= 3], key=version, reverse=True))
+IMAGE = first_working(['gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview']
+                      + sorted([n for n in listed if 'image' in n and version(n) >= 2.5], key=version, reverse=True))
 print('writer / reflection / plotting model:', WRITER, '| image model:', IMAGE)
-assert WRITER, 'no Gemini "pro" model is available to this key: ' + ', '.join(names[:30])
+assert WRITER, 'no Gemini 3 "pro" model answered with this key; paste the lines above into the chat'
 USE_PLOTTING = IMAGE is not None
 if not USE_PLOTTING:
     print('no image model available: figures will not be generated (the paper will have tables only)')
