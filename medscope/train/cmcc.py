@@ -15,6 +15,15 @@ objective puts the three views in one loss:
           (where the agent looks) must not be drawn to the control patch
   L     = L_sft(trajectories of O, E, C) + l_did * L_did + l_inv * L_inv + l_act * L_act
 
+Optional global hard-negative term (a CORAL-style comparator, review request): `swaps` maps a case to a different,
+lesion-free image of the same source, retrieved by image similarity; the same question and the same two candidate
+replies are scored on it, and
+
+  L_swap = softplus(tau - (s(O) - s(H)))       the answer must not stay "present" when the whole image is swapped
+
+is added with weight l_swap. With l_swap = 0 (or no swaps) the run is exactly the replay-only control, so an arm that
+differs from the control only in this term isolates it.
+
 The trajectory term replays one of the three views per case (round-robin), so it costs a third of supervised training
 on the same cases; the two candidate replies of a view are scored in one forward pass of batch 2.
 
@@ -78,11 +87,14 @@ def candidates(view: View) -> tuple[str, str]:
 def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float = 2e-5, grad_accum: int = 8,
                tau: float = 2.0, l_did: float = 0.5, l_inv: float = 0.5, l_act: float = 0.5, seed: int = 0,
                save_every: int = 50, max_steps: Optional[int] = None, negatives: Optional[list[View]] = None,
-               neg_every: int = 3, log: Callable[[str], None] = print) -> Path:
+               neg_every: int = 3, swaps: Optional[dict[str, View]] = None, l_swap: float = 0.0,
+               log: Callable[[str], None] = print) -> Path:
     """`negatives`: lesion-free (natural negative) views; one is replayed every `neg_every` cases so the continuation
     keeps seeing healthy images (the triplets only exist for lesion cases; the smoke test without this drifted
     towards "present" on healthy images)."""
     import torch
+    swaps = swaps or {}
+    trainer = TRAINER + ("+swap" if swaps and l_swap else "")
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     model = policy.model
@@ -100,8 +112,8 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=lr, weight_decay=0.0)
     start, step = state.get("cases_done", 0), state.get("opt_step", 0)
-    if start and state.get("trainer") != TRAINER:
-        log(f"checkpoint from trainer {state.get('trainer', 'v1')!r} discarded; starting over with {TRAINER}")
+    if start and state.get("trainer") != trainer:
+        log(f"checkpoint from trainer {state.get('trainer', 'v1')!r} discarded; starting over with {trainer}")
         start, step = 0, 0
         (out / "train_log.jsonl").unlink(missing_ok=True)
     if start and checkpoint_path(out).exists():
@@ -127,13 +139,18 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
         for v, img in zip(views, imgs):
             present, absent = candidates(v)
             prompts.append((policy.encode_cpu(start_messages(img, v.question)), policy.target_ids(present), policy.target_ids(absent)))
+        swap = None
+        if l_swap and t.case_id in swaps:            # the hard negative: same question and candidates, other image
+            present, absent = candidates(t.original)
+            swap = (policy.encode_cpu(start_messages(load_image(swaps[t.case_id].image_path), t.original.question)),
+                    policy.target_ids(present), policy.target_ids(absent))
         first = samples_for(t.original, "agentic", seed, i, window_prob=0.3, small_zoom=True)[0]
         act_inputs = []
         for img in (imgs[0], imgs[2]):
             msgs = list(first.messages)
             msgs[-1] = start_messages(img, t.original.question)[-1]
             act_inputs.append(policy.encode_cpu(msgs))
-        return replay, prompts, (policy.target_ids(first.target), act_inputs)
+        return replay, prompts, (policy.target_ids(first.target), act_inputs), swap
 
     def prepared(start_i: int):
         import os, queue, threading
@@ -181,10 +198,10 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
         opt.zero_grad(set_to_none=True)
         step += 1
 
-    running, t0 = {"sft": [], "did": [], "inv": [], "act": [], "s_o": [], "s_e": [], "s_c": []}, time.time()
+    running, t0 = {"sft": [], "did": [], "inv": [], "act": [], "swap": [], "s_o": [], "s_e": [], "s_c": [], "s_h": []}, time.time()
     # Per case: ~1.6 trajectory passes (one view), 3 batch-of-2 log-odds passes, 2 first-action passes; each term is
     # backpropagated on its own (same gradient as the summed loss, smaller peak memory).
-    for i, (replay, prompts, (act_target, act_inputs)) in prepared(start):
+    for i, (replay, prompts, (act_target, act_inputs), swap) in prepared(start):
         # 1. trajectory replay on one view, as in supervised training
         sft_vals = []
         for target, inputs in replay:
@@ -200,20 +217,28 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
         s_o, s_e, s_c = s
         did = torch.nn.functional.softplus(tau - (s_c - s_e))
         inv = (s_o - s_c) ** 2
-        if l_did or l_inv:
-            ((l_did * did + l_inv * inv) / grad_accum).backward()
+        sw, s_h = torch.zeros((), device=s_o.device), torch.full((), float("nan"))
+        if swap is not None:
+            lp_p, lp_a = policy.token_logprobs_pair(None, swap[1], swap[2], inputs=swap[0])
+            s_h = lp_p.sum() - lp_a.sum()
+            sw = torch.nn.functional.softplus(tau - (s_o - s_h))
+        terms = [w * x for w, x in ((l_did, did), (l_inv, inv), (l_swap, sw)) if w and (x is not sw or swap is not None)]
+        if terms:                                    # only weighted terms are backpropagated (no 0 * graph passes)
+            (sum(terms) / grad_accum).backward()
         # 3. the first action of the original's trajectory must be as likely on the control view
         lp_o = policy.token_logprobs(None, act_target, inputs=act_inputs[0]).mean()
         lp_c = policy.token_logprobs(None, act_target, inputs=act_inputs[1]).mean()
         act = (lp_o - lp_c) ** 2
         if l_act:
             (l_act * act / grad_accum).backward()
-        for k, v in (("sft", l_sft), ("did", did), ("inv", inv), ("act", act), ("s_o", s_o), ("s_e", s_e), ("s_c", s_c)):
+        for k, v in (("sft", l_sft), ("did", did), ("inv", inv), ("act", act), ("swap", sw), ("s_o", s_o), ("s_e", s_e),
+                     ("s_c", s_c), ("s_h", s_h)):
             running[k].append(float(v))
         if (i + 1 - start) % grad_accum == 0:
             optimizer_step()
             if step % 10 == 0:
-                rec = {"step": step, **{k: float(np.mean(v)) for k, v in running.items()}, "lr": opt.param_groups[0]["lr"],
+                rec = {"step": step, **{k: float(np.nanmean(v)) if v and not all(x != x for x in v) else float("nan")
+                                        for k, v in running.items()}, "lr": opt.param_groups[0]["lr"],
                        "cases_done": i + 1, "secs": round(time.time() - t0)}
                 append_log(out, rec)
                 log(f"step {step}/{total_steps} sft {rec['sft']:.3f} did {rec['did']:.3f} inv {rec['inv']:.3f} act {rec['act']:.3f} "
@@ -222,14 +247,14 @@ def train_cmcc(policy, triplets: list[Triplet], out_dir: str | Path, lr: float =
             if step % save_every == 0:
                 policy.save_adapter(str(checkpoint_path(out)))
                 save_optimizer(opt, out)
-                write_state(out, {"cases_done": i + 1, "opt_step": step, "total_steps": total_steps, "trainer": TRAINER})
+                write_state(out, {"cases_done": i + 1, "opt_step": step, "total_steps": total_steps, "trainer": trainer})
             if max_steps and step >= max_steps:
                 break
     if (len(order) - start) % grad_accum and not (max_steps and step >= max_steps):
         optimizer_step()
     policy.save_adapter(str(final))
     write_state(out, {"cases_done": len(order), "opt_step": step, "total_steps": total_steps, "finished": True,
-                      "trainer": TRAINER, "tau": tau, "l_did": l_did, "l_inv": l_inv, "l_act": l_act,
-                      "negatives": len(negatives), "neg_every": neg_every})
+                      "trainer": trainer, "tau": tau, "l_did": l_did, "l_inv": l_inv, "l_act": l_act,
+                      "negatives": len(negatives), "neg_every": neg_every, "l_swap": l_swap, "swaps": len(swaps)})
     log(f"saved final adapter to {final}")
     return final

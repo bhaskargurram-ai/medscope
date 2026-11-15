@@ -139,9 +139,11 @@ def _fold(case_id: str, k: int = 5) -> int:
     return int(hashlib.sha1(case_id.encode()).hexdigest()[:8], 16) % k
 
 
-def probe_auroc(feats: dict[str, np.ndarray], scores: dict[str, dict], pos_key: str, neg_key: str,
-                train_tool: str, test_tool: str, layer: int, which: int, k: int = 5) -> float:
-    """Train on (pos, neg) views of train_tool, test on test_tool, 5-fold grouped by case (a case is never in both).
+def probe_oof(feats: dict[str, np.ndarray], scores: dict[str, dict], pos_key: str, neg_key: str,
+              train_tool: str, test_tool: str, layer: int, which: int, k: int = 5) -> dict:
+    """Out-of-fold probe outputs. Train on (pos, neg) views of train_tool, test on test_tool, 5-fold grouped by case
+    (a case is never in both). Returns per test view: case id, label, probability, and a hard call made with the
+    threshold that maximises TPR - FPR on that fold's *training* predictions (so the call is out of sample).
     pos_key/neg_key are variants ('ring', 'erased', 'control', 'original'); 'original' has no tool."""
     from sklearn.linear_model import LogisticRegression
     from sklearn.pipeline import make_pipeline
@@ -156,20 +158,124 @@ def probe_auroc(feats: dict[str, np.ndarray], scores: dict[str, dict], pos_key: 
         return out
     tr = [(c, x, 1) for c, x in rows(train_tool, pos_key)] + [(c, x, 0) for c, x in rows(train_tool, neg_key)]
     te = [(c, x, 1) for c, x in rows(test_tool, pos_key)] + [(c, x, 0) for c, x in rows(test_tool, neg_key)]
+    res = {"case": [], "y": [], "p": [], "call": []}
     if len({y for _, _, y in tr}) < 2 or len({y for _, _, y in te}) < 2:
-        return float("nan")
-    pos_s, neg_s = [], []
+        return res
     for f in range(k):
         a = [(x, y) for c, x, y in tr if _fold(c, k) != f]
-        b = [(x, y) for c, x, y in te if _fold(c, k) == f]
+        b = [(c, x, y) for c, x, y in te if _fold(c, k) == f]
         if not b or len({y for _, y in a}) < 2:
             continue
         m = make_pipeline(StandardScaler(), LogisticRegression(C=0.05, max_iter=3000))
-        m.fit(np.stack([x for x, _ in a]), np.array([y for _, y in a]))
-        p = m.predict_proba(np.stack([x for x, _ in b]))[:, 1]
-        pos_s += [s for s, (_, y) in zip(p, b) if y == 1]
-        neg_s += [s for s, (_, y) in zip(p, b) if y == 0]
-    return auroc(np.array(pos_s), np.array(neg_s))
+        xa, ya = np.stack([x for x, _ in a]), np.array([y for _, y in a])
+        m.fit(xa, ya)
+        thr = youden_threshold(m.predict_proba(xa)[:, 1], ya)
+        p = m.predict_proba(np.stack([x for _, x, _ in b]))[:, 1]
+        res["case"] += [c for c, _, _ in b]
+        res["y"] += [y for _, _, y in b]
+        res["p"] += [float(v) for v in p]
+        res["call"] += [int(v >= thr) for v in p]
+    return res
+
+
+def youden_threshold(p: np.ndarray, y: np.ndarray) -> float:
+    """Threshold t maximising P(p >= t | y=1) - P(p >= t | y=0) on these (training) predictions."""
+    p, y = np.asarray(p, float), np.asarray(y, int)
+    best, thr = -np.inf, 0.5
+    for t in np.unique(p):
+        j = (p[y == 1] >= t).mean() - (p[y == 0] >= t).mean()
+        if j > best:
+            best, thr = j, float(t)
+    return thr
+
+
+def probe_auroc(feats: dict[str, np.ndarray], scores: dict[str, dict], pos_key: str, neg_key: str,
+                train_tool: str, test_tool: str, layer: int, which: int, k: int = 5) -> float:
+    r = probe_oof(feats, scores, pos_key, neg_key, train_tool, test_tool, layer, which, k)
+    y, p = np.asarray(r["y"]), np.asarray(r["p"])
+    return auroc(p[y == 1], p[y == 0]) if len(y) else float("nan")
+
+
+# ---- the abstention ceiling, measured: a lower bound on the total-variation distance --------------------------------
+#
+# Proposition 1: for any decision D computed from signals S, |P(D | erased) - P(D | ring)| <= TV(S | erased, S | ring).
+# Any fixed event A gives TV >= |P(A | erased) - P(A | ring)|. The out-of-sample hard call of a probe is such an event
+# (its threshold was chosen on other cases), so its TPR - FPR estimates a lower bound on TV for the hidden states.
+# Comparing it with the model's own denial gap (its ESG against the ring, from the generated answers) shows how much
+# of the separation that is linearly available in the hidden states the answers use.
+
+def tv_lower_bound(res: dict, n_boot: int = 2000, seed: int = 0) -> tuple[float, float, float, int]:
+    """TPR - FPR of the out-of-fold hard calls, with a case-bootstrap 95% interval; returns (j, lo, hi, n_cases)."""
+    if not res["y"]:
+        return float("nan"), float("nan"), float("nan"), 0
+    by: dict[str, list[tuple[int, int]]] = {}
+    for c, y, call in zip(res["case"], res["y"], res["call"]):
+        by.setdefault(c, []).append((y, call))
+    cases = sorted(by)
+
+    def j(sample):
+        pos = [call for c in sample for y, call in by[c] if y == 1]
+        neg = [call for c in sample for y, call in by[c] if y == 0]
+        return (np.mean(pos) - np.mean(neg)) if pos and neg else np.nan
+    point = float(j(cases))
+    rng = np.random.default_rng(seed)
+    bs = [j([cases[i] for i in rng.integers(0, len(cases), len(cases))]) for _ in range(n_boot)]
+    bs = [b for b in bs if b == b]
+    return point, float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5)), len(cases)
+
+
+def tv_summary(feats: dict[str, np.ndarray], scores: dict[str, dict], n_layers: int,
+               pairs: tuple = (("erased_vs_ring", "erased", "ring"), ("erased_vs_control", "erased", "control"))) -> dict:
+    """Per pair, test tool and token: TV lower bound by layer and at the best layer (chosen by the bound itself, so
+    the best-layer value is mildly optimistic; every layer is reported)."""
+    out = {}
+    for name, pos, neg in pairs:
+        for test in ("lama", "telea"):
+            for which, wname in ((0, "last"), (1, "image")):
+                per = [tv_lower_bound(probe_oof(feats, scores, pos, neg, "lama", test, layer, which))
+                       for layer in range(n_layers)]
+                best = max(range(n_layers), key=lambda i: per[i][0] if per[i][0] == per[i][0] else -1)
+                out[f"{name}/{test}/{wname}"] = {"by_layer": per, "best_layer": best, "best": per[best]}
+    return out
+
+
+def answer_gap(answers: dict[str, dict], tool: str, neg: str = "ring") -> tuple[float, float, float, int]:
+    """The model's own denial gap P(denied | erased) - P(denied | neg) over cases with both views (all cases, as the
+    probe uses all cases), with a case-bootstrap 95% interval. `answers` as from stage0.read_answers/table."""
+    t = table(answers)
+    e, g = f"{tool}/erased", f"{tool}/{neg}"
+    cases = [c for c in t if e in t[c] and g in t[c]]
+    if not cases:
+        return float("nan"), float("nan"), float("nan"), 0
+    d = np.array([float(t[c][e] < 0) - float(t[c][g] < 0) for c in cases])
+    rng = np.random.default_rng(0)
+    bs = [d[rng.integers(0, len(d), len(d))].mean() for _ in range(2000)]
+    return float(d.mean()), float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5)), len(cases)
+
+
+def tv_report(tv: dict, gaps: dict[str, tuple], n_layers: int) -> str:
+    f = lambda x: "-" if x != x else f"{x:.3f}"  # noqa: E731
+    lines = ["# The abstention ceiling, measured", "",
+             "Proposition 1: any decision computed from signals S has a denial gap (ESG) at most TV(S | erased, S | "
+             "other view). An out-of-sample linear probe on the hidden states gives a **lower bound** on that TV "
+             "(its hard call is one fixed event). If the model's own denial gap is close to the bound, its answers "
+             "already use about as much separation as the hidden states linearly hold; a large shortfall would be a "
+             "read-out gap. The true TV can be higher than any linear bound.", "",
+             "| Pair | Test tool | Token | TV lower bound, best layer [95% CI] (layer) | Model's denial gap [95% CI] | "
+             "Bound minus gap |", "| --- | --- | --- | --- | --- | --- |"]
+    for key, r in tv.items():
+        name, test, which = key.split("/")
+        j, lo, hi, n = r["best"]
+        neg = "ring" if name == "erased_vs_ring" else "control"
+        g = gaps.get(f"{test}/{neg}", (float("nan"),) * 4)
+        lines.append(f"| {name.replace('_', ' ')} | {test} | {which} | {f(j)} [{f(lo)}, {f(hi)}] (layer {r['best_layer']}, "
+                     f"{n} cases) | {f(g[0])} [{f(g[1])}, {f(g[2])}] ({g[3]} cases) | {f(j - g[0])} |")
+    lines += ["", "By layer (TV lower bound, point estimates):", "",
+              "| Pair / tool / token | " + " | ".join(str(i) for i in range(n_layers)) + " |",
+              "| --- |" + " --- |" * n_layers]
+    for key, r in tv.items():
+        lines.append(f"| {key} | " + " | ".join(f(x[0]) for x in r["by_layer"]) + " |")
+    return "\n".join(lines) + "\n"
 
 
 def probe_summary(feats: dict[str, np.ndarray], scores: dict[str, dict], n_layers: int) -> dict:

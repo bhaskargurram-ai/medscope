@@ -4417,6 +4417,233 @@ print(open(f'{DRIVE}/results/26_siim_full_resolution_report.md').read())
     ]
 
 
+def nb47_review_measure() -> list[dict]:
+    """Notebook 47: review measurements R3 (frozen encoders compared) and R4 (abstention ceiling measured)."""
+    B = lambda t: t.replace('@BASE@', BASE)  # noqa: E731
+    return [md("""
+# MedScope 47: review measurements - is the limit this encoder, and how close are the answers to the ceiling?
+
+Two measurements asked for by the external review, fixed in `docs/REVIEW_EXPERIMENTS.md` before this ran. No
+training, no model selection, nothing tuned on a test set.
+
+- **R4, the abstention ceiling measured.** The recipe's and the base model's hidden states on the stage-0 validation
+  views are recomputed, and an out-of-sample linear probe gives a lower bound on the total-variation distance between
+  erased and ring-edited (and control-edited) views. It is compared with the model's own denial gap.
+- **R3, frozen encoders compared.** The same linear probe on four frozen image encoders (Qwen3.5-4B's own,
+  BiomedCLIP, RAD-DINO, DINOv2): can any of them tell an erasure from a control edit better, on the main-test views
+  made with LaMa and with the held-out tools?
+
+**Needs:** notebooks 44-44c (stage-0 views and answers) and the held-out-tool test views in
+`MyDrive/medscope/inpaint_test`. An A100 (or L4/G4), about 2 hours. Run all; nothing to set. If the session ends,
+run all again: finished parts are kept.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4),
+        code(B(r"""
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+assert plan, 'docs/REVIEW_EXPERIMENTS.md is not in the repository: do not run without the pre-registration'
+print('review plan committed:', plan[-1], '| latest:', plan[0])
+import torch
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+print(torch.cuda.get_device_name(0) if GPU_GB else 'no GPU', f'({round(GPU_GB)} GB)')
+if GPU_GB < 20:
+    raise SystemExit('This GPU is too small (T4 or none). Runtime > Change runtime type > A100 (or L4), then run all again.')
+SB, S0 = f'{RESULTS}/screen_b', f'{RESULTS}/fw_stage0'
+assert os.path.exists(f'{S0}/views.json') and os.path.exists(f'{S0}/answers_recipe.jsonl'), 'run notebooks 44, 44b and 44c first'
+INP = f'{DRIVE}/inpaint_test'
+TOOLS = ' '.join(f'--tool {t}={INP}/{t}/views.jsonl' for t in ('telea', 'diffusion') if os.path.exists(f'{INP}/{t}/views.jsonl'))
+print('held-out tools:', TOOLS or 'none found')
+ARGS = (f'--views {VAL_V4} --negatives {VAL_NEG_V4} --cases 200 --negs 80 --dev-dir {SB}/dev --out {S0} '
+        f'--base-model @BASE@ --hidden-dir {WORK}/fw_stage0_hidden --model recipe={ADAPTERS}/v4_s1/final --model base= '
+        f'--gen-model recipe={ADAPTERS}/v4_s1/final --gen-model base=')
+""")),
+        md("## 1. R4: hidden states of the recipe and the base model (scores are kept; about 30-40 minutes)"),
+        code(r"""
+sh(f'python scripts/fw_stage0.py {ARGS} --stage score')
+"""),
+        md("## 2. R4: the lower bound on TV against the denial gap (CPU, a few minutes)"),
+        code(r"""
+sh(f'python scripts/fw_stage0.py {ARGS} --stage tvbound')
+"""),
+        md("## 3. R3: four frozen encoders, whole image and lesion crop (about 1 hour)"),
+        code(r"""
+!pip install -q open_clip_torch
+sh(f'python scripts/encoder_compare.py --train {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl --test {TEST_VIEWS} {TOOLS} '
+   f'--encoders qwen biomedclip raddino dinov2 --per-kind 600 --out {RESULTS}/encoder_compare')
+"""),
+        publish("MedScope report - 47 review measurements", """
+    ('R4: the abstention ceiling, measured', read_text(f'{RESULTS}/fw_stage0/tvbound.md')),
+    ('R3: frozen encoders compared', read_text(f'{RESULTS}/encoder_compare/encoders.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
+def nb48_review_arms() -> list[dict]:
+    """Notebook 48: review experiments R1 (CORAL-style hard-negative swaps) and R2 (vision adapters, layer-wise decay)."""
+    B = lambda t: t.replace('@BASE@', BASE)  # noqa: E731
+    s1 = S1_ARGS
+    return [md("""
+# MedScope 48: review experiments - a CORAL-style comparator and a gently adapted vision encoder
+
+Two training arms asked for by the external review, fixed in `docs/REVIEW_EXPERIMENTS.md` before training, both
+screened on validation images only (the test sets are not touched):
+
+- **R1 `v4q_hns_s0`:** the replay-only control (`v4q_sftc_s0`) plus one CORAL-style term: the answer must change
+  when the image is swapped for the most similar lesion-free image of another patient (CLIP retrieval). CORAL's own
+  weights are not public, so its training signal is tested inside this pipeline. Compared with the control.
+- **R2 `v4_vlrd_s0`:** the stage-1 recipe with LoRA on the vision encoder too, at a tenth of the learning rate at
+  the top and 0.9 times less per block below (layer-wise decay). Compared with the frozen-encoder recipe `v4_s1`:
+  does it find more real lesions without losing discrimination?
+
+**Needs:** notebooks 42b and 44-45 (dev set, stage-0 views, the control's and the recipe's answers). A G4 (RTX PRO
+6000, 96 GB) or A100 80 GB: about 7-8 hours with the two trainings at once; on 40 GB about 12 hours. Run all; nothing
+to set. If the session ends, run all again: training resumes from its checkpoints and finished answers are kept.
+
+**Check in the first minutes:** R2's log must show `vision adapted: True` and several learning-rate groups.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4),
+        code(B(r"""
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+assert plan, 'docs/REVIEW_EXPERIMENTS.md is not in the repository: do not train without the pre-registration'
+print('review plan committed:', plan[-1], '| latest:', plan[0])
+import torch
+from concurrent.futures import ThreadPoolExecutor
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+print(torch.cuda.get_device_name(0) if GPU_GB else 'no GPU', f'({round(GPU_GB)} GB)')
+if GPU_GB < 35:
+    raise SystemExit('This GPU is too small. Runtime > Change runtime type > A100 (or G4), then run all again.')
+PAR = 2 if GPU_GB >= 70 else 1
+BS = 16 if GPU_GB >= 70 else 12
+def run_par(cmds):
+    if PAR == 1 or len(cmds) == 1:
+        for cmd in cmds:
+            sh(cmd)
+    else:
+        with ThreadPoolExecutor(PAR) as ex:
+            list(ex.map(sh, cmds))
+RECIPE = f'{ADAPTERS}/v4_s1/final'
+assert os.path.exists(f'{RECIPE}/adapter_config.json'), 'missing the stage-1 recipe adapter'
+SB, S0, SR = f'{RESULTS}/screen_b', f'{RESULTS}/fw_stage0', f'{RESULTS}/fw_review'
+for need in ('answers_recipe.jsonl', 'answers_replay_control.jsonl'):
+    assert os.path.exists(f'{S0}/{need}'), f'{need} missing: run notebooks 44b and 45 first'
+HN = f'{DRIVE}/review/hardneg.jsonl'
+R1 = (f'python scripts/train_cmcc.py --model @BASE@ --init {RECIPE} --views {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl '
+      f'--negatives {TRAIN_NEG_V4} --neg-every 3 --cases 3000 --lr 2e-5 --grad-accum 8 --seed 0 '
+      f'--l-did 0 --l-inv 0 --l-act 0 --tau 2.0 --hard-negatives {HN} --l-swap 0.5 --out {ADAPTERS}/v4q_hns_s0')
+S1 = f'@S1@'
+R2 = (f'python scripts/train_sft.py --model @BASE@ {S1} --lora-vision --vision-lr-scale 0.1 --vision-layer-decay 0.9 '
+      f'--seed 0 --out {ADAPTERS}/v4_vlrd_s0')
+GEN = (f'--views {VAL_V4} --negatives {VAL_NEG_V4} --cases 200 --negs 80 --dev-dir {SB}/dev --out {S0} '
+       f'--base-model @BASE@ --batch-size {BS} --gen-variants original,erased,control,ring,negative')
+print('GPU', round(GPU_GB), 'GB | jobs at a time', PAR)
+""").replace('@S1@', s1)),
+        md("## 1. R1's hard negatives: CLIP retrieval over the training images (about 10-15 minutes)"),
+        code(r"""
+os.makedirs(os.path.dirname(HN), exist_ok=True)
+if not os.path.exists(HN):
+    sh(f'python scripts/build_hardneg.py --views {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl --negatives {TRAIN_NEG_V4} --out {HN}')
+print(open(HN.replace('.jsonl', '.md')).read())
+"""),
+        md("## 2. Train both arms (resumable)"),
+        code(r"""
+cmds = [c for c, out in ((R1, 'v4q_hns_s0'), (R2, 'v4_vlrd_s0')) if not os.path.exists(f'{ADAPTERS}/{out}/final/adapter_config.json')]
+run_par(cmds)
+for name in ('v4q_hns_s0', 'v4_vlrd_s0'):
+    print(name, open(f'{ADAPTERS}/{name}/state.json').read()[:300])
+"""),
+        md("## 3. Answers of both arms on the validation views (about 1.5 hours each)"),
+        code(r"""
+models = [('hardneg', f'{ADAPTERS}/v4q_hns_s0/final'), ('vision_lrd', f'{ADAPTERS}/v4_vlrd_s0/final')]
+run_par([f'python scripts/fw_stage0.py {GEN} --gen-model {n}={a} --stage generate' for n, a in models])
+"""),
+        md("## 4. The rules (CPU, a minute)"),
+        code(r"""
+sh(f'python scripts/fw_review.py --answers {S0} --out {SR}')
+"""),
+        publish("MedScope report - 48 review experiments", """
+    ('R1 and R2', read_text(f'{RESULTS}/fw_review/review_experiments.md')),
+    ('Hard negatives', read_text(f'{DRIVE}/review/hardneg.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
+def nb49_expert_readers() -> list[dict]:
+    """Notebook 49: expert reader study (pack 4, R5): build and publish the page; later score the answers."""
+    return [md("""
+# MedScope 49: expert reader study (pack 4)
+
+The review's main request: board-certified radiologists, all imaging types, and the Stable Diffusion erasures the
+first readers never saw. Design fixed in `docs/REVIEW_EXPERIMENTS.md` (R5) before any image was drawn: from the main
+test set, each image from a different case, stratified by source, 36 each of unedited lesion images, LaMa erasures,
+LaMa control edits, unedited lesion-free images, Stable Diffusion erasures and Stable Diffusion control edits (216
+images, about 3 hours per reader). The page is the same blinded page as packs 2-3, now also asking for board
+certification; it is published at `.../medscope-reader/pack4/` and leaves packs 2 and 3 untouched.
+
+**Before you start:** the `medscope-reader` GitHub repository and the `GITHUB_TOKEN` secret from notebook 28.
+Recruit at least two board-certified radiologists (5+ years); they should not have seen packs 2 or 3.
+
+**Runtime:** CPU. Section 1 takes about 5 minutes. Run section 2 after the readers have sent their answer files:
+put them (`*.json`) in `MyDrive/medscope/reader/answers_pack4/`.
+"""),
+        code(SETUP), code(RESTORE_ALL),
+        code(r"""
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+assert plan, 'docs/REVIEW_EXPERIMENTS.md is not in the repository'
+print('review plan committed:', plan[-1])
+RS = f'{DRIVE}/reader'
+os.makedirs(f'{RS}/answers_pack4', exist_ok=True)
+KEY4 = f'{RS}/key_v4.json'
+INP = f'{DRIVE}/inpaint_test'
+assert os.path.exists(f'{INP}/diffusion/views.jsonl'), 'the Stable Diffusion test views are missing (notebook 21)'
+"""),
+        md("## 1. Build pack 4 and publish it next to packs 2 and 3"),
+        code(r"""
+PACK = f'{WORK}/reader_site'
+os.makedirs(f'{PACK}/site', exist_ok=True)
+!tar -C {PACK}/site -xf {RS}/site_v2.tar
+os.makedirs(f'{PACK}/site/pack3', exist_ok=True)
+!tar -C {PACK}/site/pack3 -xf {RS}/site_v3.tar
+P4 = f'{WORK}/reader_pack4'
+if not os.path.exists(KEY4):
+    !python scripts/make_reader_study.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {P4} --per-kind 36 --seed 4 --tool diffusion={INP}/diffusion/views.jsonl --tool-per-kind 36
+    !cp {P4}/key.json {KEY4}
+    !cd {P4}/site && tar -cf {RS}/site_v4.tar .
+os.makedirs(f'{PACK}/site/pack4', exist_ok=True)
+!tar -C {PACK}/site/pack4 -xf {RS}/site_v4.tar
+for d in ('', '/pack3', '/pack4'):
+    !cp reader/index.html {PACK}/site{d}/index.html
+tok = (secret('GITHUB_TOKEN') or '').strip()
+if not tok:
+    raise SystemExit('Add the Colab secret GITHUB_TOKEN (write access to medscope-reader), then rerun this cell.')
+remote = f'https://x-access-token:{tok}@github.com/bhaskargurram-ai/medscope-reader.git'
+r = subprocess.run(f'cd {PACK}/site && rm -rf .git && git init -q -b main && git add -A && '
+                   'git -c user.name="Bhaskar Gurram" -c user.email="bhaskargurram.g123@gmail.com" commit -q -m "Reader study" && '
+                   f'git push -q --force {remote} main', shell=True, capture_output=True, text=True)
+print(r.stderr.replace(tok, '***') or 'published')
+if r.returncode:
+    raise SystemExit('Push failed: check that medscope-reader exists and the token can write to it.')
+print('Expert pack: https://bhaskargurram-ai.github.io/medscope-reader/pack4/')
+"""),
+        md("## 2. Score the experts' answers"),
+        code(r"""
+import glob
+answers = sorted(glob.glob(f'{RS}/answers_pack4/*.json'))
+print(len(answers), 'answer file(s):', [os.path.basename(a) for a in answers])
+if answers:
+    !python scripts/make_reader_study.py --score --key {KEY4} --answers {' '.join(answers)} --out {RESULTS}/reader_study_experts.md
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -4493,6 +4720,9 @@ NOTEBOOKS = {
     "44c_framework_stage0_base.ipynb": nb44c_fw_stage0_base,
     "45_framework_stage1_screen.ipynb": nb45_fw_stage1,
     "46_paper_orchestra.ipynb": nb46_paper_orchestra,
+    "47_review_measurements.ipynb": nb47_review_measure,
+    "48_review_arms.ipynb": nb48_review_arms,
+    "49_expert_readers.ipynb": nb49_expert_readers,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

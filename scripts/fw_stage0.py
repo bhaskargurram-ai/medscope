@@ -29,7 +29,7 @@ def main() -> None:
     ap.add_argument("--negs", type=int, default=80)
     ap.add_argument("--dev-dir", required=True, help="the screening dev folder (TELEA views are reused or made there)")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--stage", choices=["views", "score", "analyse", "generate", "analyse_gen", "all"], default="all")
+    ap.add_argument("--stage", choices=["views", "score", "analyse", "generate", "analyse_gen", "tvbound", "all"], default="all")
     ap.add_argument("--base-model", default="Qwen/Qwen3.5-4B")
     ap.add_argument("--model", action="append", default=[], help="name=adapter (empty adapter = the base model)")
     ap.add_argument("--layers", default="4,8,12,16,20,24,28,32")
@@ -69,7 +69,7 @@ def main() -> None:
             kinds[k] = kinds.get(k, 0) + 1
         print(f"dev: {len(dev)} views; new: {len(extra)} {kinds}")
     from medscope.fw.stage0 import scoreable
-    all_views = [v for v in dev + ([] if args.stage in ("analyse", "analyse_gen") else extra) if scoreable(v, originals)]
+    all_views = [v for v in dev + ([] if args.stage in ("analyse", "analyse_gen", "tvbound") else extra) if scoreable(v, originals)]
     print(f"scoreable views (yes/no questions): {len(all_views)}")
 
     if args.stage in ("score", "all"):
@@ -168,6 +168,30 @@ def main() -> None:
         (out / "stage0_gen.json").write_text(json.dumps({"summary": summ, "decision": decision, "agreement_n": n_agree},
                                                         indent=1, default=float))
         print(md)
+
+    if args.stage == "tvbound":
+        # Proposition 1 measured: an out-of-sample probe's TPR - FPR is a lower bound on TV(hidden | erased, hidden |
+        # ring); compare it with the same model's denial gap from its generated answers (review request)
+        from medscope.fw.analysis import answer_gap, load_feats, tv_report, tv_summary
+        from medscope.fw.stage0 import read_answers, read_scores
+        md, js = [], {}
+        for name in HIDDEN_MODELS:
+            feats = load_feats(hidden_root / name)
+            sc = read_scores(out / f"scores_{name}.jsonl")
+            if not feats or not sc:
+                print(f"{name}: no hidden features or scores under {hidden_root / name}; run --stage score first")
+                continue
+            tv = tv_summary(feats, sc, len(layers))
+            ans = read_answers(out / f"answers_{name}.jsonl")
+            gaps = {f"{t}/{n}": answer_gap(ans, t, n) for t in ("lama", "telea") for n in ("ring", "control")} if ans else {}
+            md.append(f"## {name}\n\n" + tv_report(tv, gaps, len(layers)).split("\n", 2)[2])
+            js[name] = {"tv": tv, "answer_gaps": gaps}
+        if not md:
+            raise SystemExit("nothing to report")
+        head = tv_report({}, {}, len(layers)).split("| Pair |")[0]
+        (out / "tvbound.md").write_text(head + "\n".join(md))
+        (out / "tvbound.json").write_text(json.dumps(js, indent=1, default=float))
+        print((out / "tvbound.md").read_text())
 
 
 if __name__ == "__main__":

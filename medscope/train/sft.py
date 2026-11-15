@@ -134,6 +134,48 @@ def is_vision_param(name: str) -> bool:
     return any(v in name for v in VISION_MODULES)
 
 
+_BLOCK = None
+
+
+def vision_depth(name: str) -> Optional[int]:
+    """Block index of a vision-encoder parameter (`...visual.blocks.7....` -> 7), None if it is not in a numbered block."""
+    import re
+    global _BLOCK
+    if _BLOCK is None:
+        _BLOCK = re.compile(r"\.(?:blocks|layers|layer)\.(\d+)\.")
+    m = _BLOCK.search(name)
+    return int(m.group(1)) if m else None
+
+
+def lr_scales(names: list[str], vision_lr_scale: float = 1.0, vision_layer_decay: float = 1.0) -> dict[str, float]:
+    """Learning-rate scale per trainable parameter name.
+
+    Language-model parameters: 1. Vision encoder and projector: `vision_lr_scale`, and with layer-wise decay
+    (`vision_layer_decay` < 1) the top vision block gets `vision_lr_scale`, each block below it a further factor
+    `vision_layer_decay`, the patch embedding (below block 0) one factor less again; the projector/merger and
+    any other un-numbered vision parameter above the blocks keep `vision_lr_scale`. Low layers hold the generic
+    features the pretrained encoder is good at, so they move least (layer-wise learning-rate decay)."""
+    vis = [n for n in names if is_vision_param(n)]
+    depths = [d for d in (vision_depth(n) for n in vis) if d is not None]
+    top = max(depths) if depths else 0
+    out = {}
+    for n in names:
+        if not is_vision_param(n):
+            out[n] = 1.0
+            continue
+        if vision_layer_decay == 1.0:
+            out[n] = vision_lr_scale
+            continue
+        d = vision_depth(n)
+        if d is not None:
+            out[n] = vision_lr_scale * vision_layer_decay ** (top - d)
+        elif any(k in n for k in ("patch_embed", "embeddings", "pos_embed", "patch_embedding")):
+            out[n] = vision_lr_scale * vision_layer_decay ** (top + 1)
+        else:
+            out[n] = vision_lr_scale
+    return out
+
+
 def train_sft(
     policy,
     views: list[View],
@@ -151,6 +193,7 @@ def train_sft(
     small_zoom: bool = False,
     schedule_steps: Optional[int] = None,
     vision_lr_scale: float = 1.0,
+    vision_layer_decay: float = 1.0,
     sample_fn: Optional[Callable] = None,   # (view, seed, index) -> [SFTSample]; replaces the synthetic trajectories
 ) -> Path:
     import torch
@@ -166,14 +209,19 @@ def train_sft(
     model.train()
     named = [(n, p) for n, p in model.named_parameters() if p.requires_grad]
     params = [p for _, p in named]
-    # one group per learning-rate scale: adapters on the vision encoder and projector can be trained more gently
-    groups = [{"params": [p for n, p in named if is_vision_param(n) == vis], "lr": lr * scale, "scale": scale}
-              for vis, scale in ((False, 1.0), (True, vision_lr_scale))]
-    groups = [g for g in groups if g["params"]]
-    if vision_lr_scale != 1.0:
+    # one group per learning-rate scale: adapters on the vision encoder and projector can be trained more gently,
+    # optionally with layer-wise decay (lower vision blocks slower)
+    scales = lr_scales([n for n, _ in named], vision_lr_scale, vision_layer_decay)
+    by_scale: dict[float, list] = {}
+    for n, p in named:
+        by_scale.setdefault(round(scales[n], 12), []).append(p)
+    groups = [{"params": ps, "lr": lr * sc, "scale": sc} for sc, ps in sorted(by_scale.items(), reverse=True)]
+    if vision_lr_scale != 1.0 or vision_layer_decay != 1.0:
+        n_vis = sum(1 for n, _ in named if is_vision_param(n))
+        assert n_vis, "--vision-lr-scale / --vision-layer-decay need an adapter that includes the vision encoder (--lora-vision)"
         log("learning rate: " + ", ".join(f"{len(g['params'])} tensors at {lr * g['scale']:.1e}" for g in groups)
-            + " (language model first, then vision encoder and projector)")
-        assert len(groups) == 2, "--vision-lr-scale needs an adapter that includes the vision encoder (--lora-vision)"
+            + f" ({len(named) - n_vis} language-model tensors at the full rate; {n_vis} vision tensors in "
+            + f"{len(groups) - 1} slower groups)")
     opt = torch.optim.AdamW(groups, lr=lr, weight_decay=0.0)
 
     final = out / "final"

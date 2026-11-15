@@ -12,6 +12,11 @@ tell which it is). Every image is re-saved the same way (PNG, no metadata) under
 answer key, and every pack carries an id so answer files from an older pack are never scored against a newer key.
 
     python scripts/make_reader_study.py --views TEST_VIEWS... --negatives TEST_NEG... --out DIR [--per-kind 32] [--seed 0]
+        [--tool diffusion=INPAINT_TEST/diffusion/views.jsonl ...] [--tool-per-kind 40]
+
+--tool adds erased and control-edited images made with another inpainting tool on the same masks (held-out tools:
+TELEA, Stable Diffusion); each comes from a case not otherwise in the pack, and the key records the tool, so the
+residual finding and edit detectability are reported per tool.
     -> DIR/site/ (index.html, items.json, images/): the page to publish
        DIR/key.json: the answer key (keep private)
 
@@ -90,6 +95,28 @@ def build(args) -> None:
                     picked += 1
         if picked < args.per_kind:
             raise SystemExit(f"only {picked} {kind} images available")
+    for spec in args.tool:                         # erasures and control edits made with another tool, same masks
+        tool, _, path = spec.partition("=")
+        tv = [v for v in load_views(path) if v.case_id in yes_cases and Path(v.image_path).exists()]
+        for kind in ("target_removal", "random_removal"):
+            pools = defaultdict(list)
+            for v in tv:
+                if v.kind.value == kind:
+                    pools[source_of(v.case_id)].append(v)
+            pools = {s: sorted(rng.sample(vs, len(vs)), key=lambda v: is_stress(v), reverse=True) for s, vs in pools.items()}
+            picked = 0
+            while picked < args.tool_per_kind and any(pools.values()):
+                for s in sorted(pools):
+                    while pools[s] and pools[s][-1].case_id in used_cases:
+                        pools[s].pop()
+                    if pools[s] and picked < args.tool_per_kind:
+                        v = pools[s].pop()
+                        v.meta = {**(v.meta or {}), "reader_tool": tool}
+                        chosen.append(v)
+                        used_cases.add(v.case_id)
+                        picked += 1
+            if picked < args.tool_per_kind:
+                print(f"note: only {picked} {tool} {kind} images available")
     rng.shuffle(chosen)
     pack = hashlib.sha1("|".join(v.view_id for v in chosen).encode()).hexdigest()[:12]
     site = Path(args.out) / "site"
@@ -102,7 +129,8 @@ def build(args) -> None:
         items.append({"id": iid, "image": f"images/{iid}.png", "question": v.question})
         key.append({"id": iid, "kind": v.kind.value, "edited": v.kind.value in EDITED,
                     "finding_present": v.kind.value in PRESENT, "case_id": v.case_id, "view_id": v.view_id,
-                    "source": source_of(v.case_id), "question": v.question, "stress": is_stress(v)})
+                    "source": source_of(v.case_id), "question": v.question, "stress": is_stress(v),
+                    "tool": (v.meta or {}).get("reader_tool") or ("lama" if v.kind.value in EDITED else None)})
     (site / "items.json").write_text(json.dumps({"pack": pack, "items": items}, indent=1))
     shutil.copy(ROOT / "reader" / "index.html", site / "index.html")
     (Path(args.out) / "key.json").write_text(json.dumps({"pack": pack, "items": key}, indent=1))
@@ -181,7 +209,7 @@ def load_packs(key_paths: list[str], answer_paths: list[str]) -> tuple[str, dict
         rec = by_reader.setdefault(r["reader"], {**r, "answers": [], "packs": []})
         rec["answers"] += [{**a, "id": f"{pack}:{a['id']}"} for a in r["answers"]]
         rec["packs"].append(pack)
-        for fld in ("specialty", "years"):
+        for fld in ("specialty", "years", "certified"):
             if r.get(fld) and not rec.get(fld):
                 rec[fld] = r[fld]
     label = " + ".join(str(p) for p in keys)
@@ -195,6 +223,7 @@ def score(args) -> None:
     out = ["# Reader study", "", f"Pack(s) {pack}: {len(key)} images "
            f"({', '.join(f'{n_kind[k]} {LABEL[k].lower()}' for k in kinds)}); {len(readers)} reader(s): "
            + "; ".join(f"{r['reader']} ({r.get('specialty') or 'specialty not given'}, {r.get('years') or '?'} y, "
+                       f"{r.get('certified') or 'certification not given'}, "
                        f"{len(r['answers'])} answers)" for r in readers) + ".", "",
            "## 1. Can physicians tell edited images from unmodified ones, and the erasure from the control edit?", "",
            "Edited-rating 1 (definitely real) to 4 (definitely edited); 'called edited' = rating 3 or 4. "
@@ -251,9 +280,36 @@ def score(args) -> None:
             lo2, hi2 = exact_ci(resid, len(ids))
             out.append(f"- Per image, majority of readers, {label}: {resid}/{len(ids)} erased images with a residual "
                        f"finding, exact 95% CI [{lo2:.1%}, {hi2:.1%}]" + (" (criterion judged here)" if not want else ""))
+    tools = sorted({x.get("tool") for x in key.values() if x["kind"] == "target_removal" and x.get("tool")})
+    if len(tools) > 1:
+        out += ["", "### By editing tool (all readers pooled; per image by reader majority)", "",
+                "| Tool | Erased reads with finding Yes | Erased images, majority Yes | Erased called edited | Control called edited |",
+                "| --- | --- | --- | --- | --- |"]
+        for t in tools:
+            ids = {i for i, x in key.items() if x.get("tool") == t}
+            reads = [a for r in readers for a in r["answers"] if a["id"] in ids]
+            er = [a for a in reads if key[a["id"]]["kind"] == "target_removal"]
+            yes = [a for a in er if a.get("finding") == "yes"]
+            maj: dict[str, list] = defaultdict(list)
+            for a in er:
+                if a.get("finding"):
+                    maj[a["id"]].append(a["finding"])
+            mres = sum(1 for v in maj.values() if sum(x == "yes" for x in v) * 2 > len(v))
+            lo, hi = exact_ci(mres, len(maj))
+            ed = lambda k: [int(int(a["edited"]) >= 3) for a in reads if a.get("edited") and key[a["id"]]["kind"] == k]  # noqa: E731
+            e1, e2 = ed("target_removal"), ed("random_removal")
+            out.append(f"| {t} | {len(yes)}/{len([a for a in er if a.get('finding')])} | {mres}/{len(maj)} "
+                       f"[{lo:.1%}, {hi:.1%}] | {sum(e1)}/{len(e1)} | {sum(e2)}/{len(e2)} |")
     if len(binary) >= 2:
         names = list(binary)
-        out += ["", "## 3. Agreement between readers (edited yes/no)", ""]
+        finding = {r["reader"]: {a["id"]: int(a["finding"] == "yes") for a in r["answers"]
+                                 if a.get("finding") in ("yes", "no") and a["id"] in key} for r in readers}
+        out += ["", "## 3. Agreement between readers (edited yes/no; finding yes/no, cannot-tell left out)", ""]
+        for i in range(len(names)):
+            for j in range(i + 1, len(names)):
+                common = sorted(set(finding[names[i]]) & set(finding[names[j]]))
+                k = kappa([finding[names[i]][c] for c in common], [finding[names[j]][c] for c in common])
+                out.append(f"- {names[i]} vs {names[j]}: Cohen's kappa on the finding {k:.2f} on {len(common)} images")
         for i in range(len(names)):
             for j in range(i + 1, len(names)):
                 common = sorted(set(binary[names[i]]) & set(binary[names[j]]))
@@ -284,6 +340,9 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--score", action="store_true")
     ap.add_argument("--key", nargs="*", default=[], help="answer key(s); several packs are scored together")
+    ap.add_argument("--tool", action="append", default=[],
+                    help="build: name=views.jsonl of erasures/control edits made with another tool (e.g. diffusion=...)")
+    ap.add_argument("--tool-per-kind", type=int, default=24, help="build: images per kind for each --tool")
     ap.add_argument("--exclude-keys", nargs="*", default=[], help="build: leave out every case already in these packs")
     ap.add_argument("--answers", nargs="*", default=[])
     args = ap.parse_args()

@@ -67,6 +67,9 @@ def parser() -> argparse.ArgumentParser:
                     help="new adapter also adapts the vision encoder and projector (frozen in the recipe)")
     ap.add_argument("--vision-lr-scale", type=float, default=1.0,
                     help="with --lora-vision: learning rate of the vision adapters as a share of --lr (0.1 = a tenth)")
+    ap.add_argument("--vision-layer-decay", type=float, default=1.0,
+                    help="with --lora-vision: layer-wise decay of the vision learning rate (0.8 = each block below the "
+                         "top at 0.8x the one above; 1 = none)")
     ap.add_argument("--kinds", nargs="*", default=None,
                     help="train only on these view kinds (ablations), e.g. original natural_negative degraded")
     ap.add_argument("--subsample", type=int, default=None,
@@ -170,7 +173,8 @@ def main() -> None:
     train_sft(policy, views, args.mode, args.out, epochs=args.epochs, lr=args.lr,
               grad_accum=args.grad_accum, max_steps=args.max_steps, save_every=args.save_every,
               replays=replays, seed=args.seed, window_prob=args.window_prob, small_zoom=args.small_zoom,
-              schedule_steps=args.schedule_steps, vision_lr_scale=args.vision_lr_scale)
+              schedule_steps=args.schedule_steps, vision_lr_scale=args.vision_lr_scale,
+              vision_layer_decay=args.vision_layer_decay)
 
 
 if __name__ == "__main__":

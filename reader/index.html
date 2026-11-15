@@ -59,6 +59,13 @@
     <h2>Your specialty and years of experience</h2>
     <input id="specialty" type="text" autocomplete="off" placeholder="e.g. radiology (thoracic), gastroenterology" maxlength="80">
     <input id="years" type="text" autocomplete="off" placeholder="years since qualification, e.g. 12" maxlength="10" style="margin-top:8px">
+    <select id="certified" style="margin-top:8px">
+      <option value="">Board certification (choose one)</option>
+      <option value="board-certified radiologist">Board-certified radiologist</option>
+      <option value="board-certified other specialty">Board-certified, other specialty</option>
+      <option value="in training">In training (resident / registrar)</option>
+      <option value="other">Other</option>
+    </select>
     <div class="bar"><span class="meta" id="resume-note"></span><button class="primary" id="go" disabled>Start</button></div>
   </section>
 
@@ -154,6 +161,7 @@
 
   function payload() {
     return JSON.stringify({ reader, pack, specialty: ($('specialty').value || '').trim(), years: ($('years').value || '').trim(),
+                            certified: (($('certified') || {}).value || ''),
                             finished: new Date().toISOString(), n_items: order.length,
                             user_agent: navigator.userAgent, answers: order.map(id => ({ id, ...answers[id] })) }, null, 1);
   }
