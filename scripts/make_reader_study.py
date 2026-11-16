@@ -21,11 +21,17 @@ residual finding and edit detectability are reported per tool.
        DIR/key.json: the answer key (keep private)
 
     python scripts/make_reader_study.py --score --key DIR/key.json --answers ANSWERS.json... --out report.md
+
+Pack 4 saves answers automatically to a Google Sheet (reader/expert.html, reader/apps_script.gs). Its three tabs,
+exported as CSV (readers.csv, profiles.csv, answers.csv), are turned into the same answer files with
+
+    python scripts/make_reader_study.py --from-sheet DIR --out DIR/answers
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import math
@@ -141,6 +147,60 @@ def build(args) -> None:
         print(f"  {s} | {k}: {n}")
 
 
+def sheet_to_readers(readers: list[dict], profiles: list[dict], answers: list[dict]) -> list[dict]:
+    """Rows of the pack-4 Google Sheet -> one answer record per reader, in the answer-file format.
+
+    Every save is a new row; a reader's latest answer per image counts (server time, then the page's own time). Codes
+    labelled TEST (the notebook's round-trip check) and codes not in the readers tab are left out."""
+    label = {}
+    for r in readers:
+        code = str(r.get("code", "")).strip()
+        if code and str(r.get("label", "")).strip().upper() != "TEST":
+            label[code] = str(r.get("label", "")).strip() or code
+    prof = {}
+    for p in profiles:                              # the latest profile row per reader
+        if p.get("reader") in label:
+            prof[p["reader"]] = p
+    latest: dict[tuple[str, str], dict] = {}
+    for a in answers:
+        code = str(a.get("reader", "")).strip()
+        if code not in label:
+            continue
+        k = (code, str(a.get("item", "")).strip())
+        stamp = (str(a.get("server_time", "")), str(a.get("client_time", "")))
+        if k not in latest or stamp >= latest[k]["_stamp"]:
+            latest[k] = {**a, "_stamp": stamp}
+    out = []
+    for code, name in label.items():
+        rows = sorted((v for (c, _), v in latest.items() if c == code), key=lambda v: v["_stamp"])
+        if not rows:
+            continue
+        p = prof.get(code, {})
+        spec = p.get("specialty", "")
+        if p.get("subspecialty"):
+            spec = f"{spec} ({p['subspecialty']})"
+        out.append({"reader": name, "pack": rows[0].get("pack", ""), "specialty": spec, "years": str(p.get("years", "")),
+                    "certified": p.get("certified", ""), "seen_before": p.get("seen_before", ""),
+                    "consent": p.get("consent", ""),
+                    "answers": [{"id": str(v["item"]).strip(), "edited": str(v["edited"]).strip(),
+                                 "finding": str(v["finding"]).strip(), "seconds": v.get("seconds", ""),
+                                 "comment": v.get("comment", "")} for v in rows]})
+    return out
+
+
+def from_sheet(args) -> None:
+    d = Path(args.from_sheet)
+    read = lambda name: list(csv.DictReader(open(d / name, newline="", encoding="utf-8")))  # noqa: E731
+    recs = sheet_to_readers(read("readers.csv"), read("profiles.csv"), read("answers.csv"))
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    for r in recs:
+        f = out / f"reader_{r['reader']}.json"
+        f.write_text(json.dumps(r, indent=1))
+        print(f"{f}: {len(r['answers'])} answers ({r['specialty'] or 'specialty not given'}, {r['certified'] or '?'}, "
+              f"{r['years'] or '?'} y; earlier round: {r['seen_before'] or '?'}; consent: {r['consent'] or '?'})")
+
+
 def auc(pos: list[float], neg: list[float]) -> float:
     pairs = [(1.0 if p > n else 0.5 if p == n else 0.0) for p in pos for n in neg]
     return sum(pairs) / len(pairs) if pairs else float("nan")
@@ -224,7 +284,8 @@ def score(args) -> None:
            f"({', '.join(f'{n_kind[k]} {LABEL[k].lower()}' for k in kinds)}); {len(readers)} reader(s): "
            + "; ".join(f"{r['reader']} ({r.get('specialty') or 'specialty not given'}, {r.get('years') or '?'} y, "
                        f"{r.get('certified') or 'certification not given'}, "
-                       f"{len(r['answers'])} answers)" for r in readers) + ".", "",
+                       + (f"took part in an earlier round: {r['seen_before']}, " if r.get("seen_before") else "")
+                       + f"{len(r['answers'])} answers)" for r in readers) + ".", "",
            "## 1. Can physicians tell edited images from unmodified ones, and the erasure from the control edit?", "",
            "Edited-rating 1 (definitely real) to 4 (definitely edited); 'called edited' = rating 3 or 4. "
            "AUC 0.5 = chance, 1.0 = always told apart. If the control edit is as recognisable as the erasure "
@@ -327,6 +388,15 @@ def score(args) -> None:
     for s in sorted({k[0] for k in by_src}):
         cells = [f"{sum(by_src[(s, g)])}/{len(by_src[(s, g)])}" if by_src[(s, g)] else "-" for g in ("erased", "control", "unmodified")]
         out.append(f"| {s} | " + " | ".join(cells) + " |")
+    notes = [(r["reader"], a) for r in readers for a in r["answers"]
+             if a.get("comment") and a["id"] in key and key[a["id"]]["kind"] == "target_removal" and a.get("finding") == "yes"]
+    if notes:
+        out += ["", "## 5. What readers noted on erased images they called Yes (free text, descriptive only)", "",
+                "| Image | Source | Tool | Reader | Note |", "| --- | --- | --- | --- | --- |"]
+        for name, a in sorted(notes, key=lambda x: x[1]["id"]):
+            k = key[a["id"]]
+            note = str(a["comment"]).replace("|", "/").replace("\n", " ")
+            out.append(f"| {a['id']} | {k['source']} | {k.get('tool') or '-'} | {name} | {note} |")
     Path(args.out).write_text("\n".join(out) + "\n")
     print("\n".join(out))
 
@@ -345,8 +415,12 @@ def main() -> None:
     ap.add_argument("--tool-per-kind", type=int, default=24, help="build: images per kind for each --tool")
     ap.add_argument("--exclude-keys", nargs="*", default=[], help="build: leave out every case already in these packs")
     ap.add_argument("--answers", nargs="*", default=[])
+    ap.add_argument("--from-sheet", help="directory with readers.csv, profiles.csv, answers.csv (pack 4); writes answer files to --out")
     args = ap.parse_args()
-    score(args) if args.score else build(args)
+    if args.from_sheet:
+        from_sheet(args)
+    else:
+        score(args) if args.score else build(args)
 
 
 if __name__ == "__main__":

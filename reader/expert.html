@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Reading Study</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1b2130; --muted: #5b6474; --line: #dce0e6;
+    --accent: #2457c5; --accent-text: #ffffff; --chosen: #e4ecfd; --chosen-line: #2457c5;
+    --ok: #1f7a3d; --warn: #9a5b00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #121418; --card: #1b1f26; --text: #e6e9ef; --muted: #9aa3b2; --line: #313844;
+            --accent: #7aa2ff; --accent-text: #0d1117; --chosen: #22314f; --chosen-line: #7aa2ff;
+            --ok: #6fd08e; --warn: #f0b45a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  h1 { font-size: 1.35rem; margin: 0 0 8px; }
+  h2 { font-size: 1.02rem; margin: 18px 0 6px; }
+  p, li { color: var(--muted); }
+  b, strong { color: var(--text); }
+  label.field { display: block; margin: 12px 0 4px; font-weight: 600; color: var(--text); }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 10px 12px; font: inherit; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--text); }
+  .check { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; color: var(--text); }
+  .check input { margin-top: 5px; width: 18px; height: 18px; flex: none; }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+           color: var(--text); padding: 10px 14px; min-height: 44px; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.link { border: none; background: none; color: var(--accent); padding: 4px 0; min-height: 0; }
+  .opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .opts button[aria-pressed=true] { background: var(--chosen); border-color: var(--chosen-line); font-weight: 600; }
+  .img-wrap { background: #000; border-radius: 8px; display: flex; justify-content: center; align-items: center;
+              overflow: hidden; min-height: 200px; }
+  .img-wrap img { max-width: 100%; max-height: 60vh; display: block; cursor: zoom-in; }
+  .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .progress { height: 6px; background: var(--line); border-radius: 3px; margin: 8px 0 14px; overflow: hidden; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; }
+  .meta { font-size: .9rem; color: var(--muted); }
+  .q { font-weight: 600; color: var(--text); margin: 14px 0 8px; }
+  .sync { font-size: .85rem; }
+  .sync.ok { color: var(--ok); }
+  .sync.warn { color: var(--warn); }
+  .keys { font-size: .8rem; color: var(--muted); margin-top: 10px; }
+  kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: .78rem; }
+  #zoom { position: fixed; inset: 0; background: rgba(0,0,0,.95); display: none; z-index: 9; overflow: auto; }
+  #zoom img { display: block; margin: auto; max-width: 100vw; max-height: 100vh; cursor: zoom-in; }
+  #zoom.big img { max-width: none; max-height: none; width: 250%; cursor: zoom-out; }
+  #zoom .close { position: fixed; top: 10px; right: 10px; z-index: 10; background: #222; color: #fff; border-color: #444; }
+  .hidden { display: none !important; }
+  ul.tight li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <section id="nolink" class="card hidden">
+    <h1>Image reading study</h1>
+    <p id="nolink-msg">Please open the personal link you received from the study team. Each reader has their own link,
+       so that your answers are saved to your record.</p>
+  </section>
+
+  <section id="start" class="card hidden">
+    <h1>Image reading study</h1>
+    <p>Thank you for taking part. You will see <b><span class="n-items">216</span> medical images</b> (CT, MRI, X-ray,
+       ultrasound and colonoscopy) from public research datasets. Some images are unmodified and some have been
+       digitally edited. For each image you answer two short questions.</p>
+    <ul class="tight">
+      <li><b>Time:</b> about 2.5 to 3 hours in total. You do not need to finish in one sitting.</li>
+      <li><b>Saving:</b> every answer is saved automatically as you go. You can close the page at any time and open
+          your link again later, on this or another device, to continue where you stopped.</li>
+      <li><b>Privacy:</b> the images contain no patient-identifying information. Your answers are stored under a reader
+          code, not your name, and are used only to evaluate the study images.</li>
+    </ul>
+    <h2>About you</h2>
+    <label class="field" for="specialty">Specialty</label>
+    <select id="specialty">
+      <option value="">Choose one</option>
+      <option>Radiology</option>
+      <option>Gastroenterology / endoscopy</option>
+      <option>Other</option>
+    </select>
+    <label class="field" for="subspecialty">Subspecialty or main area of practice (optional)</label>
+    <input id="subspecialty" type="text" maxlength="100" autocomplete="off" placeholder="e.g. thoracic, neuroradiology, breast imaging">
+    <label class="field" for="certified">Certification</label>
+    <select id="certified">
+      <option value="">Choose one</option>
+      <option value="board-certified radiologist">Board-certified radiologist</option>
+      <option value="board-certified other specialty">Board-certified, other specialty</option>
+      <option value="in training">In training (resident / registrar)</option>
+      <option value="other">Other</option>
+    </select>
+    <label class="field" for="years">Years since board certification (0 if in training)</label>
+    <input id="years" type="number" min="0" max="60" inputmode="numeric" autocomplete="off">
+    <label class="field" for="seen">Have you taken part in an earlier round of this image-reading study?</label>
+    <select id="seen">
+      <option value="">Choose one</option>
+      <option value="no">No</option>
+      <option value="yes">Yes</option>
+    </select>
+    <label class="check"><input type="checkbox" id="consent">
+      <span>I agree that my answers and the details above are used, under a reader code, for a research publication
+            evaluating these images.</span></label>
+    <div class="bar"><span class="meta" id="start-note"></span><button class="primary" id="go" disabled>Continue</button></div>
+  </section>
+
+  <section id="guide" class="card hidden">
+    <h1>How to answer</h1>
+    <p>For each image, two questions:</p>
+    <ol>
+      <li><b>Has this image been digitally edited?</b> Rate from <i>definitely real</i> to <i>definitely edited</i>.
+          An edited image may have had a region altered or filled in by software.</li>
+      <li><b>The clinical question shown under the image</b> (for example, "Is there a polyp?").
+          Answer <b>Yes</b>, <b>No</b> or <b>Cannot tell</b> from what you see in this image.</li>
+    </ol>
+    <ul class="tight">
+      <li>Answer from the image alone; there is no other clinical information.</li>
+      <li>Please answer the clinical question as you would in practice, even if you suspect the image was edited.</li>
+      <li>Tap or click the image to enlarge it; in the enlarged view, click again to zoom further.</li>
+      <li>An optional note box lets you say briefly what you see (for example, where a finding is). Notes are welcome
+          but never required.</li>
+      <li>You can go back to change an answer; the latest answer counts.</li>
+    </ul>
+    <div class="bar"><span></span><button class="primary" id="begin">Start reading</button></div>
+  </section>
+
+  <section id="item" class="card hidden">
+    <div class="bar" style="margin-top:0"><span class="meta" id="count"></span><span class="sync" id="sync"></span></div>
+    <div class="progress"><div id="prog"></div></div>
+    <div class="img-wrap"><img id="img" alt="Study image"></div>
+    <div class="q">1. Has this image been digitally edited?</div>
+    <div class="opts" id="q1">
+      <button data-v="1">Definitely real</button><button data-v="2">Probably real</button>
+      <button data-v="3">Probably edited</button><button data-v="4">Definitely edited</button>
+    </div>
+    <div class="q" id="q2text">2.</div>
+    <div class="opts" id="q2">
+      <button data-v="yes">Yes</button><button data-v="no">No</button><button data-v="unsure">Cannot tell</button>
+    </div>
+    <div style="margin-top:10px">
+      <button class="link" id="note-toggle">Add a note (optional)</button>
+      <textarea id="note" class="hidden" rows="2" maxlength="500" placeholder="What do you see? e.g. residual mass at lower left; blurred patch near the centre"></textarea>
+    </div>
+    <div class="bar"><button id="back">Back</button><button class="primary" id="next" disabled>Next</button></div>
+    <div class="keys">Keyboard: <kbd>1</kbd>&ndash;<kbd>4</kbd> question 1, <kbd>Y</kbd> <kbd>N</kbd> <kbd>C</kbd> question 2,
+      <kbd>Enter</kbd> next, <kbd>&larr;</kbd> back.</div>
+  </section>
+
+  <section id="done" class="card hidden">
+    <h1 id="done-title">Saving your answers</h1>
+    <p id="done-msg"></p>
+    <div class="bar" style="justify-content:flex-start">
+      <button class="primary hidden" id="retry">Try saving again</button>
+      <button class="hidden" id="backup">Download a backup file</button>
+      <button id="review">Review my answers</button>
+    </div>
+  </section>
+</main>
+<p class="meta" style="max-width:820px;margin:0 auto;padding:0 16px 24px">Images from public research datasets
+  (SLAKE, Kvasir-SEG, HyperKvasir, ChestX-Det / NIH ChestX-ray14, BUSI, TCGA-LGG). No patient-identifying information.
+  Questions or problems: <span id="contact">gurrambhaskar.ai@gmail.com</span></p>
+<div id="zoom"><button class="close" id="zoom-close">Close</button><img alt="Enlarged study image"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const code = (new URLSearchParams(location.search).get('r') || '').trim();
+  let endpoint = '', pack = '', items = [], byId = {}, order = [], pos = 0, shownAt = 0;
+  let answers = {};        // id -> {edited, finding, seconds, comment, client_time, position}
+  let pending = {};        // id -> answer not yet confirmed by the server
+  let serverIds = new Set(), profile = null, profileSaved = false, busy = false, failures = 0, retryTimer = null;
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+  const key = () => 'reader-study-v4:' + pack + ':' + code;
+  const save = () => store.set(key(), { answers, pending, pos, profile, profileSaved });
+
+  function seeded(str) {           // the same order for a reader on every device
+    let h = 2166136261;
+    for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1e9) / 1e9; };
+  }
+  function shuffle(arr, rnd) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  function show(view) {
+    ['nolink', 'start', 'guide', 'item', 'done'].forEach(v => $(v).classList.toggle('hidden', v !== view));
+    window.scrollTo(0, 0);
+  }
+
+  // ---------------------------------------------------------------- server
+  async function getStatus() {
+    const r = await fetch(endpoint + '?r=' + encodeURIComponent(code), { cache: 'no-store' });
+    return r.json();
+  }
+  function absorb(st) {
+    if (!st || !st.ok) return;
+    serverIds = new Set(st.answered || []);
+    if (st.profile) profileSaved = true;
+    for (const id of Object.keys(pending)) if (serverIds.has(id) && pending[id].sent) delete pending[id];
+  }
+  function syncText() {
+    const n = Object.keys(pending).length;
+    const el = $('sync');
+    if (!n) { el.textContent = 'All answers saved'; el.className = 'sync ok'; }
+    else if (failures) { el.textContent = `${n} answer${n > 1 ? 's' : ''} waiting to be saved (no connection; will retry)`; el.className = 'sync warn'; }
+    else { el.textContent = 'Saving...'; el.className = 'sync'; }
+  }
+  async function flush() {
+    if (busy || !endpoint) return;
+    const ids = Object.keys(pending).slice(0, 40);
+    if (!ids.length && (profileSaved || !profile)) { syncText(); return; }
+    busy = true;
+    ids.forEach(id => { pending[id].sent = true; });
+    const body = JSON.stringify({ reader: code, pack, profile: profileSaved ? null : profile,
+                                  answers: ids.map(id => ({ id, ...answers[id] })) });
+    try {
+      let st = null;
+      try {
+        const r = await fetch(endpoint, { method: 'POST', body, headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+        st = await r.json();
+      } catch (e) {
+        // Some browsers cannot read the reply; the answers may still have arrived, so ask the server what it holds.
+        await fetch(endpoint, { method: 'POST', body, mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+        st = await getStatus();
+      }
+      if (!st || !st.ok) throw new Error((st && st.error) || 'no reply');
+      absorb(st);
+      ids.forEach(id => { if (pending[id] && pending[id].sent) delete pending[id]; });   // refused by the server: never loop on it
+      failures = 0;
+    } catch (e) {
+      failures++;
+      ids.forEach(id => { if (pending[id]) pending[id].sent = false; });
+    }
+    busy = false;
+    save(); syncText();
+    if (Object.keys(pending).length) {
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(flush, failures ? Math.min(60000, 5000 * failures) : 300);
+    }
+    if (!$('done').classList.contains('hidden')) renderDone();
+  }
+
+  // ---------------------------------------------------------------- reading
+  function render() {
+    if (pos >= order.length) { show('done'); renderDone(); flush(); return; }
+    const it = byId[order[pos]];
+    const a = answers[it.id] || {};
+    $('count').textContent = `Image ${pos + 1} of ${order.length}`;
+    $('prog').style.width = `${100 * pos / order.length}%`;
+    $('img').src = it.image;
+    $('q2text').textContent = '2. ' + it.question;
+    for (const [grp, field] of [['q1', 'edited'], ['q2', 'finding']]) {
+      for (const b of $(grp).querySelectorAll('button')) b.setAttribute('aria-pressed', String(a[field] === b.dataset.v));
+    }
+    $('note').value = a.comment || '';
+    $('note').classList.toggle('hidden', !a.comment);
+    $('next').disabled = !(a.edited && a.finding);
+    $('back').disabled = pos === 0;
+    shownAt = performance.now();
+    syncText();
+    show('item');
+    const nx = order[pos + 1] && byId[order[pos + 1]];
+    if (nx) { const pre = new Image(); pre.src = nx.image; }     // load the next image in advance
+  }
+  function current() {
+    const id = order[pos];
+    const a = answers[id] || {};
+    a.seconds = Math.round(((a.seconds || 0) + (performance.now() - shownAt) / 1000) * 10) / 10;
+    shownAt = performance.now();
+    answers[id] = a;
+    return a;
+  }
+  function choose(field, v) {
+    const a = current();
+    a[field] = v;
+    save(); render();
+  }
+  function commit() {             // the answer for this image is final until the reader comes back to it
+    const id = order[pos];
+    const a = current();
+    a.comment = ($('note').value || '').trim();
+    a.client_time = new Date().toISOString();
+    a.position = pos + 1;
+    pending[id] = { sent: false };
+    save(); flush();
+  }
+  function next() {
+    const a = answers[order[pos]] || {};
+    if (!(a.edited && a.finding)) return;
+    commit(); pos++; save(); render();
+  }
+  function back() {
+    if (pos === 0) return;
+    if ((answers[order[pos]] || {}).edited && (answers[order[pos]] || {}).finding) commit();
+    pos--; save(); render();
+  }
+
+  function renderDone() {
+    const total = order.length;
+    const saved = order.filter(id => serverIds.has(id) && !pending[id]).length;
+    const waiting = Object.keys(pending).length;
+    if (!waiting && saved === total) {
+      $('done-title').textContent = 'Thank you';
+      $('done-msg').textContent = `All ${total} answers are saved. You can close this page. If you want to change an answer, use Review.`;
+      $('retry').classList.add('hidden'); $('backup').classList.add('hidden');
+    } else {
+      $('done-title').textContent = 'Saving your answers';
+      $('done-msg').textContent = `${total - waiting} of ${total} answers saved so far. ` +
+        (failures ? 'The connection seems to be down. Keep this page open and press "Try saving again" when you are back online, or download a backup file and send it to the study team.'
+                  : 'Please keep this page open for a moment.');
+      $('retry').classList.toggle('hidden', !failures);
+      $('backup').classList.toggle('hidden', !failures);
+    }
+  }
+
+  // ---------------------------------------------------------------- start
+  function profileReady() {
+    return $('specialty').value && $('certified').value && $('years').value !== '' && $('seen').value && $('consent').checked;
+  }
+  ['specialty', 'certified', 'years', 'seen', 'consent', 'subspecialty'].forEach(id =>
+    $(id).addEventListener('input', () => { $('go').disabled = !profileReady(); }));
+  ['specialty', 'certified', 'seen'].forEach(id => $(id).addEventListener('change', () => { $('go').disabled = !profileReady(); }));
+  $('go').addEventListener('click', () => {
+    profile = { specialty: $('specialty').value, subspecialty: ($('subspecialty').value || '').trim(),
+                certified: $('certified').value, years: $('years').value, seen_before: $('seen').value,
+                consent: $('consent').checked ? 'yes' : 'no', user_agent: navigator.userAgent };
+    save(); flush(); show('guide');
+  });
+  $('begin').addEventListener('click', () => { pos = order.findIndex(id => !(answers[id] || {}).finding && !serverIds.has(id)); if (pos < 0) pos = order.length; render(); });
+
+  $('q1').addEventListener('click', e => e.target.dataset.v && choose('edited', e.target.dataset.v));
+  $('q2').addEventListener('click', e => e.target.dataset.v && choose('finding', e.target.dataset.v));
+  $('note-toggle').addEventListener('click', () => { $('note').classList.remove('hidden'); $('note').focus(); });
+  $('next').addEventListener('click', next);
+  $('back').addEventListener('click', back);
+  $('review').addEventListener('click', () => { pos = 0; render(); });
+  $('retry').addEventListener('click', () => { failures = 0; flush(); });
+  $('backup').addEventListener('click', () => {
+    const text = JSON.stringify({ reader: code, pack, profile, answers: order.filter(id => answers[id]).map(id => ({ id, ...answers[id] })) }, null, 1);
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = `reader_${code}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+  });
+  document.addEventListener('keydown', e => {
+    if ($('item').classList.contains('hidden') || e.target.tagName === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if ('1234'.includes(k) && k.length === 1) choose('edited', k);
+    else if (k === 'y') choose('finding', 'yes');
+    else if (k === 'n') choose('finding', 'no');
+    else if (k === 'c') choose('finding', 'unsure');
+    else if (k === 'enter' || k === 'arrowright') next();
+    else if (k === 'arrowleft') back();
+    else return;
+    e.preventDefault();
+  });
+  $('img').addEventListener('click', () => {
+    const z = $('zoom'); z.querySelector('img').src = $('img').src; z.classList.remove('big'); z.style.display = 'block';
+  });
+  $('zoom').querySelector('img').addEventListener('click', () => $('zoom').classList.toggle('big'));
+  $('zoom-close').addEventListener('click', () => { $('zoom').style.display = 'none'; });
+  window.addEventListener('online', () => { failures = 0; flush(); });
+  window.addEventListener('beforeunload', e => { if (Object.keys(pending).length) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------------------------------------------------------------- boot
+  (async () => {
+    if (!code) { show('nolink'); return; }
+    try {
+      const [cfg, data] = await Promise.all([fetch('config.json', { cache: 'no-store' }).then(r => r.json()),
+                                             fetch('items.json').then(r => r.json())]);
+      endpoint = cfg.endpoint; pack = data.pack || ''; items = data.items;
+    } catch (e) {
+      $('nolink-msg').textContent = 'The study could not be loaded. Please check your connection and reload the page.';
+      show('nolink'); return;
+    }
+    items.forEach(x => { byId[x.id] = x; });
+    document.querySelectorAll('.n-items').forEach(el => { el.textContent = items.length; });
+    order = shuffle(items.map(x => x.id), seeded(code));
+    const saved = store.get(key());
+    if (saved) ({ answers = {}, pending = {}, pos = 0, profile = null, profileSaved = false } = saved);
+    Object.values(pending).forEach(p => { p.sent = false; });
+    try {
+      const st = await getStatus();
+      if (!st.ok) {
+        $('nolink-msg').textContent = 'This link is not recognised. Please use the personal link you received, or contact the study team.';
+        show('nolink'); return;
+      }
+      absorb(st);
+    } catch (e) { failures = 1; }       // offline: continue; answers wait on this device and are sent later
+    if (profile || profileSaved) {
+      pos = order.findIndex(id => !(answers[id] || {}).finding && !serverIds.has(id));
+      if (pos < 0) pos = order.length;
+      flush(); render();
+    } else show('start');
+  })();
+})();
+</script>
+</body>
+</html>

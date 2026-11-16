@@ -242,3 +242,61 @@ class TestLeakage(unittest.TestCase):
         e /= np.linalg.norm(e, axis=1, keepdims=True)
         cal = calibration(e, [f"p{i}" for i in range(10)] * 3)
         self.assertGreater(cal["auroc"], 0.95)
+
+
+class TestReaderSheet(unittest.TestCase):
+    """Pack 4 answers arrive as Google Sheet rows (reader/apps_script.gs); they must become the usual answer files."""
+
+    def rows(self):
+        readers = [{"code": "k1", "label": "R1"}, {"code": "k2", "label": "R2"}, {"code": "tt", "label": "TEST"}]
+        profiles = [{"reader": "k1", "specialty": "Radiology", "subspecialty": "thoracic", "years": "12",
+                     "certified": "board-certified radiologist", "seen_before": "no", "consent": "yes"}]
+        a = lambda t, r, i, e, f, c="": {"server_time": t, "reader": r, "pack": "p4", "item": i, "edited": e,  # noqa: E731
+                                         "finding": f, "seconds": "9", "comment": c, "client_time": t}
+        answers = [a("2026-11-20 10:00:00", "k1", "i000", "1", "yes"),
+                   a("2026-11-20 10:01:00", "k1", "i001", "3", "no"),
+                   a("2026-11-20 10:05:00", "k1", "i000", "2", "no", "changed my mind"),   # later answer wins
+                   a("2026-11-20 10:02:00", "k2", "i000", "4", "unsure"),
+                   a("2026-11-20 10:03:00", "tt", "i000", "1", "yes"),                   # test code: left out
+                   a("2026-11-20 10:04:00", "zz", "i000", "1", "yes")]                   # unknown code: left out
+        return readers, profiles, answers
+
+    def test_latest_answer_and_exclusions(self):
+        from make_reader_study import sheet_to_readers
+        recs = {r["reader"]: r for r in sheet_to_readers(*self.rows())}
+        self.assertEqual(set(recs), {"R1", "R2"})
+        r1 = {a["id"]: a for a in recs["R1"]["answers"]}
+        self.assertEqual(r1["i000"]["finding"], "no")
+        self.assertEqual(r1["i000"]["comment"], "changed my mind")
+        self.assertEqual(len(r1), 2)
+        self.assertEqual(recs["R1"]["specialty"], "Radiology (thoracic)")
+        self.assertEqual(recs["R1"]["pack"], "p4")
+        self.assertEqual(recs["R2"]["certified"], "")
+
+    def test_end_to_end_score(self):
+        import csv as _csv
+        readers, profiles, answers = self.rows()
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            for name, rows in (("readers.csv", readers), ("profiles.csv", profiles), ("answers.csv", answers)):
+                cols = sorted({k for r in rows for k in r})
+                with open(d / name, "w", newline="") as f:
+                    w = _csv.DictWriter(f, fieldnames=cols)
+                    w.writeheader()
+                    w.writerows(rows)
+            key = {"pack": "p4", "items": [
+                {"id": "i000", "kind": "target_removal", "source": "BUSI", "tool": "diffusion", "stress": False},
+                {"id": "i001", "kind": "original", "source": "BUSI", "tool": None, "stress": False}]}
+            (d / "key.json").write_text(json.dumps(key))
+            script = str(ROOT / "scripts" / "make_reader_study.py")
+            r = subprocess.run([sys.executable, script, "--from-sheet", str(d), "--out", str(d / "ans")],
+                               capture_output=True, text=True, cwd=ROOT)
+            self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+            files = sorted(str(p) for p in (d / "ans").glob("*.json"))
+            self.assertEqual(len(files), 2)
+            r = subprocess.run([sys.executable, script, "--score", "--key", str(d / "key.json"), "--answers", *files,
+                                "--out", str(d / "report.md")], capture_output=True, text=True, cwd=ROOT)
+            self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+            rep = (d / "report.md").read_text()
+            self.assertIn("2 reader(s)", rep)
+            self.assertIn("took part in an earlier round: no", rep)

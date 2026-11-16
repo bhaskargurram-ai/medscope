@@ -134,3 +134,20 @@ v4's minus 0.02, its lesion-free claims at most v4's plus 0.02, and it finds at 
 pneumothoraxes as v4.1. It is tested either way on the main test, external, fresh and fresh external sets, the new
 SIIM test patients and standard VQA. MedScope-4B (v4) remains the pre-registered model of the paper; v4.2 is reported
 as a post hoc remedy.
+
+---
+
+# Amendment 2 (16 Nov 2026, R5 delivery only; committed before pack 4 was built)
+
+Nothing in R5's images, readers, questions, criterion or analysis changes. Only how the answers reach us:
+
+- **Automatic saving.** Each reader gets a personal link (an opaque code, no name). Every answer is saved as it is
+  given to a Google Sheet owned by the author (`reader/expert.html`, `reader/apps_script.gs`); readers send nothing
+  back and can continue on any device. Each save is a new row; a reader's latest answer per image counts. Codes are
+  issued by notebook 49; a TEST code used to check the connection is never scored.
+- **Two recorded fields added**, neither scored in the pre-registered criterion: whether the reader took part in an
+  earlier round (packs 2-3; R5 requires none did, so a "yes" is reported and that reader is analysed apart), and an
+  optional free-text note per image. Notes on erased images called "Yes" are reported descriptively (what readers
+  saw), answering a question the trainee study left open.
+- **Consent** to the use of the answers under a reader code is recorded on the page before the first image.
+- The image order is shuffled per reader (seeded by the reader's code, so the same on every device), as before.

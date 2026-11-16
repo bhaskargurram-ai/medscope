@@ -2666,8 +2666,9 @@ tok = (secret('GITHUB_TOKEN') or '').strip()
 if not tok:
     raise SystemExit('Add the Colab secret GITHUB_TOKEN (write access to medscope-reader), then rerun this cell.')
 remote = f'https://x-access-token:{tok}@github.com/bhaskargurram-ai/medscope-reader.git'
+who = git('log', '-1', '--format=%an|%ae', cwd='/content/medscope').stdout.strip().split('|')   # the repository's own author
 r = subprocess.run(f'cd {PACK}/site && rm -rf .git && git init -q -b main && git add -A && '
-                   'git -c user.name="Bhaskar Gurram" -c user.email="bhaskargurram.g123@gmail.com" commit -q -m "Reader study" && '
+                   f'git -c user.name="{who[0]}" -c user.email="{who[1]}" commit -q -m "Reader study" && '
                    f'git push -q --force {remote} main', shell=True, capture_output=True, text=True)
 print(r.stderr.replace(tok, '***') or 'published')
 if r.returncode:
@@ -4577,69 +4578,193 @@ runtime.unassign()
 
 
 def nb49_expert_readers() -> list[dict]:
-    """Notebook 49: expert reader study (pack 4, R5): build and publish the page; later score the answers."""
+    """Notebook 49: expert reader study (pack 4, R5): build the pack, set up automatic saving to a Google Sheet,
+    publish personal reader links, follow progress, score."""
     return [md("""
 # MedScope 49: expert reader study (pack 4)
 
-The review's main request: board-certified radiologists, all imaging types, and the Stable Diffusion erasures the
-first readers never saw. Design fixed in `docs/REVIEW_EXPERIMENTS.md` (R5) before any image was drawn: from the main
+Design fixed in `docs/REVIEW_EXPERIMENTS.md` (R5; delivery in Amendment 2) before any image was drawn: from the main
 test set, each image from a different case, stratified by source, 36 each of unedited lesion images, LaMa erasures,
 LaMa control edits, unedited lesion-free images, Stable Diffusion erasures and Stable Diffusion control edits (216
-images, about 3 hours per reader). The page is the same blinded page as packs 2-3, now also asking for board
-certification; it is published at `.../medscope-reader/pack4/` and leaves packs 2 and 3 untouched.
+images, about 2.5-3 hours per reader, in as many sittings as they like).
 
-**Before you start:** the `medscope-reader` GitHub repository and the `GITHUB_TOKEN` secret from notebook 28.
-Recruit at least two board-certified radiologists (5+ years); they should not have seen packs 2 or 3.
+**Readers only open a personal link and answer.** Every answer is saved automatically to a Google Sheet in your Drive
+as they go; nothing has to be sent back. A reader can stop at any time and continue later, on any device.
 
-**Runtime:** CPU. Section 1 takes about 5 minutes. Run section 2 after the readers have sent their answer files:
-put them (`*.json`) in `MyDrive/medscope/reader/answers_pack4/`.
+**What you do once (about 10 minutes):**
+1. Run section 1. It builds the pack and creates the Google Sheet, and prints the Sheet link and the steps to connect
+   it (paste a short script into the Sheet, click Deploy, copy one URL).
+2. Paste that URL into the ENDPOINT box in section 2 and run section 2. It checks the connection, publishes the page
+   and prints one personal link per reader, plus a TEST link for you to try first.
+
+**Readers:** at least two board-certified radiologists (5 or more years after certification), and a
+gastroenterologist or endoscopist for colonoscopy if available; none should have seen packs 2 or 3.
+
+**Runtime:** CPU. Needs the `GITHUB_TOKEN` secret (write access to `medscope-reader`, as in notebook 28).
+Section 3 shows progress at any time; section 4 scores the answers.
 """),
         code(SETUP), code(RESTORE_ALL),
         code(r"""
 plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
-assert plan, 'docs/REVIEW_EXPERIMENTS.md is not in the repository'
-print('review plan committed:', plan[-1])
+assert 'Amendment 2' in open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read(), 'amendment 2 missing: pull the repository'
+print('review plan, latest commit:', plan[0])
 RS = f'{DRIVE}/reader'
 os.makedirs(f'{RS}/answers_pack4', exist_ok=True)
 KEY4 = f'{RS}/key_v4.json'
+SHEET_INFO = f'{RS}/pack4_sheet.json'
 INP = f'{DRIVE}/inpaint_test'
 assert os.path.exists(f'{INP}/diffusion/views.jsonl'), 'the Stable Diffusion test views are missing (notebook 21)'
+import secrets as _secrets, gspread, requests
+from google.colab import auth
+from google.auth import default as _gdefault
+auth.authenticate_user()
+gc = gspread.authorize(_gdefault()[0])
+HEAD = {'readers': ['code', 'label', 'name (private: fill in yourself)', 'created'],
+        'profiles': ['server_time', 'reader', 'pack', 'specialty', 'subspecialty', 'years', 'certified', 'seen_before',
+                     'consent', 'user_agent'],
+        'answers': ['server_time', 'reader', 'pack', 'item', 'edited', 'finding', 'seconds', 'comment', 'client_time',
+                    'position']}
 """),
-        md("## 1. Build pack 4 and publish it next to packs 2 and 3"),
+        md("## 1. Build the pack and create the Google Sheet"),
         code(r"""
-PACK = f'{WORK}/reader_site'
-os.makedirs(f'{PACK}/site', exist_ok=True)
-!tar -C {PACK}/site -xf {RS}/site_v2.tar
-os.makedirs(f'{PACK}/site/pack3', exist_ok=True)
-!tar -C {PACK}/site/pack3 -xf {RS}/site_v3.tar
+N_READERS = 4  # @param {type:"integer"}
 P4 = f'{WORK}/reader_pack4'
 if not os.path.exists(KEY4):
-    !python scripts/make_reader_study.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {P4} --per-kind 36 --seed 4 --tool diffusion={INP}/diffusion/views.jsonl --tool-per-kind 36
-    !cp {P4}/key.json {KEY4}
-    !cd {P4}/site && tar -cf {RS}/site_v4.tar .
-os.makedirs(f'{PACK}/site/pack4', exist_ok=True)
-!tar -C {PACK}/site/pack4 -xf {RS}/site_v4.tar
-for d in ('', '/pack3', '/pack4'):
-    !cp reader/index.html {PACK}/site{d}/index.html
+    sh(f"python scripts/make_reader_study.py --views {TEST_VIEWS} --negatives {TEST_NEG} --out {P4} --per-kind 36 --seed 4 --tool diffusion={INP}/diffusion/views.jsonl --tool-per-kind 36")
+    sh(f'cp {P4}/key.json {KEY4}')
+    sh(f'cd {P4}/site && tar -cf {RS}/site_v4.tar .')
+key4 = json.load(open(KEY4))
+from collections import Counter
+print('pack', key4['pack'], '|', len(key4['items']), 'images |',
+      dict(Counter((k['kind'], k.get('tool')) for k in key4['items'])))
+
+if os.path.exists(SHEET_INFO):
+    info = json.load(open(SHEET_INFO))
+    book = gc.open_by_key(info['id'])
+else:
+    book = gc.create('MedScope reader study - pack 4')
+    ws = book.sheet1
+    ws.update_title('readers')
+    for name in ('profiles', 'answers'):
+        book.add_worksheet(name, rows=200 if name == 'profiles' else 6000, cols=len(HEAD[name]))
+    for name, cols in HEAD.items():
+        book.worksheet(name).update(values=[cols], range_name='A1')
+    info = {'id': book.id, 'url': book.url}
+readers_ws = book.worksheet('readers')
+rows = readers_ws.get_all_records()
+now = __import__('datetime').datetime.now().isoformat(timespec='seconds')
+if not any(r['label'] == 'TEST' for r in rows):
+    readers_ws.append_row(['test-' + _secrets.token_hex(4), 'TEST', 'you (try the page; never scored)', now])
+have = [r for r in readers_ws.get_all_records() if r['label'] != 'TEST']
+for i in range(len(have) + 1, N_READERS + 1):
+    readers_ws.append_row([_secrets.token_hex(5), f'R{i}', '', now])
+info['pack'] = key4['pack']
+json.dump(info, open(SHEET_INFO, 'w'), indent=1)
+print('\nGoogle Sheet:', info['url'])
+print('''
+Connect it (once):
+  1. Open the Sheet above. Menu: Extensions > Apps Script.
+  2. Delete everything in the editor, paste the script printed below, and click Save (the disk icon).
+  3. Click Deploy > New deployment. Click the gear next to "Select type" and choose Web app.
+     Execute as: Me.   Who has access: Anyone.   Click Deploy.
+  4. Click Authorize access and choose your Google account. If Google says the app is not verified, click
+     Advanced > Go to (unsafe): it is your own script, and it can only write to this Sheet.
+  5. Copy the Web app URL (it ends in /exec) and paste it into ENDPOINT in section 2.
+''')
+print('-' * 30, 'script to paste', '-' * 30)
+print(open('/content/medscope/reader/apps_script.gs').read())
+"""),
+        md("## 2. Check the connection, publish the page and get the reader links"),
+        code(r"""
+ENDPOINT = ''  # @param {type:"string"}
+ENDPOINT = ENDPOINT.strip() or json.load(open(SHEET_INFO)).get('endpoint', '')   # kept from an earlier run
+if not ENDPOINT.endswith('/exec'):
+    raise SystemExit('Paste the Web app URL from step 5 above (it ends in /exec) into ENDPOINT, then run this cell again.')
+info = json.load(open(SHEET_INFO))
+readers = book.worksheet('readers').get_all_records()
+test_code = next(r['code'] for r in readers if r['label'] == 'TEST')
+# round trip: one answer from the TEST code, read back
+st = requests.get(ENDPOINT, params={'r': test_code}, timeout=60).json()
+if not st.get('ok'):
+    raise SystemExit(f'The script answered {st}: check that it is deployed from this Sheet with access "Anyone".')
+st = requests.post(ENDPOINT, data=json.dumps({'reader': test_code, 'pack': info['pack'], 'answers': [
+    {'id': 'i000', 'edited': '1', 'finding': 'no', 'seconds': 1, 'comment': 'connection check', 'client_time': 'notebook', 'position': 0}]}),
+    headers={'Content-Type': 'text/plain;charset=utf-8'}, timeout=60).json()
+assert st.get('ok') and 'i000' in st.get('answered', []), st
+assert requests.get(ENDPOINT, params={'r': 'not-a-reader'}, timeout=60).json().get('ok') is False
+print('connection works: a test answer was written to the Sheet and read back (TEST rows are never scored)')
+info['endpoint'] = ENDPOINT
+json.dump(info, open(SHEET_INFO, 'w'), indent=1)
+
+PACK = f'{WORK}/reader_site'
+sh(f'rm -rf {PACK} && mkdir -p {PACK}/site/pack3 {PACK}/site/pack4')
+sh(f'tar -C {PACK}/site -xf {RS}/site_v2.tar && tar -C {PACK}/site/pack3 -xf {RS}/site_v3.tar && tar -C {PACK}/site/pack4 -xf {RS}/site_v4.tar')
+for d in ('', '/pack3'):
+    sh(f'cp reader/index.html {PACK}/site{d}/index.html')       # packs 2 and 3 unchanged
+sh(f'cp reader/expert.html {PACK}/site/pack4/index.html')
+json.dump({'endpoint': ENDPOINT}, open(f'{PACK}/site/pack4/config.json', 'w'))
+assert 'kind' not in open(f'{PACK}/site/pack4/items.json').read(), 'the page must not hold the answer key'
 tok = (secret('GITHUB_TOKEN') or '').strip()
 if not tok:
     raise SystemExit('Add the Colab secret GITHUB_TOKEN (write access to medscope-reader), then rerun this cell.')
 remote = f'https://x-access-token:{tok}@github.com/bhaskargurram-ai/medscope-reader.git'
+who = git('log', '-1', '--format=%an|%ae', cwd='/content/medscope').stdout.strip().split('|')   # the repository's own author
 r = subprocess.run(f'cd {PACK}/site && rm -rf .git && git init -q -b main && git add -A && '
-                   'git -c user.name="Bhaskar Gurram" -c user.email="bhaskargurram.g123@gmail.com" commit -q -m "Reader study" && '
+                   f'git -c user.name="{who[0]}" -c user.email="{who[1]}" commit -q -m "Reader study" && '
                    f'git push -q --force {remote} main', shell=True, capture_output=True, text=True)
-print(r.stderr.replace(tok, '***') or 'published')
+print(r.stderr.replace(tok, '***') or 'published (GitHub Pages takes 1-2 minutes to update)')
 if r.returncode:
     raise SystemExit('Push failed: check that medscope-reader exists and the token can write to it.')
-print('Expert pack: https://bhaskargurram-ai.github.io/medscope-reader/pack4/')
+BASE = 'https://bhaskargurram-ai.github.io/medscope-reader/pack4/'
+print('\nTry it yourself first (answers from this link are never scored):')
+print('  TEST:', f'{BASE}?r={test_code}')
+print('\nPersonal links: send each reader one link. Write the reader\'s name next to the code in the Sheet\'s readers tab.')
+for r in readers:
+    if r['label'] != 'TEST':
+        print(f"  {r['label']}: {BASE}?r={r['code']}")
 """),
-        md("## 2. Score the experts' answers"),
+        md("## 3. Progress (run any time)"),
         code(r"""
-import glob
-answers = sorted(glob.glob(f'{RS}/answers_pack4/*.json'))
-print(len(answers), 'answer file(s):', [os.path.basename(a) for a in answers])
-if answers:
-    !python scripts/make_reader_study.py --score --key {KEY4} --answers {' '.join(answers)} --out {RESULTS}/reader_study_experts.md
+key4 = json.load(open(KEY4))
+labels = {r['code']: r['label'] for r in book.worksheet('readers').get_all_records()}
+ans = book.worksheet('answers').get_all_records()
+prof = {p['reader']: p for p in book.worksheet('profiles').get_all_records()}
+for code, lab in labels.items():
+    mine = [a for a in ans if a['reader'] == code]
+    done = len({a['item'] for a in mine})
+    last = max((str(a['server_time']) for a in mine), default='-')
+    p = prof.get(code, {})
+    who = f"{p.get('specialty', '')}, {p.get('certified', '')}, {p.get('years', '?')} y" if p else 'not started'
+    print(f"{lab:5s} {done:4d} / {len(key4['items'])} answered | last answer {last} | {who}")
+"""),
+        md("## 4. Score the answers (when the readers have finished)"),
+        code(r"""
+import csv, glob
+EXP = f'{RS}/pack4_export'
+os.makedirs(EXP, exist_ok=True)
+tabs = {name: book.worksheet(name).get_all_records() for name in ('readers', 'profiles', 'answers')}
+# backup files a reader downloaded when offline (rare): added as rows older than anything saved online
+by_code = {r['code']: r for r in tabs['readers']}
+for f in sorted(glob.glob(f'{RS}/answers_pack4/*.json')):
+    b = json.load(open(f))
+    if b.get('reader') in by_code:
+        tabs['answers'] += [{'server_time': '', 'reader': b['reader'], 'pack': b.get('pack', ''), 'item': a['id'],
+                             'edited': a.get('edited', ''), 'finding': a.get('finding', ''), 'seconds': a.get('seconds', ''),
+                             'comment': a.get('comment', ''), 'client_time': a.get('client_time', ''), 'position': a.get('position', '')}
+                            for a in b.get('answers', []) if a.get('edited') and a.get('finding')]
+        if b.get('profile') and not any(p['reader'] == b['reader'] for p in tabs['profiles']):
+            tabs['profiles'].append({'reader': b['reader'], **b['profile']})
+for name, rows in tabs.items():
+    cols = HEAD[name] if name != 'readers' else ['code', 'label', 'created']
+    with open(f'{EXP}/{name}.csv', 'w', newline='') as fh:
+        w = csv.DictWriter(fh, fieldnames=cols, extrasaction='ignore')
+        w.writeheader()
+        w.writerows(rows)
+sh(f'python scripts/make_reader_study.py --from-sheet {EXP} --out {EXP}/answers')
+files = ' '.join(sorted(glob.glob(f'{EXP}/answers/*.json')))
+sh(f'python scripts/make_reader_study.py --score --key {KEY4} --answers {files} --out {RESULTS}/reader_study_experts.md')
+from medscope.colab import publish_doc
+publish_doc('MedScope report - 49 expert readers', open(f'{RESULTS}/reader_study_experts.md').read())
 """),
     ]
 
