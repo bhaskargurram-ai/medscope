@@ -91,3 +91,46 @@ localized findings apart from the named stress tests; acceptable if the exact 95
 36 images, possible only with no residual image). Reported with edit detectability (AUC), agreement on edits and on
 the finding (Cohen's kappa), and by source. Results replace nothing: they are added to the trainee study, and the
 reader-verified re-scoring is repeated on the expert labels.
+
+---
+
+# Amendment 1 (15 Nov 2026, after a second review; committed before R6-R8 ran)
+
+R1-R4 have run (results in `docs/RESULTS_LOG.md`). A second pass of the review asked for a Med-CAP comparison,
+subject-wise splits for every source and a retrained model without the pneumothorax failure. The author asked to
+leave IEEE formatting and further clinical validation aside.
+
+## R6. A Med-CAP-style comparator: adaptive prior suppression
+
+Med-CAP (MICCAI 2026) has two parts: evidence-discard training from gradient attribution on a classifier head, which
+an agent answering in text does not have, and adaptive prior suppression at decision time, which we test. For each
+stage-0 validation case, the question-only prior p is the recipe's single-turn decision log-odds on a uniform grey
+image with the case's question and candidate replies (`scripts/fw_stage0.py --stage prior`). Variants
+(`medscope/fw/aps.py`): fixed suppression s - a p and Med-CAP's adaptive form s - a0 c (1 - e) p (c: prior
+confidence, e: evidence strength); a, a0, the variant and the threshold are chosen on half A of the cases (by hash)
+with LaMa views only; results on half B for LaMa and TELEA. **Rule:** the chosen variant passes if the TELEA
+erased-vs-ring AUROC rises by at least 0.03 over the raw score with the case-bootstrap interval above zero.
+Reported with found, lesion-free claims and ESG at the half-A threshold.
+
+## R7. Leakage sensitivity where patient ids do not exist
+
+SLAKE, Kvasir-SEG/HyperKvasir and BUSI release no patient ids, so their splits stay by near-copy group; a strict
+subject-wise split cannot be made without the ids, and the splits are not changed after testing. Instead
+(`scripts/leakage_similarity.py`): (1) on training images with patient ids (ChestX-Det, TCGA-LGG), how well DINOv2
+image similarity separates same-patient from other-patient pairs; (2) for every main-test case, its most similar
+training image of the same source; within each source the top 10%, 25% and 50% most similar test cases are removed
+and the main-test comparisons (MedScope-4B vs gemini-4-argon, Claude Opus 5.5, gpt-6-astra) are recomputed from the
+stored outcomes, for all sources and for the three sources without ids. **Reading:** if MedScope-4B's ESG advantage
+over each comparator keeps its sign and its interval stays above zero after removing the top 25% in every source,
+leakage of near-similar images does not explain it.
+
+## R8. A rebalanced model: pneumothorax in every stage (v4.2, post hoc)
+
+v4.1 added SIIM pneumothorax training patients to stage 3 only (27% found on new SIIM patients). v4.2 runs the whole
+v4 recipe again (same data, options and seed) with the same 150 + 150 SIIM training patients added to stages 1, 2
+and 3 (and to the rejection-sampling pool), from patients in no evaluation (`scripts/prepare_siim_train.py`, same
+split as v4.1). **Rule, fixed before any v4.2 test result:** v4.2 passes if its validation net utility is at least
+v4's minus 0.02, its lesion-free claims at most v4's plus 0.02, and it finds at least as many SIIM validation
+pneumothoraxes as v4.1. It is tested either way on the main test, external, fresh and fresh external sets, the new
+SIIM test patients and standard VQA. MedScope-4B (v4) remains the pre-registered model of the paper; v4.2 is reported
+as a post hoc remedy.

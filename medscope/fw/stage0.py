@@ -247,6 +247,46 @@ def score_views(policy, views: list[View], originals: dict[str, View], out_path:
     return read_scores(out)
 
 
+def score_prior(policy, views: list[View], originals: dict[str, View], out_path: str | Path,
+                log: Callable[[str], None] = print) -> dict[str, dict]:
+    """The question-only prior of each case (review check R6, a Med-CAP-style comparator): s on a uniform mid-grey
+    image with the case's question and the same two candidate replies, so it carries no image evidence. One per case
+    (lesion-free images are their own case). Resumable jsonl keyed by case id."""
+    from PIL import Image
+    from ..agent.prompts import start_messages
+    from ..train.cmcc import candidates
+    torch = policy.torch
+    out = Path(out_path)
+    have = {}
+    if out.exists():
+        for line in out.read_text().splitlines():
+            if line.strip():
+                r = json.loads(line)
+                have[r["case_id"]] = r
+    refs: dict[str, View] = {}
+    for v in views:
+        if v.case_id not in refs:
+            refs[v.case_id] = reference_view(v, originals)
+    todo = [c for c in refs if c not in have]
+    log(f"question-only priors: {len(have)} done, {len(todo)} to run")
+    grey = np.asarray(Image.new("RGB", (512, 512), (128, 128, 128)))
+    policy.model.eval()
+    with open(out, "a") as f:
+        for i, cid in enumerate(todo):
+            ref = refs[cid]
+            present, absent = candidates(ref)
+            inputs = policy.encode(start_messages(grey, ref.question))
+            with torch.no_grad():
+                lp_p, lp_a = policy.token_logprobs_pair(None, policy.target_ids(present), policy.target_ids(absent),
+                                                        inputs=inputs)
+            f.write(json.dumps({"case_id": cid, "s_prior": float(lp_p.sum() - lp_a.sum())}) + "\n")
+            f.flush()
+            if (i + 1) % 50 == 0:
+                log(f"  {i + 1}/{len(todo)}")
+    rows = [json.loads(line) for line in out.read_text().splitlines() if line.strip()]
+    return {r["case_id"]: r for r in rows}
+
+
 def case_seed(text: str) -> int:
     return int(hashlib.sha1(text.encode()).hexdigest()[:8], 16)
 

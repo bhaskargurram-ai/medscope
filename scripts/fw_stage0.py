@@ -29,7 +29,7 @@ def main() -> None:
     ap.add_argument("--negs", type=int, default=80)
     ap.add_argument("--dev-dir", required=True, help="the screening dev folder (TELEA views are reused or made there)")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--stage", choices=["views", "score", "analyse", "generate", "analyse_gen", "tvbound", "all"], default="all")
+    ap.add_argument("--stage", choices=["views", "score", "analyse", "generate", "analyse_gen", "tvbound", "prior", "aps", "all"], default="all")
     ap.add_argument("--base-model", default="Qwen/Qwen3.5-4B")
     ap.add_argument("--model", action="append", default=[], help="name=adapter (empty adapter = the base model)")
     ap.add_argument("--layers", default="4,8,12,16,20,24,28,32")
@@ -69,7 +69,7 @@ def main() -> None:
             kinds[k] = kinds.get(k, 0) + 1
         print(f"dev: {len(dev)} views; new: {len(extra)} {kinds}")
     from medscope.fw.stage0 import scoreable
-    all_views = [v for v in dev + ([] if args.stage in ("analyse", "analyse_gen", "tvbound") else extra) if scoreable(v, originals)]
+    all_views = [v for v in dev + ([] if args.stage in ("analyse", "analyse_gen", "tvbound", "aps") else extra) if scoreable(v, originals)]
     print(f"scoreable views (yes/no questions): {len(all_views)}")
 
     if args.stage in ("score", "all"):
@@ -192,6 +192,40 @@ def main() -> None:
         (out / "tvbound.md").write_text(head + "\n".join(md))
         (out / "tvbound.json").write_text(json.dumps(js, indent=1, default=float))
         print((out / "tvbound.md").read_text())
+
+    if args.stage == "prior":
+        # review check R6: each case's question-only prior (uniform grey image), for every --model given
+        import torch
+
+        from medscope.fw.stage0 import score_prior
+        from medscope.train.hf_policy import HFPolicy
+        for spec in args.model:
+            name, _, adapter = spec.partition("=")
+            print(f"== {name} ({adapter or 'no adapter'})")
+            policy = HFPolicy(args.base_model, adapter=adapter or None, max_new_tokens=8)
+            score_prior(policy, all_views, originals, out / f"prior_{name}.jsonl")
+            del policy
+            gc.collect()
+            torch.cuda.empty_cache()
+
+    if args.stage == "aps":
+        from medscope.fw.aps import evaluate as aps_evaluate, report as aps_report
+        from medscope.fw.stage0 import read_scores
+        md, js = [], {}
+        for spec in args.model:
+            name = spec.partition("=")[0]
+            sc = read_scores(out / f"scores_{name}.jsonl")
+            pf = out / f"prior_{name}.jsonl"
+            if not sc or not pf.exists():
+                print(f"{name}: scores or priors missing, skipped")
+                continue
+            priors = {json.loads(l)["case_id"]: json.loads(l)["s_prior"] for l in pf.read_text().splitlines() if l.strip()}
+            res = aps_evaluate(sc, priors)
+            md.append(aps_report(res).replace("on the recipe's decision scores", f"on {name}'s decision scores"))
+            js[name] = res
+        (out / "aps.md").write_text("\n".join(md))
+        (out / "aps.json").write_text(json.dumps(js, indent=1, default=float))
+        print("\n".join(md))
 
 
 if __name__ == "__main__":

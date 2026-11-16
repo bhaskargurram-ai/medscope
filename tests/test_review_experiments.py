@@ -182,3 +182,63 @@ class TestReaderPackTool(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAPS(unittest.TestCase):
+    def test_prior_removes_case_offsets(self):
+        from medscope.fw.aps import evaluate, half, report
+        rng = np.random.default_rng(0)
+        scores, priors = {}, {}
+        for i in range(200):
+            c = f"c{i}"
+            off = rng.normal(0, 8)                   # a case-level offset (like the reply-length bias)
+            priors[c] = off + rng.normal(0, 0.1)
+            for tool in ("lama", "telea"):
+                for variant, base in (("erased", -2.0), ("ring", 2.0), ("control", 2.0)):
+                    vid = f"{c}_{tool}_{variant}"
+                    scores[vid] = {"view_id": vid, "case_id": c, "variant": variant, "tool": tool,
+                                   "s": off + base + rng.normal(0, 1)}
+            scores[f"{c}_o"] = {"view_id": f"{c}_o", "case_id": c, "variant": "original", "tool": None, "s": off + 2 + rng.normal(0, 1)}
+        res = evaluate(scores, priors)
+        self.assertEqual(res["fit"]["a"], 1.0)                                    # the full prior is subtracted
+        self.assertLess(res["methods"]["raw"]["auroc_telea_ring"], 0.75)        # offsets swamp the evidence
+        self.assertGreater(res["methods"]["fixed"]["auroc_telea_ring"], 0.95)   # suppression restores it
+        self.assertTrue(res["rule"]["pass"])
+        self.assertIn("PASSES", report(res))
+        self.assertIn(half("c1"), ("A", "B"))
+
+    def test_no_offsets_no_gain(self):
+        from medscope.fw.aps import evaluate
+        rng = np.random.default_rng(1)
+        scores, priors = {}, {}
+        for i in range(160):
+            c = f"c{i}"
+            priors[c] = rng.normal(0, 3)             # a prior unrelated to the scores
+            for tool in ("lama", "telea"):
+                for variant, base in (("erased", -1.0), ("ring", 1.0), ("control", 1.0)):
+                    vid = f"{c}_{tool}_{variant}"
+                    scores[vid] = {"view_id": vid, "case_id": c, "variant": variant, "tool": tool, "s": base + rng.normal(0, 1)}
+        res = evaluate(scores, priors)
+        self.assertFalse(res["rule"]["pass"])
+
+
+class TestLeakage(unittest.TestCase):
+    def test_nearest_and_exclusion(self):
+        from leakage_similarity import calibration, exclusion_sets, nearest_same_source
+        tr = np.eye(4)
+        te = np.array([[1, 0, 0, 0], [0, 0.6, 0.8, 0], [0, 0, 0, 1.0]])
+        s = nearest_same_source(te, ["A", "A", "B"], tr, ["A", "A", "B", "B"])
+        self.assertAlmostEqual(s[0], 1.0)
+        self.assertAlmostEqual(s[1], 0.6)                                  # only same-source training images count
+        self.assertAlmostEqual(s[2], 1.0)
+        drop = exclusion_sets(["x", "y", "z"], np.array([0.9, 0.5, 0.7]), ["A", "A", "B"], 0.5)
+        self.assertIn("x", drop)
+        self.assertNotIn("y", drop)
+        drop2 = exclusion_sets(["x", "y", "z"], np.array([0.9, 0.5, 0.7]), ["SLAKE CT", "SLAKE CT", "LGG"], 0.5, ("SLAKE",))
+        self.assertNotIn("z", drop2)
+        rng = np.random.default_rng(0)
+        centres = rng.normal(size=(10, 16))
+        e = np.concatenate([centres + rng.normal(0, 0.05, (10, 16)) for _ in range(3)])
+        e /= np.linalg.norm(e, axis=1, keepdims=True)
+        cal = calibration(e, [f"p{i}" for i in range(10)] * 3)
+        self.assertGreater(cal["auroc"], 0.95)

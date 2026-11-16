@@ -4644,6 +4644,193 @@ if answers:
     ]
 
 
+def nb50_review_checks2() -> list[dict]:
+    """Notebook 50: review checks R6 (Med-CAP-style prior suppression) and R7 (leakage sensitivity)."""
+    B = lambda t: t.replace('@BASE@', BASE)  # noqa: E731
+    others = ["v2_gemini_test", "v2_claudeopus_test", "v2_gpt6astra_test"]
+    return [md("""
+# MedScope 50: review checks 2 - Med-CAP-style prior suppression and a leakage sensitivity analysis
+
+Fixed in `docs/REVIEW_EXPERIMENTS.md` (amendment 1) before this ran.
+
+- **R6.** Med-CAP removes a question-only prior from the decision, adaptively. Here the recipe's decision score on a
+  blank grey image with the same question is that prior; fixed and adaptive suppression are fitted on half of the
+  validation cases and tested on the other half (LaMa and the held-out TELEA views).
+- **R7.** Three main-test sources release no patient ids. The main-test comparisons are recomputed after removing,
+  within each source, the test cases most similar to any training image (top 10%, 25%, 50%), from the stored
+  outcomes; where ids exist, we first check how well image similarity identifies a patient.
+
+**Needs:** notebooks 44-44c (stage-0 views and scores). An A100 (or L4), about 1 hour. Run all; nothing to set.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code(RESTORE_ALL), code(RESTORE_V4),
+        code(B(r"""
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+assert plan, 'docs/REVIEW_EXPERIMENTS.md is not in the repository'
+assert 'Amendment 1' in open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read(), 'amendment 1 missing: pull the repository'
+print('review plan, latest commit:', plan[0])
+import torch
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+if GPU_GB < 20:
+    raise SystemExit('This GPU is too small (T4 or none). Runtime > Change runtime type > A100 (or L4), then run all again.')
+SB, S0 = f'{RESULTS}/screen_b', f'{RESULTS}/fw_stage0'
+assert os.path.exists(f'{S0}/scores_recipe.jsonl'), 'run notebooks 44-44c first'
+ARGS = (f'--views {VAL_V4} --negatives {VAL_NEG_V4} --cases 200 --negs 80 --dev-dir {SB}/dev --out {S0} '
+        f'--base-model @BASE@ --model recipe={ADAPTERS}/v4_s1/final')
+""")),
+        md("## 1. R6: the question-only prior of every validation case (about 10 minutes), then suppression (CPU)"),
+        code(r"""
+sh(f'python scripts/fw_stage0.py {ARGS} --stage prior')
+sh(f'python scripts/fw_stage0.py {ARGS} --stage aps')
+"""),
+        md("## 2. R7: image similarity and the main test without the most similar cases (about 30 minutes)"),
+        code(f"""
+OTHERS = {others!r}
+sh(f'python scripts/leakage_similarity.py --train {{TRAIN_V4_BASE}} {{TRAIN_NEG_V4}} --test {{TEST_VIEWS}} {{TEST_NEG}} '
+   f'--results {{RESULTS}} --ref v4_final_test --others {{" ".join(OTHERS)}} --out {{RESULTS}}/leakage')
+"""),
+        publish("MedScope report - 50 review checks 2", """
+    ('R6: Med-CAP-style adaptive prior suppression', read_text(f'{RESULTS}/fw_stage0/aps.md')),
+    ('R7: leakage sensitivity', read_text(f'{RESULTS}/leakage/leakage.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
+def nb51_v42() -> list[dict]:
+    """Notebook 51: R8, MedScope v4.2 = the whole v4 recipe with SIIM pneumothorax patients in every stage (post hoc)."""
+    c26 = nb26_siim_fullres()
+    siim_data = next(c for c in c26 if "MANUAL =" in "".join(c["source"]))
+    s1 = S1_ARGS
+    s2 = ("--views {TRAIN_V4} --negatives {TRAIN_NEG_V4} --subsample 3000 --replays {ADAPTERS}/v42_rft/samples.jsonl "
+          "--hard-repeat 3 --lr 5e-5 --mode agentic --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    s3 = ("--views {TRAIN_V4} {REPLAY} --negatives {TRAIN_NEG_V4} --subsample 5000 --lr 5e-5 --mode agentic "
+          "--min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    return [md("""
+# MedScope 51: v4.2, the whole recipe with pneumothorax in every stage (review check R8, post hoc)
+
+v4 missed every pneumothorax on the fresh external test because its training held almost none (4 images) and its
+validation none. v4.1 (notebook 27) added 150 + 150 SIIM patients to stage 3 only and found 27% on new SIIM patients.
+v4.2 runs **all three stages again** (same data, options and seed as v4) with the same SIIM patients added to stage 1,
+the rejection-sampling pool and stage 2, and stage 3. The rule in `docs/REVIEW_EXPERIMENTS.md` (amendment 1, R8) is
+applied on validation before any test result; v4.2 is then tested everywhere and compared with v4 and v4.1 on the
+same new SIIM patients. MedScope-4B (v4) stays the paper's pre-registered model.
+
+**Needs:** an A100 40 GB or larger, about 11-13 hours (every step resumes, so it can span sessions); `HF_TOKEN`; the
+SIIM-ACR `archive.zip` in `MyDrive/medscope/siim/` (as for notebooks 26-27). Run all; nothing to set.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code("!pip install -q kaggle pydicom"), code(LAMA_CELL),
+        code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(r"""
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+assert 'Amendment 1' in open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read(), 'amendment 1 missing: pull the repository'
+print('review plan, latest commit:', plan[0])
+import torch
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+if GPU_GB < 35:
+    raise SystemExit('This GPU is too small. Runtime > Change runtime type > A100, then run all again.')
+BATCH = 24 if GPU_GB >= 38 else 8
+from medscope.eval.runner import scored_rows
+said_yes = lambda run, kind: [r['action'] == 'answer' and not r.get('claims_absent') for r in scored_rows(f'{RESULTS}/{run}') if r['kind'] == kind] if os.path.exists(f'{RESULTS}/{run}') else []
+"""),
+        md("## 1. SIIM-ACR images (as in notebooks 26-27)"),
+        siim_data,
+        code(r"""
+FULL = f'{V4}/siim_full'
+if not os.path.exists(f'{FULL}/views/views_clean.jsonl'):
+    sh(f"python scripts/siim_fullres.py --views {EXT2} --siim {SIIM} --out {FULL}")
+    sh(f"python scripts/build_views.py --manifest {FULL}/cases_test.jsonl --out {FULL}/views --inpainter lama")
+    sh(f"python scripts/check_views.py --views {FULL}/views/views.jsonl")
+SIIMFULL = f'{FULL}/views/views_clean.jsonl {FULL}/negatives/views_negatives_external.jsonl'
+ST = f'{V4}/siim_train'
+if not os.path.exists(f'{ST}/test/cases.jsonl'):
+    sh(f'python scripts/prepare_siim_train.py --siim {SIIM} --exclude-views {EXT2} {SIIMFULL} --out {ST} --train 150 --val 50 --test 100')
+for split in ('train', 'val', 'test'):
+    extra = '--v4-degradations' if split == 'train' else ''
+    if not os.path.exists(f'{ST}/{split}/views/views_clean.jsonl'):
+        sh(f'python scripts/build_views.py --manifest {ST}/{split}/cases.jsonl --out {ST}/{split}/views --inpainter lama {extra}')
+        sh(f'python scripts/check_views.py --views {ST}/{split}/views/views.jsonl')
+SIIM_TRAIN = f'{ST}/train/views/views_clean.jsonl {ST}/train/negatives.jsonl'
+SIIM_VAL = f'{ST}/val/views/views_clean.jsonl {ST}/val/negatives.jsonl'
+SIIM_TEST = f'{ST}/test/views/views_clean.jsonl {ST}/test/negatives.jsonl'
+print(open(f'{ST}/report.txt').read())
+"""),
+        md("## 2. Stage 1 with the SIIM patients (about 4 hours)"),
+        code(f"""
+if not os.path.exists(f'{{ADAPTERS}}/v42_s1/final/adapter_config.json'):
+    sh(f'python scripts/train_sft.py --model {BASE} {s1} --extra-views {{SIIM_TRAIN}} --out {{ADAPTERS}}/v42_s1')
+"""),
+        md("## 3. Stage 2: rejection sampling with the SIIM patients in the pool, then training (about 3-4 hours)"),
+        code(f"""
+if not os.path.exists(f'{{ADAPTERS}}/v42_rft/samples.jsonl'):
+    sh(f'python scripts/sample_rft.py --model {BASE} --adapter {{ADAPTERS}}/v42_s1/final --views {{TRAIN_V4}} {{ST}}/train/views/views_clean.jsonl --negatives {{TRAIN_NEG_V4}} {{ST}}/train/negatives.jsonl --per-kind 200 --per-kind-override natural_negative=500 target_removal=300 --k 4 --temperature 1.2 --out {{ADAPTERS}}/v42_rft/samples.jsonl')
+if not os.path.exists(f'{{ADAPTERS}}/v42_s2/final/adapter_config.json'):
+    sh(f'python scripts/train_sft.py --model {BASE} --init {{ADAPTERS}}/v42_s1/final {s2} --extra-views {{SIIM_TRAIN}} --out {{ADAPTERS}}/v42_s2')
+"""),
+        md("## 4. Stage 3 with the SIIM patients (about 1.5 hours)"),
+        code(f"""
+REPLAY = f'{{DRIVE}}/external/vqa_train/views_vqa_train.jsonl'
+if not os.path.exists(f'{{ADAPTERS}}/v42_s3/final/adapter_config.json'):
+    sh(f'python scripts/train_sft.py --model {BASE} --init {{ADAPTERS}}/v42_s2/final {s3} --extra-views {{SIIM_TRAIN}} --out {{ADAPTERS}}/v42_s3')
+V42 = f'{{ADAPTERS}}/v42_s3/final'
+FINAL = json.load(open(f'{{ADAPTERS}}/final_choice_v4.json'))['adapter']
+V41 = f'{{ADAPTERS}}/v41_s3/final'
+"""),
+        md("## 5. The rule, on validation only (before any test result)"),
+        code(f"""
+sh(f'python scripts/evaluate.py --model {BASE} --adapter {{V42}} --views {{VAL_V4}} {{VAL_NEG_V4}} --out {{RESULTS}}/v42_val --name medscope-v4.2 --split validation --batch-size {{BATCH}}')
+for run, adapter in [('v42', V42), ('v41', V41), ('v4_final', FINAL)]:
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{SIIM_VAL}} --out {{RESULTS}}/{{run}}_siimval_r8 --name {{run}}-siimval --split siimval --batch-size {{BATCH}}')
+m = lambda run, k: json.load(open(f'{{RESULTS}}/{{run}}/summary.json'))['metrics'][k]['value']
+det = lambda run: (lambda p: sum(p) / max(1, len(p)))(said_yes(run, 'original'))
+U42, U4 = m('v42_val', 'net_utility'), m('v4_s3_val', 'net_utility')
+H42, H4 = m('v42_val', 'natural_hallucination_rate'), m('v4_s3_val', 'natural_hallucination_rate')
+D42, D41 = det('v42_siimval_r8'), det('v41_siimval_r8')
+passed = U42 >= U4 - 0.02 and H42 <= H4 + 0.02 and D42 >= D41
+RULE = (f'validation net utility {{U42:.3f}} (v4 {{U4:.3f}}), lesion-free claims {{H42:.1%}} (v4 {{H4:.1%}}), SIIM '
+        f'validation pneumothorax found {{D42:.0%}} (v4.1 {{D41:.0%}}, v4 {{det("v4_final_siimval_r8"):.0%}}): '
+        + ('PASSED' if passed else 'NOT PASSED'))
+json.dump({{'adapter': V42, 'passed': passed, 'rule': RULE}}, open(f'{{ADAPTERS}}/v42_choice.json', 'w'), indent=1)
+print(RULE)
+"""),
+        md("## 6. Every test, and v4 and v4.1 on the same new SIIM patients (about 2.5 hours)"),
+        code(f"""
+SETS = {{'test': f'{{TEST_VIEWS}} {{TEST_NEG}}', 'ext': EXT_VIEWS, 'fresh': FRESH, 'ext2': EXT2, 'siimte': SIIM_TEST, 'vqa': VQA_VIEWS}}
+for split, views in SETS.items():
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {{V42}} --views {{views}} --out {{RESULTS}}/v42_{{split}} --name medscope-v4.2 --split {{split}} --batch-size {{BATCH}}')
+for run, adapter in [('v4_final', FINAL), ('v41', V41)]:
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {{adapter}} --views {{SIIM_TEST}} --out {{RESULTS}}/{{run}}_siimte_r8 --name {{run}}-siimte --split siimte --batch-size {{BATCH}}')
+lines = ['| Model | New SIIM patients: pneumothorax found | New SIIM patients: healthy called positive |', '| --- | --- | --- |']
+rate = lambda run, kind: (lambda p: f'{{sum(p)}}/{{len(p)}} ({{sum(p) / max(1, len(p)):.0%}})')(said_yes(run, kind))
+for tag in ('v42_siimte', 'v41_siimte_r8', 'v4_final_siimte_r8'):
+    lines.append(f'| {{tag}} | {{rate(tag, "original")}} | {{rate(tag, "natural_negative")}} |')
+PTX_TABLE = '\\n'.join(lines)
+open(f'{{RESULTS}}/v42_pneumothorax.md', 'w').write(PTX_TABLE + '\\n')
+print(PTX_TABLE)
+"""),
+        publish("MedScope report - 51 v4.2 rebalanced", """
+    ('What v4.2 is', 'The whole v4 recipe again (same data, options, seed) with 150 + 150 SIIM training patients added to stages 1, 2 (and the rejection-sampling pool) and 3. Post hoc; v4 remains the pre-registered model.'),
+    ('Rule fixed before any v4.2 test result', RULE),
+    ('Pneumothorax on new SIIM patients: v4.2, v4.1, v4', read_text(f'{RESULTS}/v42_pneumothorax.md')),
+    ('Main test: v4.2 vs v4 (paired)', significance_table(RESULTS, 'v42_test', ['v4_final_test'])),
+    ('External centres: v4.2 vs v4', significance_table(RESULTS, 'v42_ext', ['v4_final_ext'])),
+    ('Fresh internal: v4.2 vs v4', significance_table(RESULTS, 'v42_fresh', ['v4_final_fresh'])),
+    ('Fresh external: v4.2 vs v4', significance_table(RESULTS, 'v42_ext2', ['v4_final_ext2'])),
+    ('New SIIM patients: v4.2 vs v4 and v4.1', significance_table(RESULTS, 'v42_siimte', ['v4_final_siimte_r8', 'v41_siimte_r8'])),
+    ('By source', by_dataset(RESULTS, ['v42_test', 'v4_final_test', 'v42_ext2', 'v4_final_ext2'])),
+    ('Standard VQA', vqa_table(RESULTS, ['v42_vqa', 'v4_final_vqa'])),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -4723,6 +4910,8 @@ NOTEBOOKS = {
     "47_review_measurements.ipynb": nb47_review_measure,
     "48_review_arms.ipynb": nb48_review_arms,
     "49_expert_readers.ipynb": nb49_expert_readers,
+    "50_review_checks2.ipynb": nb50_review_checks2,
+    "51_v42_rebalanced.ipynb": nb51_v42,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
