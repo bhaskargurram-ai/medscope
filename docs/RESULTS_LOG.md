@@ -1342,3 +1342,23 @@ change of threshold rather than of separation.
   lesion-free claims -0.075 [-0.150, 0.000]; TELEA ring denial +0.075 [0.030, 0.128]. One seed.
 - Paper: new Section 4.6 and Appendix Table (review checks); Fig. 4B gains the two arms; perception and ceiling text
   updated.
+
+## 2026-11-16 — review checks R6, R7 (notebook 50; docs/REVIEW_EXPERIMENTS.md, Amendment 1)
+
+- **R6, Med-CAP-style adaptive prior suppression (validation dev set; fitted on half A, LaMa views; reported on half B,
+  118 cases):** does not pass. Chosen variant: fixed, a = 1.0 (adaptive a0 = 0.5, t = 15.44). TELEA erased-vs-ring
+  AUROC raw 0.731; fixed +0.003 [-0.018, 0.024]; adaptive -0.003 [-0.022, 0.019]. The adaptive form lowers LaMa AUROC
+  (ring -0.036 [-0.061, -0.010], control -0.047 [-0.075, -0.019]). At the half-A threshold the fixed form finds more
+  intact lesions (0.675 vs 0.506) but lowers TELEA ESG (ring 0.325 vs 0.398): a threshold change, not separation.
+  Lesion-free claims 0 for all three. Source: RESULTS/fw_stage0/aps.md, aps.json.
+- **R7, leakage sensitivity where patient ids do not exist:** reading met. (1) Calibration on training images with ids:
+  DINOv2 similarity barely separates same-patient from other-patient images (AUROC ChestX-Det 0.531, 35 images;
+  TCGA-LGG 0.530, 486 images). Note: the statistic compares the most similar of a patient's few other images with the
+  most similar of hundreds of other-patient images, which favours the latter, but in any case similarity is not a
+  patient detector here. (2) Worst-case exclusion: removing the top 25% most similar test cases per source (378 cases
+  kept): ESG 0.755; advantage over gemini-4-argon +0.306 [0.200, 0.405], Claude Opus 5.5 +0.435 [0.333, 0.530],
+  gpt-6-astra +0.456 [0.342, 0.561]. Top 50% (252 kept): ESG 0.795, all advantages >= +0.375 with CI above zero.
+  Sources without ids only, top 50% removed (337 kept): ESG 0.715, erased claims 13.1%, advantages +0.323, +0.454,
+  +0.415, all CIs above zero. Median nearest-training similarity by source: LGG 0.889, BUSI 0.844, ChestX-Det 0.987,
+  colonoscopy 0.863, SLAKE 0.846. Source: RESULTS/leakage/leakage.md, leakage.json.
+- Paper (v3): two paragraphs added to Section 4.6; Section 4.1 points to the exclusion.

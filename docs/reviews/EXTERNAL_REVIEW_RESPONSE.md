@@ -23,4 +23,12 @@ Experiments R1-R5 are pre-registered in `docs/REVIEW_EXPERIMENTS.md`.
 - R4 (ceiling measured): recipe's denial gap equals the probe TV bound (no read-out gap); base model's answers use
   little of the separation its hidden states hold.
 - R5 (expert readers): pending recruitment.
+
+## Second pass (Amendment 1) results (16 Nov 2026)
+- R6 (Med-CAP-style prior suppression): no pass; TELEA erased-vs-ring AUROC +0.003 [-0.018, 0.024]; the adaptive form
+  lowers LaMa AUROC; the fixed form finds more lesions but lowers TELEA ESG (threshold shift).
+- R7 (leakage without patient ids): reading met; after removing the 25% most similar test cases per source, every ESG
+  advantage keeps its sign with the interval above zero (+0.306 to +0.456). Similarity does not identify patients
+  (AUROC 0.53), so same-patient pairs that do not look alike remain possible; stated in the paper.
+- R8 (v4.2 rebalanced): running (notebook 51).
 Paper: Section 4.6, Appendix Table 4, Fig. 4B.
