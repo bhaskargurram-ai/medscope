@@ -69,7 +69,7 @@ def main() -> None:
             kinds[k] = kinds.get(k, 0) + 1
         print(f"dev: {len(dev)} views; new: {len(extra)} {kinds}")
     from medscope.fw.stage0 import scoreable
-    all_views = [v for v in dev + ([] if args.stage in ("analyse", "analyse_gen", "tvbound", "aps") else extra) if scoreable(v, originals)]
+    all_views = [v for v in dev + ([] if args.stage in ("analyse", "analyse_gen", "tvbound", "aps", "prior") else extra) if scoreable(v, originals)]
     print(f"scoreable views (yes/no questions): {len(all_views)}")
 
     if args.stage in ("score", "all"):
