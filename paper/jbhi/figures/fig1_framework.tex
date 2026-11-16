@@ -1,0 +1,94 @@
+% Figure 1: the counterfactual evidence pipeline, with real images from the data.
+% Tiles are cropped from the pipeline's own example sheet (figures/examples_montage.png; brain MRI: TCGA-LGG,
+% breast ultrasound: BUSI). Drawn at the IEEE two-column text width (7.16 in). Build: pdflatex fig1_framework.tex
+\documentclass[tikz,border=1pt]{standalone}
+\usepackage[scaled=0.92]{helvet}
+\usepackage{sansmath}
+\renewcommand{\familydefault}{\sfdefault}
+\usetikzlibrary{positioning,arrows.meta,calc}
+\definecolor{tblue}{HTML}{4477AA}
+\definecolor{tred}{HTML}{CC3344}
+\definecolor{tgreen}{HTML}{228833}
+\definecolor{stage}{HTML}{F4F5F7}
+\definecolor{ink}{HTML}{222222}
+\begin{document}
+\sansmath
+\begin{tikzpicture}[
+  font=\fontsize{6.6}{7.9}\selectfont\color{ink},
+  >={Stealth[length=3.6pt,width=3pt]},
+  flow/.style={->, line width=0.6pt, draw=black!60},
+  box/.style={draw=black!45, line width=0.4pt, fill=white, rounded corners=1.5pt, align=center, inner sep=2.5pt},
+  ttl/.style={font=\fontsize{6.6}{7.9}\selectfont\bfseries},
+  sm/.style={font=\fontsize{5.9}{7}\selectfont, text=black!70, align=center},
+  hdr/.style={font=\fontsize{7.6}{9}\selectfont\bfseries, anchor=west},
+  num/.style={circle, fill=tblue, text=white, font=\fontsize{6.8}{7}\selectfont\bfseries, inner sep=1.1pt, minimum size=9pt},
+  col/.style={font=\fontsize{6.6}{7.6}\selectfont\bfseries, anchor=base},
+  ans/.style={font=\fontsize{6.4}{7.4}\selectfont\itshape, anchor=north, align=center},
+]
+% ---------------------------------------------------------------- stage backgrounds and headers
+\fill[stage, rounded corners=3pt] (0,0.35) rectangle (10.95,6.0);
+\fill[stage, rounded corners=3pt] (11.2,0.35) rectangle (14.55,6.0);
+\fill[stage, rounded corners=3pt] (14.8,0.35) rectangle (18.1,6.0);
+\node[num] at (0.22,6.28) {1}; \node[hdr] at (0.42,6.28) {Build matched views of each case};
+\node[num] at (11.42,6.28) {2}; \node[hdr] at (11.62,6.28) {Run the agent};
+\node[num] at (15.02,6.28) {3}; \node[hdr] at (15.22,6.28) {Score and verify};
+
+% ---------------------------------------------------------------- stage 1, left: data flow
+\node[box, text width=2.05cm, font=\fontsize{6.1}{7.3}\selectfont] (src) at (1.3,5.1)
+  {{\bfseries Source case}\\image, expert lesion mask,\\closed question};
+\node[box, text width=2.05cm, font=\fontsize{6.1}{7.3}\selectfont] (edit) at (1.3,3.45)
+  {{\bfseries Inpainting edit}\\training: LaMa,\\tissue transplant\\held-out: TELEA,\\Stable Diffusion};
+\node[box, text width=2.05cm, font=\fontsize{6.1}{7.3}\selectfont] (qc) at (1.3,1.55)
+  {{\bfseries Automatic checks}\\control changes no lesion pixel; residual contrast; no near-copies across splits};
+\draw[flow] (src) -- (edit);
+\draw[flow] (edit) -- (qc);
+\draw[flow, rounded corners=2.5pt] (qc.east) -- (2.78,1.55) -- (2.78,4.135) -- (3.36,4.135);
+
+% ---------------------------------------------------------------- stage 1, right: real images (2 cases x 5 views)
+\foreach \i/\n/\t in {0/orig/Original, 1/erased/Lesion erased, 2/control/Control edit, 3/degraded/Degraded, 4/free/Lesion-free} {
+  \node[col] at (4.17+\i*1.5,5.62) {\t};
+  \node[inner sep=0pt, anchor=south west] at (3.45+\i*1.5,4.17) {\includegraphics[width=1.44cm]{tiles/mri_\n.png}};
+  \node[inner sep=0pt, anchor=south west] at (3.45+\i*1.5,2.84) {\includegraphics[width=1.44cm]{tiles/us_\n.png}};
+}
+\node[sm, rotate=90, anchor=south] at (3.42,4.8) {Brain MRI};
+\node[sm, rotate=90, anchor=south] at (3.42,3.47) {Breast US};
+\node[ans, text=tblue] at (4.17,2.78) {present,\\with box};
+\node[ans, text=tred]  at (5.67,2.78) {absent};
+\node[ans, text=tblue] at (7.17,2.78) {present};
+\node[ans, text=black!70] at (8.67,2.78) {ask for a\\better image};
+\node[ans, text=tred]  at (10.17,2.78) {absent};
+\draw[black!25, line width=0.3pt] (3.2,1.98) -- (10.75,1.98);
+\node[sm, anchor=north west, text width=7.45cm, align=left] at (3.15,1.9)
+  {Expected answer under each column. Every view of a case gets the same question (``Is there a lesion in this
+   breast ultrasound image?''). The control edit uses the same tool and mask shape as the erasure, elsewhere in the
+   image. Solid box: expert lesion box. Dashed box: edited region.};
+
+% ---------------------------------------------------------------- stage 2: agent loop
+\node[box, minimum width=2.95cm, minimum height=0.55cm] (in) at (12.875,5.4) {one view + question};
+\node[box, draw=tblue, line width=0.7pt, minimum width=2.95cm, minimum height=0.85cm] (vlm) at (12.875,4.2)
+  {{\bfseries Model under test}\\{\fontsize{5.9}{7}\selectfont short reasoning + one action}};
+\node[box, text width=1.0cm, minimum height=0.95cm, font=\fontsize{6.1}{7.3}\selectfont] (tool) at (12.0,2.7) {{\bfseries Tools}\\zoom,\\window};
+\node[box, text width=1.35cm, minimum height=0.95cm, font=\fontsize{6.1}{7.3}\selectfont] (out) at (13.6,2.7) {{\bfseries Final action}\\answer, refer\\or clarify};
+\draw[flow] (in) -- (vlm);
+\draw[flow] (vlm.south -| tool) -- (tool);
+\draw[flow] (vlm.south -| out) -- (out);
+\draw[flow, rounded corners=2.5pt] (tool.west) -- ++(-0.14,0) |- (vlm.west);
+\node[sm, anchor=north] at (12.875,1.95) {at most 3 tool calls; the same\\loop, prompt and images\\for all 16 models};
+\node[sm, anchor=north, text=tblue] at (12.875,1.05) {MedScope-4B:\\Qwen3.5-4B + LoRA};
+
+% ---------------------------------------------------------------- stage 3: metrics and checks
+\node[box, text width=2.9cm, align=left, font=\fontsize{6.1}{7.4}\selectfont] (met) at (16.45,4.45)
+  {{\fontsize{6.6}{7.9}\selectfont\bfseries Evidence Sensitivity Gap}\\[1.5pt]
+   ESG $=$ P(deny $\mid$ \textcolor{tred}{erased})\\\hspace*{2.3em}$-$ P(deny $\mid$ \textcolor{tgreen}{control})\\[1.5pt]
+   \textcolor{black!70}{deny $=$ absent or refer;\\zero for any constant policy}\\[1.5pt]
+   also: erased-lesion claims,\\AUROC, net utility};
+\node[box, text width=2.9cm, align=left, font=\fontsize{6.1}{7.4}\selectfont] (chk) at (16.45,1.6)
+  {{\fontsize{6.6}{7.9}\selectfont\bfseries Checks on the measure}\\[1.5pt]
+   held-out editing tools\\blinded physician readers\\probes on hidden states\\ceiling: ESG $\le$ TV distance};
+\draw[flow] (met) -- (chk);
+
+% ---------------------------------------------------------------- flow between stages
+\draw[flow, line width=0.9pt] (10.97,4.2) -- (11.18,4.2);
+\draw[flow, line width=0.9pt] (14.57,4.2) -- (14.78,4.2);
+\end{tikzpicture}
+\end{document}
