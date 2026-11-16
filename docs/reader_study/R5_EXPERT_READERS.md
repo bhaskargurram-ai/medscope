@@ -1,6 +1,6 @@
 # R5 expert reader study: how to run it
 
-**Pack:** 216 images from the main test set, each from a different case, stratified by source: 36 each of unedited
+**Pack:** 212 images (planned 216; only 32 Stable Diffusion control edits were available from distinct cases) from the main test set, each from a different case, stratified by source: 36 each of unedited
 lesion images, LaMa erasures, LaMa control edits, unedited lesion-free images, Stable Diffusion erasures and Stable
 Diffusion control edits (pre-registration: `docs/REVIEW_EXPERIMENTS.md`, R5 and Amendment 2).
 
@@ -30,10 +30,10 @@ endoscopist for colonoscopy if available. None may have seen packs 2 or 3 (the t
 >
 > Your personal link: ___
 >
-> - 216 images (CT, MRI, X-ray, ultrasound, colonoscopy) from public research datasets; no patient information.
+> - 212 images (CT, MRI, X-ray, ultrasound, colonoscopy) from public research datasets; no patient information.
 > - Two quick questions per image: has the image been digitally edited, and the clinical question shown
 >   (e.g. "Is there a polyp?"). Answer from the image alone.
-> - About 2.5 to 3 hours in total, in as many sittings as you like. Every answer is saved automatically; you can close
+> - About 2 hours in total, in as many sittings as you like. Every answer is saved automatically; you can close
 >   the page and open the link again later, on any device, to continue where you stopped. Nothing needs to be sent back.
 > - A computer or tablet works best for viewing the images.
 >

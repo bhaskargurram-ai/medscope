@@ -4586,7 +4586,7 @@ def nb49_expert_readers() -> list[dict]:
 Design fixed in `docs/REVIEW_EXPERIMENTS.md` (R5; delivery in Amendment 2) before any image was drawn: from the main
 test set, each image from a different case, stratified by source, 36 each of unedited lesion images, LaMa erasures,
 LaMa control edits, unedited lesion-free images, Stable Diffusion erasures and Stable Diffusion control edits (216
-images, about 2.5-3 hours per reader, in as many sittings as they like).
+images, about 2 hours per reader, in as many sittings as they like; 212 were available, see below).
 
 **Readers only open a personal link and answer.** Every answer is saved automatically to a Google Sheet in your Drive
 as they go; nothing has to be sent back. A reader can stop at any time and continue later, on any device.
