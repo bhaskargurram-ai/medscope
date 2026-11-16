@@ -4684,7 +4684,15 @@ info = json.load(open(SHEET_INFO))
 readers = book.worksheet('readers').get_all_records()
 test_code = next(r['code'] for r in readers if r['label'] == 'TEST')
 # round trip: one answer from the TEST code, read back
-st = requests.get(ENDPOINT, params={'r': test_code}, timeout=60).json()
+_r = requests.get(ENDPOINT, params={'r': test_code}, timeout=60)
+if 'accounts.google.com' in _r.url or not _r.text.lstrip().startswith('{'):
+    raise SystemExit('The script asked for a Google sign-in instead of answering, so readers could not save answers.\n'
+                     'Fix: in Apps Script, Deploy > Manage deployments > pencil icon > Who has access: Anyone '
+                     '(not "Anyone with Google account", not "Only myself") > Version: New version > Deploy.\n'
+                     'The URL stays the same; run this cell again.' if 'accounts.google.com' in _r.url else
+                     f'The script did not answer with data (first characters: {_r.text[:200]!r}). Check that the '
+                     'pasted script was saved before deploying, then Deploy > Manage deployments > New version.')
+st = _r.json()
 if not st.get('ok'):
     raise SystemExit(f'The script answered {st}: check that it is deployed from this Sheet with access "Anyone".')
 st = requests.post(ENDPOINT, data=json.dumps({'reader': test_code, 'pack': info['pack'], 'answers': [
