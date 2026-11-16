@@ -1362,3 +1362,22 @@ change of threshold rather than of separation.
   +0.415, all CIs above zero. Median nearest-training similarity by source: LGG 0.889, BUSI 0.844, ChestX-Det 0.987,
   colonoscopy 0.863, SLAKE 0.846. Source: RESULTS/leakage/leakage.md, leakage.json.
 - Paper (v3): two paragraphs added to Section 4.6; Section 4.1 points to the exclusion.
+
+## 2026-11-16 — review check R8: v4.2, SIIM in every stage (notebook 51; post hoc)
+
+- **Rule (fixed before any v4.2 test result): PASSED.** Validation net utility 0.632 (v4 0.613; limit >= 0.593),
+  lesion-free claims 9.1% (v4 7.7%; limit <= 9.7%), SIIM validation pneumothorax found 65% (v4.1 48%, v4 2%).
+- **New SIIM test patients (100 + 100):** pneumothorax found v4.2 53/100, v4.1 26/100 (27% in its original run,
+  notebook 27), v4 0/100; healthy called positive 5/100, 1/100, 0/100. ESG 0.360 vs 0.000 (v4), 0.080 (v4.1).
+- **Main test (507), v4.2 vs v4:** ESG 0.740 vs 0.758 (-0.018 [-0.073, 0.037], p 0.59); net utility 0.714 vs 0.732
+  (p 0.57); CCR 0.856 vs 0.849; erased claims 11.0% vs 9.6% (p 0.64); lesion-free claims 9.0% vs 7.6% (p 0.42).
+- **External centres (169):** ESG 0.739 vs 0.597 (+0.143 [0.070, 0.218]); net utility 0.696 vs 0.530 (+0.166
+  [0.071, 0.266]); CCR +0.088; erased claims 6.7% vs 11.8%.
+- **Fresh internal (76):** no significant difference (net utility +0.098 [-0.105, 0.318]).
+- **Fresh external (316):** net utility 0.048 vs -0.053 (+0.101 [0.001, 0.196], p 0.049); CCR +0.060; ESG +0.024
+  [-0.043, 0.086]. By source: SIIM (256-px copies) CCR 0.22 vs 0.00, utility -0.70 vs -1.10; BraTS meningioma worse
+  (ESG 0.31 vs 0.41, utility -0.17 vs -0.03, healthy claims 0.18 vs 0.08); BUS-UCLM ESG 0.63 vs 0.71; ETIS-Larib
+  ESG 0.59 vs 0.46.
+- **Standard VQA (all questions):** VQA-RAD 0.539 vs 0.514; SLAKE 0.750 vs 0.730; PathVQA 0.487 vs 0.477.
+- One seed. v4 remains the pre-registered model; v4.2 is reported as a post hoc remedy (paper v3: Sections 4.5, 4.6,
+  abstract, contributions, limitations). Source: RESULTS/51_v4.2_rebalanced_report.md, adapters/v42_choice.json.

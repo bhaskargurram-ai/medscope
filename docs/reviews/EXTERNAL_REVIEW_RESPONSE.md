@@ -30,5 +30,7 @@ Experiments R1-R5 are pre-registered in `docs/REVIEW_EXPERIMENTS.md`.
 - R7 (leakage without patient ids): reading met; after removing the 25% most similar test cases per source, every ESG
   advantage keeps its sign with the interval above zero (+0.306 to +0.456). Similarity does not identify patients
   (AUROC 0.53), so same-patient pairs that do not look alike remain possible; stated in the paper.
-- R8 (v4.2 rebalanced): running (notebook 51).
+- R8 (v4.2 rebalanced, post hoc): passed its rule; 53/100 pneumothoraxes on new SIIM patients (v4.1 26, v4 0) with
+  5/100 healthy films called positive; main test unchanged (ESG 0.740 vs 0.758, n.s.); external centres better (ESG
+  +0.143); BraTS meningioma worse. v4 stays the reported model.
 Paper: Section 4.6, Appendix Table 4, Fig. 4B.
