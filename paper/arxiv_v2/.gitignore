@@ -1,0 +1,9 @@
+*.aux
+*.log
+*.blg
+*.out
+*.bbl
+paper.bib
+*.spl
+paper.bib
+!paper.bbl
