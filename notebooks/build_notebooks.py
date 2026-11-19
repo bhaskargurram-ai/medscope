@@ -4964,6 +4964,142 @@ runtime.unassign()
     ]
 
 
+def nb52_natural_pairs() -> list[dict]:
+    """Notebook 52: review check R9 (Amendment 4), natural pairs - real lesion vs real absence, no editing."""
+    return [md("""
+# MedScope 52: natural pairs, a real lesion against a real absence in the same patient (review check R9)
+
+Fixed in `docs/REVIEW_EXPERIMENTS.md` (Amendment 4) before any frame or film was looked at. Nothing here is edited:
+
+- **Colonoscopy (primary):** REAL-Colon (60 full videos, 4 centres, never used in this project). A frame showing a
+  polyp and a frame of the same video 10-30 s before it appears (after, if nothing clear before), at least 10 s
+  from any boxed frame. Up to 3 polyps per video.
+- **Chest X-ray (secondary):** NIH ChestX-ray14 follow-ups. A film whose only label is a pneumothorax, effusion,
+  nodule or mass, and the nearest "No Finding" film of the same patient and view. Up to 50 per finding. Every
+  ChestX-Det patient and every near-copy of an earlier image is left out.
+
+Models: MedScope-4B (v4), v4.2, the untrained Qwen3.5-4B, and gemini-4-argon, claude-opus-5-5, gpt-6-astra over the
+API (about $30). Natural ESG = lesion-free image answered "absent" or referred, minus the same on the lesion image;
+paired bootstrap over whole videos or patients.
+
+**Needs:** an A100 (or L4), about 3-4 hours (downloads are most of it; every step resumes); the Colab secrets
+`KAGGLE_USERNAME` and `KAGGLE_KEY` (kaggle.com -> Settings -> API -> Create New Token), and `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`. Run all; nothing to set.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code("!pip install -q kaggle"), code(RESTORE_ALL),
+        code(RESTORE_V4),
+        code(r"""
+doc = open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read()
+assert 'Amendment 4' in doc, 'Amendment 4 missing: pull the repository'
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+print('plan, latest commit:', plan[0])
+for k in ('KAGGLE_USERNAME', 'KAGGLE_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY'):
+    if secret(k):
+        os.environ[k] = secret(k)
+import torch, subprocess, zipfile
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+if GPU_GB < 20:
+    raise SystemExit('This GPU is too small (T4 or none). Runtime > Change runtime type > A100 (or L4), then run all again.')
+BATCH = 24 if GPU_GB >= 38 else 8
+NP = f'{DRIVE}/natural_pairs'          # on Drive: survives a disconnect
+RAW = f'{WORK}/raw/natural_pairs'      # large downloads: local disk only, deleted after use
+os.makedirs(NP, exist_ok=True); os.makedirs(RAW, exist_ok=True)
+FINAL = json.load(open(f'{ADAPTERS}/final_choice_v4.json'))['adapter']
+V42 = f'{ADAPTERS}/v42_s3/final'
+EARLIER = ' '.join(f for f in f'{TRAIN_V4} {TRAIN_NEG_V4} {VAL_V4} {VAL_NEG_V4} {TEST_VIEWS} {TEST_NEG} {FRESH} {EXT2}'.split() if os.path.exists(f))
+ST = f'{V4}/siim_train/train/views/views_clean.jsonl'
+if os.path.exists(ST):
+    EARLIER += f' {ST}'
+"""),
+        md("## 1. Colonoscopy: REAL-Colon annotations, then only the chosen frames (about 1-2 hours of downloads)"),
+        code(r"""
+COLON = f'{NP}/colon'
+if not os.path.exists(f'{COLON}/views_natural_colon.jsonl'):
+    sh(f'python scripts/natural_pairs.py colon-fetch --out {COLON}')
+    sel = [json.loads(l) for l in open(f'{COLON}/selection.jsonl')]
+    if sum(len(s['pairs']) for s in sel) == 0:
+        sh(f'python scripts/natural_pairs.py colon-fetch --out {COLON}-inspect --max-videos 1 --inspect')
+        raise SystemExit('No polyp tracks were found: the annotation format differs from the one expected. '
+                         'Stop here and share the annotation file printed above; nothing has been evaluated.')
+    sh(f'python scripts/natural_pairs.py colon-build --out {COLON}')
+print(open(f'{COLON}/report_colon.txt').read())
+COLON_VIEWS = f'{COLON}/views_natural_colon.jsonl'
+"""),
+        md("## 2. Chest X-ray: NIH follow-up pairs (one 42 GB download, only the chosen films kept)"),
+        code(r"""
+CXR = f'{NP}/cxr'
+os.makedirs(CXR, exist_ok=True)
+if not os.path.exists(f'{CXR}/views_natural_cxr.jsonl'):
+    if not os.environ.get('KAGGLE_KEY'):
+        raise SystemExit('Add the Colab secrets KAGGLE_USERNAME and KAGGLE_KEY (notebook access on), then rerun this cell.')
+    csv = f'{CXR}/Data_Entry_2017.csv'
+    if not os.path.exists(csv):
+        sh(f'kaggle datasets download -d nih-chest-xrays/data -f Data_Entry_2017.csv -p {CXR}')
+        if os.path.exists(csv + '.zip'):
+            zipfile.ZipFile(csv + '.zip').extractall(CXR); os.remove(csv + '.zip')
+    import importlib.util, pandas as pd
+    spec = importlib.util.spec_from_file_location('natural_pairs', '/content/medscope/scripts/natural_pairs.py')
+    npm = importlib.util.module_from_spec(spec); spec.loader.exec_module(npm)
+    pairs = npm.cxr_pairs(pd.read_csv(csv), npm.excluded_patients(EARLIER.split()))
+    need = {p['pos'] for p in pairs} | {p['neg'] for p in pairs}
+    IMG = f'{RAW}/nih_images'
+    os.makedirs(IMG, exist_ok=True)
+    if len([f for f in os.listdir(IMG) if f in need]) < len(need):
+        sh(f'kaggle datasets download -d nih-chest-xrays/data -p {RAW}')
+        with zipfile.ZipFile(f'{RAW}/data.zip') as z:
+            for m in z.namelist():
+                if os.path.basename(m) in need:
+                    open(f'{IMG}/{os.path.basename(m)}', 'wb').write(z.read(m))
+        os.remove(f'{RAW}/data.zip')
+    sh(f'python scripts/natural_pairs.py cxr-build --csv {csv} --images {IMG} --exclude {EARLIER} --out {CXR}')
+    sh(f'python scripts/natural_pairs.py dedup --views {CXR}/views_natural_cxr.jsonl --against {EARLIER}')
+print(open(f'{CXR}/report_cxr.txt').read())
+CXR_VIEWS = f'{CXR}/views_natural_cxr.jsonl'
+"""),
+        md("## 3. Every model on both sets (local models about 1 hour; API models alongside)"),
+        code(r"""
+SETS = {'colon': COLON_VIEWS, 'cxr': CXR_VIEWS}
+LOCAL = [('v4', FINAL), ('v42', V42 if os.path.exists(f'{V42}/adapter_config.json') else None), ('base', '')]
+API = [('gemini', 'gemini', 'gemini-4-argon'), ('claudeopus', 'anthropic', 'claude-opus-5-5'), ('gpt6astra', 'openai', 'gpt-6-astra')]
+API = [a for a in API if os.environ.get({'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}[a[1]])]
+procs = []
+for tag, provider, model in API:
+    for s, views in SETS.items():
+        procs.append(subprocess.Popen(f'python scripts/evaluate.py --api {provider} --model {model} --views {views} '
+                                      f'--out {RESULTS}/np_{tag}_{s} --name {model}-natural --split natural_{s} --batch-size 8 '
+                                      f'> {NP}/log_{tag}_{s}.txt 2>&1', shell=True, cwd='/content/medscope'))
+for tag, adapter in LOCAL:
+    if adapter is None:
+        continue
+    for s, views in SETS.items():
+        a = f'--adapter {adapter}' if adapter else ''
+        sh(f'python scripts/evaluate.py --model {BASE} {a} --views {views} --out {RESULTS}/np_{tag}_{s} --name {tag}-natural --split natural_{s} --batch-size {BATCH}')
+for p in procs:
+    p.wait()
+for tag, _, _ in API:
+    for s in SETS:
+        print(tag, s, open(f'{NP}/log_{tag}_{s}.txt').read()[-400:])
+"""),
+        md("## 4. Natural ESG, paired against MedScope-4B (v4)"),
+        code(r"""
+RUNS = ' '.join(f'{n}={RESULTS}/np_{t}_{{s}}' for t, n in [('v4', 'MedScope-4B'), ('v42', 'MedScope-v4.2'), ('base', 'Qwen3.5-4B'),
+                                                       ('gemini', 'gemini-4-argon'), ('claudeopus', 'claude-opus-5-5'), ('gpt6astra', 'gpt-6-astra')])
+sh(f'python scripts/natural_pairs.py score --views {COLON_VIEWS} --runs {RUNS.format(s="colon")} --ref MedScope-4B --by dataset --out {NP}/natural_colon.md')
+sh(f'python scripts/natural_pairs.py score --views {CXR_VIEWS} --runs {RUNS.format(s="cxr")} --ref MedScope-4B --by finding --out {NP}/natural_cxr.md')
+"""),
+        publish("MedScope report - 52 natural pairs (R9)", """
+    ('What this is', 'Review check R9 (Amendment 4): a real lesion against a real absence of the same video or patient, nothing edited.'),
+    ('Colonoscopy (primary): REAL-Colon', read_text(f'{COLON}/report_colon.txt') + '\\n\\n' + read_text(f'{NP}/natural_colon.md')),
+    ('Chest X-ray (secondary): NIH follow-ups', read_text(f'{CXR}/report_cxr.txt') + '\\n\\n' + read_text(f'{NP}/natural_cxr.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -5045,6 +5181,7 @@ NOTEBOOKS = {
     "49_expert_readers.ipynb": nb49_expert_readers,
     "50_review_checks2.ipynb": nb50_review_checks2,
     "51_v42_rebalanced.ipynb": nb51_v42,
+    "52_natural_pairs.ipynb": nb52_natural_pairs,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

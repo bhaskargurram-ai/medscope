@@ -185,3 +185,54 @@ run once now and reported as interim, one reader:
   trainee readers.
 - The radiologist part of R5 stays closed under Amendment 3 (two radiologists or 10 January 2027); the closing rule
   does not change after this analysis. The final R5 report uses all readers and supersedes the interim one.
+
+---
+
+# Amendment 4 (19 Nov 2026, 00:15 ET): R9, natural pairs (committed before any frame or film was downloaded)
+
+## R9. Does the advantage hold on real lesions against real absences, with nothing edited?
+
+**Why.** MedScope-4B is trained on counterfactual views made by the pipeline that builds the test. The matched
+control edits, held-out tools, untouched lesion-free images and external centres argue against an "edited means
+absent" shortcut, but no test so far pairs a real lesion with a real absence in the same patient without any edit.
+
+**Data (never used in this project).**
+- **Colonoscopy, primary.** REAL-Colon (60 full videos from 4 centres, per-frame polyp boxes, CC BY 4.0). Per video,
+  the 3 longest polyp tracks (boxed runs, gaps under 2 s merged, at least 1 s long). Lesion frame: from the middle
+  half of the track, largest box at least 1% of the frame. Paired frame: same video, 10-30 s before the track starts
+  (after it ends if no frame qualifies before), and at least 10 s from any boxed frame. Of 12 evenly spaced
+  candidates per side, the sharpest (variance of the Laplacian) with mean brightness 40-215 is kept. Question:
+  "Is there a polyp in this image?" for both.
+- **Chest X-ray, secondary.** NIH ChestX-ray14 follow-up studies. Lesion film: the only label is pneumothorax,
+  pleural effusion, nodule or mass. Paired film: the nearest "No Finding" study of the same patient and view
+  position. One pair per patient, up to 50 per finding (chosen by a fixed hash). Every patient in any ChestX-Det
+  split is excluded, and any pair with a near-copy of an earlier image (any split, SIIM training patients included)
+  is dropped. Question: "Is there {finding} in this chest X-ray?", the main test's wording.
+
+**Models.** MedScope-4B (v4, the pre-registered model), v4.2 (reported apart), the untrained Qwen3.5-4B, and
+gemini-4-argon, claude-opus-5-5 and gpt-6-astra over their APIs, all with the main test's agent prompt.
+
+**Measure.** Natural ESG = share of lesion-free images answered "absent" or referred, minus the share of lesion
+images of the same video or patient answered "absent" or referred (constant policies score 0, as with ESG). Also
+reported: lesion found, lesion-free image answered "absent". Paired differences against MedScope-4B, 2,000 bootstrap
+resamples of whole videos (colonoscopy) or patients (chest X-ray), two-sided.
+
+**Reading rules, fixed now (colonoscopy).**
+- MedScope-4B's natural ESG above every flagship's, each difference's 95% interval above 0: the counterfactual
+  advantage carries over to unedited images.
+- Above none of them (every interval reaching 0 or below): it does not carry over, and the paper says so.
+- Otherwise: mixed, reported comparison by comparison.
+- Reported descriptively: MedScope-4B's natural ESG against its counterfactual colonoscopy ESG (0.95 on the main
+  test), and against the untrained base model (what training changes).
+
+**Chest X-ray** is reported by finding and pooled, descriptively. MedScope-4B's known pneumothorax failure (0/48 on
+the fresh external set) is expected to show; v4.2 is reported beside it. No chest X-ray result changes the
+colonoscopy reading.
+
+**Known limits, stated in advance.** Natural pairs differ in more than the lesion (view, lighting, bowel
+preparation); a paired frame may hold a small polyp that was not annotated (REAL-Colon boxes the polyps that were
+removed); NIH labels are mined from reports, not read from the images.
+
+**Fixed.** No parameter above changes after any frame, film or answer is seen. If the annotation files cannot be
+parsed as expected, only the parser changes, before any image is evaluated, and the change is logged. Every result is
+reported, whatever it shows. Code: `scripts/natural_pairs.py`, notebook 52.

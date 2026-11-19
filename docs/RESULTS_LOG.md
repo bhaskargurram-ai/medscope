@@ -1392,3 +1392,12 @@ change of threshold rather than of separation.
 - Agreement with pack-2 trainees on 39 shared images: kappa 0.24 and 0.39.
 - Model re-scoring not run in the interim (deviation, reported); done in the final R5 report.
 - Source: docs/reader_study/R5_interim_R1.md; paper v4, Section 4.5.
+
+## 2026-11-19 — R9 natural pairs pre-registered (Amendment 4; no results yet)
+
+Real lesion against real absence of the same video or patient, nothing edited: REAL-Colon colonoscopy (primary, up to
+180 pairs from 60 videos) and NIH ChestX-ray14 follow-up films (secondary, up to 200 pairs). Models: MedScope-4B, v4.2,
+base Qwen3.5-4B, gemini-4-argon, claude-opus-5-5, gpt-6-astra. Reading rules in docs/REVIEW_EXPERIMENTS.md; code in
+scripts/natural_pairs.py and notebook 52. Manuscript v4: new Section 5.1 collects the existing shortcut tests and their
+limits (no new runs; one bound derived from logged ESG and erased-claim rates).
+
