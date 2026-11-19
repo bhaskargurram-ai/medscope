@@ -168,3 +168,20 @@ endoscopist. No R5 answer has been opened or scored. Nothing in R5's images, que
   sources are reported by specialty and kept out of the radiologist majority.
 - **Readers as authors.** Readers who complete the reading and review the manuscript are offered authorship. They read
   blinded (no labels, no edit types, no other reader's answers), and the paper says which readers are authors.
+
+## Amendment 3a (18 Nov 2026, 23:10 ET; committed before any R5 answer was opened)
+
+The endoscopist's reading is complete for the images the protocol assigns to an endoscopist (colonoscopy), and that
+result does not depend on any radiologist. So an **interim single-reader analysis of the endoscopist (R1)** is added,
+run once now and reported as interim, one reader:
+
+- **Primary (colonoscopy):** share of erased images (LaMa; Stable Diffusion apart) on which R1 calls the finding
+  present, with the exact 95% interval, against R5's 10% upper-bound criterion; edit detectability (AUC, edited vs
+  unedited); finding calls on unedited lesion and lesion-free images; agreement with the trainee readers where the
+  same cases were read.
+- **Descriptive only (other sources):** the same measures for brain MRI, chest X-ray, breast ultrasound and SLAKE,
+  labelled as outside the reader's specialty and not used in any criterion.
+- **Re-scoring:** stored model outputs re-scored on the colonoscopy erasures R1 calls clean, as was done with the
+  trainee readers.
+- The radiologist part of R5 stays closed under Amendment 3 (two radiologists or 10 January 2027); the closing rule
+  does not change after this analysis. The final R5 report uses all readers and supersedes the interim one.
