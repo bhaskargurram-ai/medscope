@@ -151,3 +151,20 @@ Nothing in R5's images, readers, questions, criterion or analysis changes. Only 
   saw), answering a question the trainee study left open.
 - **Consent** to the use of the answers under a reader code is recorded on the page before the first image.
 - The image order is shuffled per reader (seeded by the reader's code, so the same on every device), as before.
+
+---
+
+# Amendment 3 (18 Nov 2026, R5 closing rule and readers; committed before any R5 answer was examined)
+
+One reader has completed pack 4 (code R1, all 212 images, 18 Nov 2026): a board-certified gastroenterologist and
+endoscopist. No R5 answer has been opened or scored. Nothing in R5's images, questions, criterion or analysis changes.
+
+- **Closing rule.** R5 closes when two board-certified radiologists (5 or more years after certification) have
+  completed all 212 images, or on 10 January 2027, whichever comes first. No answer is examined before R5 closes,
+  and the closing date is not moved after any answer is seen. If fewer than two radiologists have finished by then,
+  R5 is reported as incomplete, with what was collected and how many readers finished.
+- **Endoscopist reader.** The endoscopist reads all 212 images, as every reader does. As pre-registered ("an
+  endoscopist for colonoscopy"), the endoscopist's reads count in the criterion for colonoscopy images; reads of other
+  sources are reported by specialty and kept out of the radiologist majority.
+- **Readers as authors.** Readers who complete the reading and review the manuscript are offered authorship. They read
+  blinded (no labels, no edit types, no other reader's answers), and the paper says which readers are authors.
