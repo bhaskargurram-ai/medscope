@@ -1381,3 +1381,14 @@ change of threshold rather than of separation.
 - **Standard VQA (all questions):** VQA-RAD 0.539 vs 0.514; SLAKE 0.750 vs 0.730; PathVQA 0.487 vs 0.477.
 - One seed. v4 remains the pre-registered model; v4.2 is reported as a post hoc remedy (paper v3: Sections 4.5, 4.6,
   abstract, contributions, limitations). Source: RESULTS/51_v4.2_rebalanced_report.md, adapters/v42_choice.json.
+
+## 2026-11-18 — R5 interim: endoscopist reader R1 (Amendment 3a; one reader)
+
+- Reader: board-certified gastroenterologist / endoscopist, 20 y; all 212 images; median 6.7 s per image.
+- **Colonoscopy (primary):** erasures called present 4/17 (23.5%, exact 95% CI 6.8-49.9): LaMa 3/7, Stable Diffusion
+  1/10; 3 of the 4 asked "Is there an abnormality?" (polyp questions 1/9). Unedited lesions 8/9, control edits 27/28,
+  lesion-free 0/7. Edit AUC 0.68. 10% criterion not judgeable from one reader (0/17 would give upper bound 19.5%).
+- **Other sources (descriptive):** erasures called present 20/55, cannot tell 22; edit AUC 0.54 over all sources.
+- Agreement with pack-2 trainees on 39 shared images: kappa 0.24 and 0.39.
+- Model re-scoring not run in the interim (deviation, reported); done in the final R5 report.
+- Source: docs/reader_study/R5_interim_R1.md; paper v4, Section 4.5.
