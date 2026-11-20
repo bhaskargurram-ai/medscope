@@ -1401,3 +1401,11 @@ base Qwen3.5-4B, gemini-4-argon, claude-opus-5-5, gpt-6-astra. Reading rules in 
 scripts/natural_pairs.py and notebook 52. Manuscript v4: new Section 5.1 collects the existing shortcut tests and their
 limits (no new runs; one bound derived from logged ESG and erased-claim rates).
 
+## 2026-11-20 — Amendment 5 pre-registered (R12-R15) and notebook 53 (no results yet)
+
+R12 training seeds 1-2 of the full recipe; R13 erased-lesion results on low-visibility erasures (edit-trace detector);
+R14 open-ended request with a blind text judge; R15 reproduction from the public Hugging Face release. Notebook 53 runs
+them with R9 and makes the release public (MedScope-4B, MedScope-4B-v4.2, MedScope-Bench; cards link arXiv:2611.13006).
+Manuscript v4: the data-availability text no longer says per-view outputs are in the GitHub repository (they were on
+Drive and in a private release); it now points to the public Hugging Face release.
+

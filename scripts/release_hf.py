@@ -1,12 +1,14 @@
 """Prepare (and optionally upload) the MedScope release on Hugging Face.
 
   <user>/MedScope-4B      LoRA adapter of the final model (stage 3, with general-VQA replay)
-  <user>/MedScope-4B-R    LoRA adapter of the verification checkpoint (stage 2, rejection sampling)
+  <user>/MedScope-4B-R    LoRA adapter of the verification checkpoint (stage 2, rejection sampling; optional)
+  <user>/MedScope-4B-v4.2 LoRA adapter of the post hoc model with pneumothorax patients in every stage (optional)
   <user>/MedScope-Bench   benchmark manifests (views without images: the images are rebuilt from the public
                           sources with the repository's scripts, since the source licences differ), and every
                           evaluation run: summary, judged outcomes and transcripts
 
-Repositories are created private; make them public when the paper is submitted.
+Repositories are created private unless --public is given (then created public, or switched to public if they
+exist). Every card links the preprint (arXiv:2611.13006), so Hugging Face lists the model on the paper's page.
 
 Usage:
     python scripts/release_hf.py --final ADAPTERS/sft_v3/final --verify ADAPTERS/rft_train/final \
@@ -27,21 +29,39 @@ from medscope.agent.prompts import SYSTEM_PROMPT  # noqa: E402
 
 BASE = "Qwen/Qwen3.5-4B"
 GITHUB = "https://github.com/bhaskargurram-ai/medscope"
+ARXIV_ID = "2611.13006"
+ARXIV = f"https://arxiv.org/abs/{ARXIV_ID}"
+TITLE = ("Measuring and Attributing Evidence Sensitivity in Medical Vision-Language Models via Symmetric "
+         "Counterfactual Controls")
+CITATION = """```bibtex
+@misc{gurram2026medscope,
+  title         = {Measuring and Attributing Evidence Sensitivity in Medical Vision-Language Models via Symmetric Counterfactual Controls},
+  author        = {Gurram, Bhaskar},
+  year          = {2026},
+  eprint        = {2611.13006},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI},
+  url           = {https://arxiv.org/abs/2611.13006}
+}
+```"""
 SHOW = [("ccr", "Correct on real lesions (CCR)"), ("esg", "Evidence sensitivity gap (ESG)"),
         ("target_hallucination_rate", "Claims an erased lesion"), ("natural_hallucination_rate", "Claims a finding on a healthy image"),
         ("grounded_accuracy", "Grounded accuracy (IoU >= 0.3)"), ("clarify_rate_degraded", "Asks to clarify on degraded input"),
         ("net_utility", "Net utility")]
 
 MODEL_CARD = """---
-license: apache-2.0
+license: cc-by-nc-sa-4.0
 base_model: {base}
 library_name: peft
-tags: [medical, vision-language, agent, hallucination, research-only]
+pipeline_tag: image-text-to-text
+tags: [medical, vision-language, agent, hallucination, research-only, arxiv:{arxiv_id}]
 ---
 
 # {name}
 
 {blurb}
+
+**Paper:** [{title}]({arxiv}) (arXiv:{arxiv_id}). **Code, pre-registrations and notebooks:** {github}
 
 > **Research use only.** Not a medical device. Do not use for diagnosis or treatment.
 
@@ -79,16 +99,27 @@ The agent loop (tools, parsing, scoring) is in the GitHub repository (`medscope/
 
 ## Limitations
 
-Evaluated on public datasets with their labels as the reference standard; no clinician review. Weakest on very small
-lesions, diffuse findings (e.g. COVID-19 opacities) and SLAKE CT/MRI. 2D images only.
+Evaluated on public datasets with their labels as the reference standard. Blinded physician readers supported the
+automated erasures in colonoscopy but still called a finding on many erased images from other sources, so erased-lesion
+results outside colonoscopy are bounded rather than certified (see the paper). Weakest on very small lesions, diffuse
+findings (e.g. COVID-19 opacities), chest X-ray and SLAKE CT/MRI; the main model misses pneumothorax (fixed in part by
+MedScope-4B-v4.2). 2D images only. Licence: the adapters were trained on public datasets that include non-commercial
+share-alike terms, so they are released for non-commercial research under CC BY-NC-SA 4.0; the base model keeps its
+own licence.
+
+## Citation
+
+{citation}
 """
 
 BENCH_CARD = """---
 license: other
-tags: [medical, benchmark, hallucination, vision-language]
+tags: [medical, benchmark, hallucination, vision-language, arxiv:{arxiv_id}]
 ---
 
 # MedScope-Bench
+
+**Paper:** [{title}]({arxiv}) (arXiv:{arxiv_id}). **Code:** {github}
 
 Counterfactual evidence views for testing whether a medical vision-language model reports only what the image shows.
 For every image with an expert lesion mask: the original, the lesion erased by LaMa inpainting, a matched edit of the
@@ -109,7 +140,12 @@ abstains or reacts to edits.
 
 Sources: SLAKE, Kvasir-SEG, HyperKvasir, ChestX-Det, BUSI, TCGA-LGG (internal); CVC-ClinicDB, QaTa-COV19, BUS-BRA,
 BraTS-Africa 2023 (external); ETIS-LaribPolypDB, BUS-UCLM, BraTS 2023 meningioma, SIIM-ACR pneumothorax (fresh
-external). Cite the original datasets when using these views.
+external). Cite the original datasets when using these views. Blinded reader-study keys and answers are not part of
+this release.
+
+## Citation
+
+{citation}
 """
 
 
@@ -134,7 +170,8 @@ def build_model(out: Path, adapter: Path, repo: str, name: str, blurb: str, resu
             shutil.copy2(f, out / f.name)
     (out / "system_prompt.txt").write_text(SYSTEM_PROMPT + "\n")
     (out / "README.md").write_text(MODEL_CARD.format(base=BASE, name=name, blurb=blurb, repo=repo, github=GITHUB,
-                                                     rows=card_rows(results, test_run, ext_run)))
+                                                     rows=card_rows(results, test_run, ext_run), arxiv=ARXIV,
+                                                     arxiv_id=ARXIV_ID, title=TITLE, citation=CITATION))
 
 
 def build_bench(out: Path, results: Path, views: list[str], external: list[str], more: dict | None = None):
@@ -150,8 +187,9 @@ def build_bench(out: Path, results: Path, views: list[str], external: list[str],
                     rows.append(r)
         (out / "manifests" / f"{split}_views.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     n_runs = 0
-    for run in sorted([*results.glob("v2_*"), *results.glob("v4*")]):
-        if not (run / "summary.json").exists():
+    runs = {r for pat in ("v2_*", "v4*", "np_*", "ft_*", "seed*") for r in results.glob(pat)}
+    for run in sorted(runs):
+        if "reader" in run.name or not (run / "summary.json").exists():
             continue
         dst = out / "runs" / run.name
         dst.mkdir(parents=True, exist_ok=True)
@@ -161,10 +199,19 @@ def build_bench(out: Path, results: Path, views: list[str], external: list[str],
         n_runs += 1
     (out / "reports").mkdir(exist_ok=True)
     for f in results.glob("*.md"):
-        if f.exists():
+        if f.exists() and "reader" not in f.name and "key" not in f.name:
             shutil.copy2(f, out / "reports" / f.name)
-    (out / "README.md").write_text(BENCH_CARD.format(github=GITHUB))
+    (out / "README.md").write_text(BENCH_CARD.format(github=GITHUB, arxiv=ARXIV, arxiv_id=ARXIV_ID, title=TITLE,
+                                                     citation=CITATION))
     return n_runs
+
+
+def set_public(api, repo_id: str, kind: str) -> None:
+    """Switch an existing repository to public (the call's name differs between huggingface_hub versions)."""
+    if hasattr(api, "update_repo_settings"):
+        api.update_repo_settings(repo_id=repo_id, private=False, repo_type=kind)
+    else:
+        api.update_repo_visibility(repo_id=repo_id, private=False, repo_type=kind)
 
 
 def main() -> None:
@@ -182,7 +229,10 @@ def main() -> None:
                     help="further test manifests, e.g. fresh_internal=a.jsonl,b.jsonl")
     ap.add_argument("--out", required=True)
     ap.add_argument("--user", default=None, help="Hugging Face user or organisation (default: the token's owner)")
-    ap.add_argument("--upload", action="store_true", help="create the private repositories and upload")
+    ap.add_argument("--v42", default=None, help="adapter folder of the post hoc v4.2 model (optional)")
+    ap.add_argument("--v42-runs", nargs=2, default=["v42_test", "v42_ext"], metavar=("TEST", "EXT"))
+    ap.add_argument("--upload", action="store_true", help="create the repositories and upload")
+    ap.add_argument("--public", action="store_true", help="make the repositories public (default: private)")
     args = ap.parse_args()
 
     results, out = Path(args.results), Path(args.out)
@@ -191,7 +241,8 @@ def main() -> None:
         from huggingface_hub import HfApi
         user = HfApi().whoami()["name"]
     user = user or "your-username"
-    repos = {"final": f"{user}/MedScope-4B", "verify": f"{user}/MedScope-4B-R", "bench": f"{user}/MedScope-Bench"}
+    repos = {"final": f"{user}/MedScope-4B", "verify": f"{user}/MedScope-4B-R", "v42": f"{user}/MedScope-4B-v4.2",
+             "bench": f"{user}/MedScope-Bench"}
 
     build_model(out / "MedScope-4B", Path(args.final), repos["final"], "MedScope-4B", args.final_blurb,
                 results, *args.final_runs)
@@ -200,6 +251,12 @@ def main() -> None:
                     "Verification checkpoint (before VQA replay): fewer false findings on healthy images, weaker on "
                     "open general questions. Use MedScope-4B for general medical VQA.",
                     results, "v2_medscope_test", "v2_medscope_ext")
+    if args.v42:
+        build_model(out / "MedScope-4B-v4.2", Path(args.v42), repos["v42"], "MedScope-4B-v4.2",
+                    "Post hoc model (one seed): the whole MedScope-4B recipe rerun with 150 + 150 SIIM-ACR pneumothorax "
+                    "training patients added to every stage. Finds 53/100 pneumothoraxes on new patients (MedScope-4B: "
+                    "0/100) without changing the main-test results. MedScope-4B remains the pre-registered model.",
+                    results, *args.v42_runs)
     more = {k: v.split(",") for k, _, v in (m.partition("=") for m in args.more)}
     n = build_bench(out / "MedScope-Bench", results, args.views, args.external, more)
     print(f"prepared {out}: adapters, benchmark manifests and {n} evaluation runs")
@@ -208,11 +265,17 @@ def main() -> None:
         from huggingface_hub import HfApi
         api = HfApi()
         parts = [("final", "MedScope-4B", "model")] + ([("verify", "MedScope-4B-R", "model")] if args.verify else []) \
-            + [("bench", "MedScope-Bench", "dataset")]
+            + ([("v42", "MedScope-4B-v4.2", "model")] if args.v42 else []) + [("bench", "MedScope-Bench", "dataset")]
+        urls = {}
         for key, folder, kind in parts:
-            api.create_repo(repos[key], repo_type=kind, private=True, exist_ok=True)
+            api.create_repo(repos[key], repo_type=kind, private=not args.public, exist_ok=True)
+            if args.public:
+                set_public(api, repos[key], kind)
             api.upload_folder(folder_path=str(out / folder), repo_id=repos[key], repo_type=kind)
-            print(f"uploaded (private): https://huggingface.co/{'datasets/' if kind == 'dataset' else ''}{repos[key]}")
+            url = f"https://huggingface.co/{'datasets/' if kind == 'dataset' else ''}{repos[key]}"
+            urls[folder] = url
+            print(f"uploaded ({'public' if args.public else 'private'}): {url}")
+        (out / "release_urls.json").write_text(json.dumps(urls, indent=1))
 
 
 if __name__ == "__main__":

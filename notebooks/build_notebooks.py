@@ -5100,6 +5100,188 @@ runtime.unassign()
     ]
 
 
+def nb53_bulletproof() -> list[dict]:
+    """Notebook 53: public release, then review checks R9 (natural pairs), R12 (seeds), R13 (edit visibility),
+    R14 (open-ended request) and R15 (reproduction from the release), all fixed in docs/REVIEW_EXPERIMENTS.md."""
+    c52 = nb52_natural_pairs()
+    pick = lambda key: next(c for c in c52 if key in "".join(c["source"]))  # noqa: E731
+    s1 = S1_ARGS
+    s2 = ("--views {TRAIN_V4} --negatives {TRAIN_NEG_V4} --subsample 3000 --replays {ADAPTERS}/seed{SEED}_rft/samples.jsonl "
+          "--hard-repeat 3 --lr 5e-5 --mode agentic --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    s3 = ("--views {TRAIN_V4} {REPLAY} --negatives {TRAIN_NEG_V4} --subsample 5000 --lr 5e-5 --mode agentic "
+          "--min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    return [md("""
+# MedScope 53: public release and the last robustness checks (R9, R12-R15)
+
+Everything here was fixed in `docs/REVIEW_EXPERIMENTS.md` (Amendments 4 and 5) before it ran. MedScope-4B (v4) stays
+the reported model, and every result is reported whatever it shows.
+
+1. **Public release** on Hugging Face: MedScope-4B and MedScope-4B-v4.2 adapters, and MedScope-Bench (view manifests,
+   no images, and every run's summary, judged decisions and transcripts). Every card links the preprint
+   (arXiv:2611.13006), so Hugging Face lists the models on the paper's page. Reader-study keys are never uploaded.
+2. **R15 reproduction:** MedScope-4B downloaded from the public hub and run on the main test (about 1 hour).
+3. **R13 edit visibility:** an edit-trace detector picks the erasures that look no more edited than a control edit;
+   stored decisions are re-scored on them (about 20 minutes).
+4. **R14 open-ended request:** "Describe any abnormal findings" on 150 cases, five models, a blind judge (about 1 hour,
+   about $10 of API calls).
+5. **R9 natural pairs:** real lesion vs real absence, nothing edited (about 3-4 hours, about $30).
+6. **R12 seeds:** the whole recipe trained again with seeds 1 and 2 and tested (about 12 hours per seed).
+7. The new runs are added to the public release, and the report is published.
+
+**Needs:** an A100 40 GB or larger. Every step resumes, so the 30 or so hours can span several sessions: run all again
+after a disconnect. Colab secrets: `HF_TOKEN` (**write** access: huggingface.co -> Settings -> Access Tokens),
+`KAGGLE_USERNAME`, `KAGGLE_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`. Run all; nothing to set.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code("!pip install -q kaggle huggingface_hub"),
+        code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(r"""
+doc = open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read()
+assert 'Amendment 4' in doc and 'Amendment 5' in doc, 'Amendments 4-5 missing: pull the repository'
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+print('plan, latest commit:', plan[0])
+for k in ('HF_TOKEN', 'KAGGLE_USERNAME', 'KAGGLE_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY'):
+    if secret(k):
+        os.environ[k] = secret(k)
+import torch, subprocess, shutil, glob
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+if GPU_GB < 35:
+    raise SystemExit('This GPU is too small. Runtime > Change runtime type > A100, then run all again.')
+BATCH = 24 if GPU_GB >= 38 else 8
+FINAL = json.load(open(f'{ADAPTERS}/final_choice_v4.json'))['adapter']
+V42 = f'{ADAPTERS}/v42_s3/final'
+INP = f'{DRIVE}/inpaint_test'
+OUT53 = f'{DRIVE}/check53'
+os.makedirs(OUT53, exist_ok=True)
+FLAG = [('gemini', 'gemini', 'gemini-4-argon'), ('claudeopus', 'anthropic', 'claude-opus-5-5'), ('gpt6astra', 'openai', 'gpt-6-astra')]
+FLAG_API = [f for f in FLAG if os.environ.get({'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}[f[1]])]
+from huggingface_hub import HfApi
+HF_USER = HfApi().whoami()['name']
+print('Hugging Face account:', HF_USER, '| API models:', [m for _, _, m in FLAG_API])
+"""),
+        md("## 1. Public release on Hugging Face (about 15 minutes)"),
+        code(r"""
+def release():
+    MORE = (f"--more fresh_internal={FRESH.replace(' ', ',')} --more fresh_external={EXT2.replace(' ', ',')} "
+            + ' '.join(f'--more heldout_inpainter_{t}={INP}/{t}/views.jsonl' for t in ['telea', 'transplant', 'diffusion']
+                       if os.path.exists(f'{INP}/{t}/views.jsonl')))
+    BLURB = ('MedScope-4B (v4), the pre-registered model: counterfactual SFT (LaMa and tissue-transplant erasures, matched '
+             'edits elsewhere, lesion insertions, degradations, paraphrased questions, window and zoom tools), '
+             'rejection-sampling fine-tuning and general medical VQA replay.')
+    v42 = f'--v42 {V42}' if os.path.exists(f'{V42}/adapter_config.json') else ''
+    sh(f"python scripts/release_hf.py --final {FINAL} --final-runs v4_final_test v4_final_ext --final-blurb '{BLURB}' {v42} "
+       f"--results {RESULTS} --views {TEST_VIEWS} {TEST_NEG} --external {EXT_VIEWS} {MORE} --out {DRIVE}/release_public "
+       f"--upload --public")
+    print(open(f'{DRIVE}/release_public/release_urls.json').read())
+if not os.path.exists(f'{OUT53}/released_once'):
+    release()
+    open(f'{OUT53}/released_once', 'w').write('1')
+URLS = json.load(open(f'{DRIVE}/release_public/release_urls.json'))
+print(URLS)
+"""),
+        md("## 2. R15: reproduce the headline from the public release (about 1 hour)"),
+        code(r"""
+from huggingface_hub import snapshot_download
+HUB = snapshot_download(f'{HF_USER}/MedScope-4B', local_dir=f'{WORK}/hub_medscope4b')
+sh(f'python scripts/evaluate.py --model {BASE} --adapter {HUB} --views {TEST_VIEWS} {TEST_NEG} --out {RESULTS}/v4_hub_test --name medscope-4b-hub --split test --batch-size {BATCH}')
+from medscope.eval.runner import scored_rows
+a = {r['view_id']: r for r in scored_rows(f'{RESULTS}/v4_final_test')}
+b = {r['view_id']: r for r in scored_rows(f'{RESULTS}/v4_hub_test')}
+same = [(a[k]['action'], bool(a[k].get('claims_absent'))) == (b[k]['action'], bool(b[k].get('claims_absent'))) for k in a.keys() & b.keys()]
+esg = lambda run: json.load(open(f'{RESULTS}/{run}/summary.json'))['metrics']['esg']['value']
+ok = abs(esg('v4_hub_test') - esg('v4_final_test')) <= 0.02 and sum(same) / len(same) >= 0.97
+R15 = (f'MedScope-4B downloaded from huggingface.co/{HF_USER}/MedScope-4B: main-test ESG {esg("v4_hub_test"):.3f} '
+       f'(stored run {esg("v4_final_test"):.3f}); {sum(same)}/{len(same)} per-view decisions identical '
+       f'({sum(same) / len(same):.1%}). Rule (ESG within 0.02, >= 97% identical): ' + ('REPRODUCED' if ok else 'NOT REPRODUCED'))
+open(f'{RESULTS}/r15_reproduction.md', 'w').write(R15 + '\n')
+print(R15)
+"""),
+        md("## 3. R13: edit visibility (about 20 minutes)"),
+        code(r"""
+runs = ' '.join(['MedScope-4B=v4_final_test'] + [f'{m}=v2_{t}_test' for t, _, m in FLAG])
+sh(f'python scripts/edit_visibility.py --train {TRAIN_VIEWS} --test {TEST_VIEWS} --results {RESULTS} --runs {runs} --ref MedScope-4B --out {RESULTS}/r13_edit_visibility')
+shutil.copy(f'{RESULTS}/r13_edit_visibility/edit_visibility.md', f'{RESULTS}/r13_edit_visibility.md')
+"""),
+        md("## 4. R14: open-ended request instead of yes/no (about 1 hour, about $10)"),
+        code(r"""
+FT = f'{OUT53}/freetext'
+os.makedirs(FT, exist_ok=True)
+if not os.path.exists(f'{FT}/views_freetext.jsonl'):
+    sh(f'python scripts/freetext.py build --views {TEST_VIEWS} {TEST_NEG} --out {FT}/views_freetext.jsonl')
+procs = [subprocess.Popen(f'python scripts/evaluate.py --api {p} --model {m} --prompt plain --views {FT}/views_freetext.jsonl '
+                          f'--out {RESULTS}/ft_{t} --name {m}-freetext --split freetext --batch-size 8 > {FT}/log_{t}.txt 2>&1',
+                          shell=True, cwd='/content/medscope') for t, p, m in FLAG_API]
+sh(f'python scripts/evaluate.py --model {BASE} --adapter {FINAL} --prompt plain --views {FT}/views_freetext.jsonl --out {RESULTS}/ft_v4 --name medscope-4b-freetext --split freetext --batch-size {BATCH}')
+sh(f'python scripts/evaluate.py --model {BASE} --prompt plain --views {FT}/views_freetext.jsonl --out {RESULTS}/ft_base --name qwen35-4b-freetext --split freetext --batch-size {BATCH}')
+for p in procs:
+    p.wait()
+runs = ' '.join(['MedScope-4B=ft_v4', 'Qwen3.5-4B=ft_base'] + [f'{m}=ft_{t}' for t, _, m in FLAG])
+sh(f'python scripts/freetext.py judge --views {FT}/views_freetext.jsonl --results {RESULTS} --runs {runs} --ref MedScope-4B --out {FT}')
+shutil.copy(f'{FT}/freetext.md', f'{RESULTS}/r14_freetext.md')
+"""),
+        md("## 5. R9: natural pairs, nothing edited (about 3-4 hours, about $30)"),
+        pick("assert 'Amendment 4' in doc"), pick("COLON = f'{NP}/colon'"), pick("CXR = f'{NP}/cxr'"),
+        pick("SETS = {'colon': COLON_VIEWS"), pick("natural_pairs.py score"),
+        code(r"""
+for f in ('natural_colon.md', 'natural_cxr.md'):
+    if os.path.exists(f'{NP}/{f}'):
+        shutil.copy(f'{NP}/{f}', f'{RESULTS}/r9_{f}')
+"""),
+        md("## 6. R12: the whole recipe with training seeds 1 and 2 (about 12 hours per seed; resumes)"),
+        code(f"""
+REPLAY = f'{{DRIVE}}/external/vqa_train/views_vqa_train.jsonl'
+for SEED in (1, 2):
+    A = f'{{ADAPTERS}}/seed{{SEED}}'
+    if not os.path.exists(f'{{A}}_s1/final/adapter_config.json'):
+        sh(f'python scripts/train_sft.py --model {BASE} {s1} --seed {{SEED}} --out {{A}}_s1')
+    if not os.path.exists(f'{{ADAPTERS}}/seed{{SEED}}_rft/samples.jsonl'):
+        sh(f'python scripts/sample_rft.py --model {BASE} --adapter {{A}}_s1/final --views {{TRAIN_V4}} --negatives {{TRAIN_NEG_V4}} --per-kind 200 --per-kind-override natural_negative=500 target_removal=300 --k 4 --temperature 1.2 --out {{ADAPTERS}}/seed{{SEED}}_rft/samples.jsonl')
+    if not os.path.exists(f'{{A}}_s2/final/adapter_config.json'):
+        sh(f'python scripts/train_sft.py --model {BASE} --init {{A}}_s1/final {s2} --seed {{SEED}} --out {{A}}_s2')
+    if not os.path.exists(f'{{A}}_s3/final/adapter_config.json'):
+        sh(f'python scripts/train_sft.py --model {BASE} --init {{A}}_s2/final {s3} --seed {{SEED}} --out {{A}}_s3')
+    for split, views in (('test', f'{{TEST_VIEWS}} {{TEST_NEG}}'), ('ext', EXT_VIEWS), ('fresh', FRESH), ('ext2', EXT2)):
+        sh(f'python scripts/evaluate.py --model {BASE} --adapter {{A}}_s3/final --views {{views}} --out {{RESULTS}}/seed{{SEED}}_{{split}} --name medscope-seed{{SEED}} --split {{split}} --batch-size {{BATCH}}')
+"""),
+        code(r"""
+from medscope.eval.compare import significance_table
+import numpy as np
+KEYS = [('ccr', 'CCR'), ('esg', 'ESG'), ('target_hallucination_rate', 'Erased claims'), ('natural_hallucination_rate', 'Lesion-free claims'), ('net_utility', 'Net utility')]
+lines = []
+for split, label in (('test', 'Main test'), ('ext', 'External centres'), ('fresh', 'Fresh internal'), ('ext2', 'Fresh external')):
+    runs = [f'v4_final_{split}', f'seed1_{split}', f'seed2_{split}']
+    vals = {r: json.load(open(f'{RESULTS}/{r}/summary.json'))['metrics'] for r in runs if os.path.exists(f'{RESULTS}/{r}/summary.json')}
+    lines += [f'**{label}**', '', '| Metric | Seed 0 (MedScope-4B) | Seed 1 | Seed 2 | Mean (sd) |', '| --- | --- | --- | --- | --- |']
+    for k, name in KEYS:
+        xs = [vals[r][k]['value'] for r in runs if r in vals]
+        cells = [f"{vals[r][k]['value']:.3f}" if r in vals else '--' for r in runs]
+        lines.append(f'| {name} | ' + ' | '.join(cells) + f' | {np.mean(xs):.3f} ({np.std(xs, ddof=1) if len(xs) > 1 else 0:.3f}) |')
+    lines.append('')
+SEEDS_TABLE = '\n'.join(lines)
+SEEDS_VS = '\n\n'.join(f'Seed {s} vs flagships (main test)\n\n' + significance_table(RESULTS, f'seed{s}_test', [f'v2_{t}_test' for t, _, _ in FLAG]) for s in (1, 2))
+open(f'{RESULTS}/r12_seeds.md', 'w').write(SEEDS_TABLE + '\n\n' + SEEDS_VS + '\n')
+print(SEEDS_TABLE)
+"""),
+        md("## 7. Add the new runs to the public release"),
+        code(r"""
+release()
+"""),
+        publish("MedScope report - 53 release and robustness checks", """
+    ('Public release', json.dumps(URLS, indent=1)),
+    ('R15: reproduction from the public release', read_text(f'{RESULTS}/r15_reproduction.md')),
+    ('R13: edit visibility', read_text(f'{RESULTS}/r13_edit_visibility.md')),
+    ('R14: open-ended request', read_text(f'{RESULTS}/r14_freetext.md')),
+    ('R9: natural pairs, colonoscopy (primary)', read_text(f'{RESULTS}/r9_natural_colon.md')),
+    ('R9: natural pairs, chest X-ray (secondary)', read_text(f'{RESULTS}/r9_natural_cxr.md')),
+    ('R12: training seeds', read_text(f'{RESULTS}/r12_seeds.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -5182,6 +5364,7 @@ NOTEBOOKS = {
     "50_review_checks2.ipynb": nb50_review_checks2,
     "51_v42_rebalanced.ipynb": nb51_v42,
     "52_natural_pairs.ipynb": nb52_natural_pairs,
+    "53_release_and_checks.ipynb": nb53_bulletproof,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

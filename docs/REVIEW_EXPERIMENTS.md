@@ -236,3 +236,56 @@ removed); NIH labels are mined from reports, not read from the images.
 **Fixed.** No parameter above changes after any frame, film or answer is seen. If the annotation files cannot be
 parsed as expected, only the parser changes, before any image is evaluated, and the change is logged. Every result is
 reported, whatever it shows. Code: `scripts/natural_pairs.py`, notebook 52.
+
+---
+
+# Amendment 5 (20 Nov 2026, 11:45 ET): R12-R15, robustness of the headline (committed before any of them ran)
+
+None of these changes the pre-registered model: MedScope-4B (v4) stays the reported model, and every result below is
+reported whatever it shows. All run in notebook 53, together with R9 (Amendment 4) and the public release.
+
+## R12. Training seeds of the full recipe
+
+**Why.** The headline model is one end-to-end training run; only stage 1 has three seeds.
+**What.** The whole v4 recipe (stages 1, 2 with rejection sampling, 3; same data, options and commands as v4) is rerun
+with training seeds 1 and 2. Each seed's model is its stage-3 adapter (no selection step). Each is tested on the main
+test, external centres, fresh internal and fresh external sets.
+**Reported.** CCR, ESG, erased-lesion claims, lesion-free claims and net utility for seeds 0 (MedScope-4B), 1 and 2,
+with mean and standard deviation, and each seed against gemini-4-argon, claude-opus-5-5 and gpt-6-astra (paired).
+**Reading.** The headline holds across seeds if every seed's main-test ESG is above each of the three flagships' with
+the paired 95% interval above 0. Otherwise the paper reports which seeds do not, and the headline is stated as the mean.
+
+## R13. Edit visibility (low-visibility erasures)
+
+**Why.** A trained CNN can tell control-edited from unedited images (AUC 0.83), so the model could in principle use
+edit traces.
+**What.** A ResNet-18 edit-trace detector is trained on control-edited vs unedited training views (both show the
+lesion), seed 0, 5 epochs, then scores every main-test view. An erasure is low-visibility when its score is at or
+below the median score of the main-test control edits. Stored decisions (no new model runs) of MedScope-4B and the
+three flagships are re-scored on cases with a low-visibility erasure. Code: `scripts/edit_visibility.py`.
+**Reading.** Edit visibility does not explain the advantage if, on low-visibility cases, MedScope-4B's ESG is above
+each flagship's with the paired 95% interval above 0. Erased-lesion claims on low-visibility vs other erasures are
+reported for every model.
+
+## R14. Open-ended request instead of a yes/no question
+
+**Why.** Every question so far is closed ("Is there a polyp?").
+**What.** On the same 150 main-test cases as the robustness checks (select_cases, seed 0), the unedited lesion image
+and its erasure are given with "Describe any abnormal findings in this image." (plain prompt, one reply, no tools).
+Cases with a generic closed question (abnormality, healthy, normal) are left out. A text-only judge (gpt-6-astra,
+blind to the model and to the image) says whether each reply states that the finding named in the case's closed
+question is present. Models: MedScope-4B, the untrained Qwen3.5-4B, gemini-4-argon, claude-opus-5-5, gpt-6-astra.
+Code: `scripts/freetext.py`.
+**Measure.** Free-text ESG = share of unedited images whose reply reports the finding minus the share of erasures whose
+reply still reports it; paired bootstrap over cases.
+**Reading.** The effect is not tied to the yes/no format if MedScope-4B's free-text ESG is above each flagship's with
+the paired 95% interval above 0. MedScope-4B was trained only on the agent format, so a lower free-text ESG is
+reported as a limit of format transfer, not hidden.
+
+## R15. Reproduction from the public release
+
+**What.** After the public Hugging Face release, the MedScope-4B adapter is downloaded from the hub (not from the
+training folders) and run on the main test with the evaluation code as released.
+**Reading.** Reproduced if main-test ESG is within 0.02 of the reported 0.758 and at least 97% of per-view decisions
+(action and stated presence) match the stored run. Greedy decoding on a different GPU can change a few tokens, which
+is why the rule is not exact equality.

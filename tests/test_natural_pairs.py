@@ -79,3 +79,32 @@ def test_natural_esg_rows_and_views_load(tmp_path):
     assert np_.natural_esg_rows(scored, views) == {"p1": (1.0, 0.0, 1.0)}
     est, lo, hi, p = np_.cluster_boot({"a": 1.0, "b": 0.0, "c": 1.0}, {"a": "x", "b": "y", "c": "z"}, n=200)
     assert abs(est - 2 / 3) < 1e-9 and lo <= est <= hi
+
+
+def test_freetext_finding_of():
+    spec2 = importlib.util.spec_from_file_location("freetext", ROOT / "scripts" / "freetext.py")
+    ft = importlib.util.module_from_spec(spec2)
+    spec2.loader.exec_module(ft)
+    assert ft.finding_of("Is there a polyp in this image?") == "a polyp"
+    assert ft.finding_of("Is there a pleural effusion in this chest X-ray?") == "a pleural effusion"
+    assert ft.finding_of("Is there a tumor in this brain MRI slice?") == "a tumor"
+    assert ft.finding_of("Does the picture contain liver cancer?") == "liver cancer"
+    assert ft.finding_of("Is there an abnormality in this colonoscopy image?") is None
+    assert ft.finding_of("Is the lung healthy?") is None
+    assert ft.parse_yes_no("Yes.") is True and ft.parse_yes_no("no") is False and ft.parse_yes_no("maybe") is None
+    cases = ft.case_rows({"a__o": True, "a__e": False}, {"a__o": {"case_id": "a", "kind": "original"},
+                                                          "a__e": {"case_id": "a", "kind": "target_removal"}})
+    assert cases == {"a": (1.0, 0.0)}
+
+
+def test_edit_visibility_split_and_case_esg():
+    spec3 = importlib.util.spec_from_file_location("edit_visibility", ROOT / "scripts" / "edit_visibility.py")
+    ev = importlib.util.module_from_spec(spec3)
+    spec3.loader.exec_module(ev)
+    scores = [{"case_id": "a", "kind": "random_removal", "score": 0.2}, {"case_id": "b", "kind": "random_removal", "score": 0.6},
+              {"case_id": "a", "kind": "target_removal", "score": 0.3}, {"case_id": "b", "kind": "target_removal", "score": 0.9}]
+    low, high, tau = ev.low_visibility_cases(scores)
+    assert tau == 0.4 and low == {"a"} and high == {"b"}
+    rows = [{"case_id": "a", "kind": "target_removal", "action": "answer", "correct": True},
+            {"case_id": "a", "kind": "random_removal", "action": "answer", "claims_absent": False}]
+    assert ev.case_esg(rows) == {"a": (1.0, 0.0, 0.0)}
