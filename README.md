@@ -4,6 +4,19 @@ A small open multimodal medical agent that reports what the image actually shows
 
 > **Research use only.** MedScope is not a medical device and must not be used for diagnosis or treatment.
 
+**Paper:** [Measuring and Attributing Evidence Sensitivity in Medical Vision-Language Models via Symmetric Counterfactual Controls](https://arxiv.org/abs/2611.13006) (arXiv:2611.13006)
+
+**Release (Hugging Face):**
+
+| | |
+| --- | --- |
+| [bhaskar-ai/MedScope-4B](https://huggingface.co/bhaskar-ai/MedScope-4B) | The pre-registered model (LoRA adapter for Qwen3.5-4B) |
+| [bhaskar-ai/MedScope-4B-v4.2](https://huggingface.co/bhaskar-ai/MedScope-4B-v4.2) | Post hoc model with pneumothorax patients in every training stage |
+| [bhaskar-ai/MedScope-Bench](https://huggingface.co/datasets/bhaskar-ai/MedScope-Bench) | View manifests (images are rebuilt from the public sources with `scripts/`) and every run's per-view outputs and transcripts |
+
+Models are released for non-commercial research under CC BY-NC-SA 4.0 (some training datasets carry non-commercial
+share-alike terms).
+
 ## What's in this repo
 
 | Path | What it does |

@@ -5001,6 +5001,7 @@ GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cud
 if GPU_GB < 20:
     raise SystemExit('This GPU is too small (T4 or none). Runtime > Change runtime type > A100 (or L4), then run all again.')
 BATCH = 24 if GPU_GB >= 38 else 8
+BASE = 'Qwen/Qwen3.5-4B'
 NP = f'{DRIVE}/natural_pairs'          # on Drive: survives a disconnect
 RAW = f'{WORK}/raw/natural_pairs'      # large downloads: local disk only, deleted after use
 os.makedirs(NP, exist_ok=True); os.makedirs(RAW, exist_ok=True)
@@ -5147,6 +5148,7 @@ GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cud
 if GPU_GB < 35:
     raise SystemExit('This GPU is too small. Runtime > Change runtime type > A100, then run all again.')
 BATCH = 24 if GPU_GB >= 38 else 8
+BASE = 'Qwen/Qwen3.5-4B'
 FINAL = json.load(open(f'{ADAPTERS}/final_choice_v4.json'))['adapter']
 V42 = f'{ADAPTERS}/v42_s3/final'
 INP = f'{DRIVE}/inpaint_test'
