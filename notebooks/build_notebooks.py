@@ -5304,7 +5304,7 @@ API calls, and the same secrets as notebook 53. Run all.
         code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code("!pip install -q -U kaggle openai anthropic google-genai"),
         code(RESTORE_ALL), code(RESTORE_V4), setup52,
         code(r"""
-import pandas as pd, importlib.util
+import pandas as pd, importlib.util, shutil, subprocess, zipfile
 spec = importlib.util.spec_from_file_location('natural_pairs', '/content/medscope/scripts/natural_pairs.py')
 npm = importlib.util.module_from_spec(spec); spec.loader.exec_module(npm)
 CXR, CXR2 = f'{NP}/cxr', f'{NP}/cxr_v2'
