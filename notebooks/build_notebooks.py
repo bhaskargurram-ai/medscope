@@ -5285,6 +5285,81 @@ runtime.unassign()
     ]
 
 
+def nb53c_cxr_corrected() -> list[dict]:
+    """Notebook 53c: R9 chest X-ray pairs rebuilt with the corrected near-copy check (post hoc, reported beside the
+    44-pair analysis as run)."""
+    c52 = nb52_natural_pairs()
+    setup52 = next(c for c in c52 if "assert 'Amendment 4' in doc" in "".join(c["source"]))
+    return [md("""
+# MedScope 53c: chest X-ray natural pairs, corrected rebuild (post hoc)
+
+The chest X-ray pairs of notebook 53b lost 156 of 200 pairs to a near-copy check that matched coarse image hashes
+without confirming them, and its patient exclusion matched nobody (see docs/RESULTS_LOG.md, 21 Nov). That 44-pair
+analysis stays reported as run. This notebook rebuilds the pairs in a new folder with every hash match confirmed by
+pixel correlation (>= 0.98), runs the same six models and scores them. It is labelled post hoc everywhere.
+
+**Needs:** an A100 (or L4), about 1.5 hours (most of it the 42 GB NIH download if this is a new session), about $10 of
+API calls, and the same secrets as notebook 53. Run all.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code("!pip install -q -U kaggle openai anthropic google-genai"),
+        code(RESTORE_ALL), code(RESTORE_V4), setup52,
+        code(r"""
+import pandas as pd, importlib.util
+spec = importlib.util.spec_from_file_location('natural_pairs', '/content/medscope/scripts/natural_pairs.py')
+npm = importlib.util.module_from_spec(spec); spec.loader.exec_module(npm)
+CXR, CXR2 = f'{NP}/cxr', f'{NP}/cxr_v2'
+os.makedirs(CXR2, exist_ok=True)
+csv = f'{CXR}/Data_Entry_2017.csv'
+pairs = npm.cxr_pairs(pd.read_csv(csv), npm.excluded_patients(EARLIER.split()))
+need = {p['pos'] for p in pairs} | {p['neg'] for p in pairs}
+IMG = f'{RAW}/nih_images'
+os.makedirs(IMG, exist_ok=True)
+if len([f for f in os.listdir(IMG) if f in need]) < len(need):
+    sh(f'kaggle datasets download -d nih-chest-xrays/data -p {RAW}')
+    with zipfile.ZipFile(f'{RAW}/data.zip') as z:
+        for m in z.namelist():
+            if os.path.basename(m) in need:
+                open(f'{IMG}/{os.path.basename(m)}', 'wb').write(z.read(m))
+    os.remove(f'{RAW}/data.zip')
+if not os.path.exists(f'{CXR2}/views_natural_cxr.jsonl'):
+    sh(f'python scripts/natural_pairs.py cxr-build --csv {csv} --images {IMG} --exclude {EARLIER} --out {CXR2}')
+    sh(f'python scripts/natural_pairs.py dedup --views {CXR2}/views_natural_cxr.jsonl --against {EARLIER}')
+print(open(f'{CXR2}/report_cxr.txt').read())
+CXR2_VIEWS = f'{CXR2}/views_natural_cxr.jsonl'
+print(sum(1 for _ in open(CXR2_VIEWS)) // 2, 'pairs after the corrected near-copy check')
+"""),
+        code(r"""
+LOCAL = [('v4', FINAL), ('v42', V42 if os.path.exists(f'{V42}/adapter_config.json') else None), ('base', '')]
+API = [('gemini', 'gemini', 'gemini-4-argon'), ('claudeopus', 'anthropic', 'claude-opus-5-5'), ('gpt6astra', 'openai', 'gpt-6-astra')]
+API = [a for a in API if os.environ.get({'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}[a[1]])]
+procs = [subprocess.Popen(f'python scripts/evaluate.py --api {p} --model {m} --views {CXR2_VIEWS} --out {RESULTS}/np_{t}_cxr2 '
+                          f'--name {m}-natural --split natural_cxr2 --batch-size 8 > {NP}/log_{t}_cxr2.txt 2>&1',
+                          shell=True, cwd='/content/medscope') for t, p, m in API]
+for tag, adapter in LOCAL:
+    if adapter is None:
+        continue
+    a = f'--adapter {adapter}' if adapter else ''
+    sh(f'python scripts/evaluate.py --model {BASE} {a} --views {CXR2_VIEWS} --out {RESULTS}/np_{tag}_cxr2 --name {tag}-natural --split natural_cxr2 --batch-size {BATCH}')
+for p in procs:
+    p.wait()
+RUNS = ' '.join(f'{n}={RESULTS}/np_{t}_cxr2' for t, n in [('v4', 'MedScope-4B'), ('v42', 'MedScope-v4.2'), ('base', 'Qwen3.5-4B'),
+                                                     ('gemini', 'gemini-4-argon'), ('claudeopus', 'claude-opus-5-5'), ('gpt6astra', 'gpt-6-astra')])
+sh(f'python scripts/natural_pairs.py score --views {CXR2_VIEWS} --runs {RUNS} --ref MedScope-4B --by finding --out {NP}/natural_cxr_v2.md')
+shutil.copy(f'{NP}/natural_cxr_v2.md', f'{RESULTS}/r9_natural_cxr_v2_posthoc.md')
+"""),
+        publish("MedScope report - 53c chest X-ray natural pairs, corrected (post hoc)", """
+    ('What this is', 'Post hoc: the R9 chest X-ray pairs rebuilt with a near-copy check confirmed by pixel correlation; reported beside the 44-pair analysis as run.'),
+    ('Pairs', read_text(f'{CXR2}/report_cxr.txt')),
+    ('Natural ESG by finding', read_text(f'{NP}/natural_cxr_v2.md')),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -5368,6 +5443,7 @@ NOTEBOOKS = {
     "51_v42_rebalanced.ipynb": nb51_v42,
     "52_natural_pairs.ipynb": nb52_natural_pairs,
     "53_release_and_checks.ipynb": nb53_bulletproof,
+    "53c_cxr_corrected.ipynb": nb53c_cxr_corrected,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
