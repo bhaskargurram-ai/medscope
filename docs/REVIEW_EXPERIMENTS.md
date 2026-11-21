@@ -292,7 +292,7 @@ is why the rule is not exact equality.
 
 ---
 
-# Amendment 6 (21 Nov 2026, 18:30 ET): R16, MedScope-v5 with natural pairs in training (post hoc; committed before any training frame was drawn or any v5 model trained)
+# Amendment 6 (21 Nov 2026, 18:00 ET): R16, MedScope-v5 with natural pairs in training (post hoc; committed before any training frame was drawn or any v5 model trained)
 
 **Status of R9.** Unchanged. By the Amendment 4 rule, MedScope-4B's counterfactual advantage does not carry over to
 natural colonoscopy pairs (natural ESG 0.243 against 0.320-0.466 for the flagships; equal to the untrained base
