@@ -1440,3 +1440,15 @@ interval above 0 (36 cases). Reported as a limit: the advantage is shown for the
 directionally consistent, not established, for open-ended answers; MedScope-4B never reports an erased lesion in
 free text (0/36) but reports fewer real ones (47.2% vs 69-86% for the flagships).
 
+## 2026-11-21 — R9 data built; two deviations found in the chest X-ray build (secondary analysis)
+
+- Colonoscopy (primary): 103 pairs from 46 REAL-Colon videos, built as pre-registered. Unaffected.
+- Chest X-ray (secondary): 200 pairs built (50 per finding), but (1) the ChestX-Det patient exclusion matched 0
+  patients (the project's ChestX-Det views do not carry NIH patient numbers in a form the script recognised), and (2)
+  the near-copy check dropped 156 of 200 pairs: it used a coarse 64-bit image hash without the pixel-correlation
+  confirmation that check_views.py uses, and chest X-rays of different patients often share a coarse hash. The models
+  were run on the remaining 44 pairs. Found while monitoring the run, after one model's chest X-ray result had been
+  seen. Handling: the 44-pair chest X-ray analysis is reported as run, with both deviations stated; a corrected rebuild
+  (hash matches confirmed by pixel correlation >= 0.98) is reported beside it as post hoc. The colonoscopy reading rules
+  are unchanged.
+
