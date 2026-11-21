@@ -1452,3 +1452,28 @@ free text (0/36) but reports fewer real ones (47.2% vs 69-86% for the flagships)
   (hash matches confirmed by pixel correlation >= 0.98) is reported beside it as post hoc. The colonoscopy reading rules
   are unchanged.
 
+
+## 2026-11-21 — R9 natural pairs: result (notebook 53b, 22:19 UTC)
+
+**Colonoscopy (primary, pre-registered; 103 pairs, 46 REAL-Colon videos).** Lesion found / lesion-free image answered
+absent or referred / natural ESG [95% CI]; paired difference vs MedScope-4B (MedScope minus model), bootstrap over videos:
+- MedScope-4B: 37.9% / 86.4% / 0.243 [0.149, 0.340]
+- MedScope-v4.2: 39.8% / 86.4% / 0.262 [0.168, 0.357]; -0.019 [-0.094, +0.047], p 0.678
+- Qwen3.5-4B (untrained base): 38.8% / 85.4% / 0.243 [0.143, 0.350]; +0.000 [-0.103, +0.095], p 1.000
+- gemini-4-argon: 68.0% / 78.6% / 0.466 [0.336, 0.581]; -0.223 [-0.346, -0.102], p 0.001
+- claude-opus-5-5: 70.9% / 73.8% / 0.447 [0.317, 0.579]; -0.204 [-0.333, -0.071], p 0.001
+- gpt-6-astra: 64.1% / 68.0% / 0.320 [0.212, 0.437]; -0.078 [-0.184, +0.028], p 0.172
+
+**Reading (Amendment 4 rule): does not carry over.** MedScope-4B's natural ESG is above none of the flagships (every
+interval reaches 0 or below); it is significantly below gemini-4-argon and claude-opus-5-5. Descriptively: 0.243 on
+natural pairs against 0.95 on the counterfactual colonoscopy test, and identical to the untrained base model (0.243),
+so on unedited colonoscopy pairs the training changes nothing measurable. The gap to the flagships comes from lesion
+detection (MedScope-4B finds 37.9% of real polyps vs 64-71%); on lesion-free frames it is the most often correct
+(86.4% vs 68-79%). The counterfactual ESG advantage is therefore established for edited images only; the paper must
+say so.
+
+**Chest X-ray (secondary, descriptive; 44 pairs after the over-aggressive near-copy check, deviations logged above).**
+Natural ESG: MedScope-4B 0.068 [-0.068, 0.205]; v4.2 0.068; Qwen3.5-4B 0.068; gemini-4-argon 0.136 [0.000, 0.295];
+claude-opus-5-5 0.045; gpt-6-astra 0.159 [0.000, 0.318]. All differences vs MedScope-4B include 0. By finding,
+MedScope-4B: effusion 0.00 (n 11), mass 0.50 (n 10), nodule -0.14 (n 7), pneumothorax -0.06 (n 16). No model separates
+lesion from lesion-free follow-up films well. Corrected rebuild (notebook 53c) to be reported as post hoc.
