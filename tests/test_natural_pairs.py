@@ -297,3 +297,36 @@ def test_colon_train_end_to_end_on_fake_archives(tmp_path, monkeypatch=None):
             assert Path(v["image_path"]).exists()
     assert not list((out / "archives").glob("*"))
     assert "| 2 | 2 | 6 | 6 | 1 | 1 |" in (out / "report_train.txt").read_text()
+
+
+def test_stream_members_reads_a_tar_over_http_and_a_cut_off_stream_raises(tmp_path):
+    import functools, http.server, io, tarfile, threading
+    from PIL import Image
+    rng = np.random.default_rng(0)
+    with tarfile.open(tmp_path / "v_frames.tar.gz", "w:gz") as tf:
+        for f in range(40):
+            buf = io.BytesIO()
+            Image.fromarray(rng.integers(60, 200, (120, 160, 3), dtype=np.uint8)).save(buf, format="JPEG")
+            info = tarfile.TarInfo(f"v_frames/v_{f}.jpg"); info.size = buf.tell()
+            buf.seek(0)
+            tf.addfile(info, buf)
+    data = (tmp_path / "v_frames.tar.gz").read_bytes()
+    (tmp_path / "cut.tar.gz").write_bytes(data[:len(data) // 2])
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(tmp_path))
+    handler.log_message = lambda *a, **k: None
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        base = f"http://127.0.0.1:{srv.server_address[1]}"
+        seen = set()
+        best = np_.best_frames(np_.stream_members(f"{base}/v_frames.tar.gz"), {3: ["a"], 30: ["a"], 39: ["b"]}, seen)
+        assert seen == {3, 30, 39} and best["a"][1] in (3, 30) and best["b"][1] == 39
+        try:
+            np_.best_frames(np_.stream_members(f"{base}/cut.tar.gz"), {3: ["a"], 39: ["b"]}, set())
+            raise AssertionError("a cut-off archive must not pass silently")
+        except AssertionError:
+            raise
+        except Exception:
+            pass
+    finally:
+        srv.shutdown()

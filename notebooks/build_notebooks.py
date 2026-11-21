@@ -5376,9 +5376,10 @@ did not carry over. v5 adds real pairs to training. This notebook builds them, b
   by a model that never saw its video;
 - for each R9 pair, one extra lesion-free frame taken 3-10 s from the polyp (a context-matched control).
 
-**Needs:** no GPU. Runtime > Change runtime type > CPU, High-RAM if you have it. About 4-6 hours: it reads all 60
-videos (about 950 GB, two at a time, nothing kept but the chosen frames). If the session ends, run all again: finished
-videos are kept. Notebook 52 (or 53b) must have been run: this uses its `natural_pairs/colon` folder.
+**Needs:** no GPU. Runtime > Change runtime type > CPU, High-RAM if you have it. About 2-5 hours: it reads all 60
+videos (about 950 GB, three at a time, straight from the download; only the chosen frames are kept). If the session
+ends, run all again: finished videos are kept. Notebook 52 (or 53b) must have been run: this uses its
+`natural_pairs/colon` folder.
 """ + SECRETS_NOTE),
         code(SETUP), code(AUTO_RELEASE),
         code(r"""
@@ -5394,9 +5395,8 @@ os.makedirs(RAW, exist_ok=True)
 for need in ('selection.jsonl', 'views_natural_colon.jsonl', 'video_info.csv'):
     assert os.path.exists(f'{COLON}/{need}'), f'{COLON}/{need} is missing: run notebook 52 (or 53b) first'
 import shutil
-free = shutil.disk_usage(WORK).free / 2 ** 30
-print(f'free local disk: {free:.0f} GB')
-WORKERS = 2 if free >= 110 else 1               # two videos at a time need room for two archives
+print(f'free local disk: {shutil.disk_usage(WORK).free / 2 ** 30:.0f} GB (an archive is written to disk only if reading it from the download fails)')
+WORKERS = 3                                      # videos read at the same time
 """),
         md("## 1. Training frames and context frames from all 60 videos (resumes video by video)"),
         code(r"""

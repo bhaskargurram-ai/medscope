@@ -480,14 +480,18 @@ def shrink(img: np.ndarray) -> np.ndarray:
     return np.asarray(im)
 
 
-def best_frames(members: Iterator[tuple[str, callable]], slot_of: dict[int, list[str]]) -> dict[str, tuple[float, int, np.ndarray]]:
+def best_frames(members: Iterator[tuple[str, callable]], slot_of: dict[int, list[str]],
+                seen: Optional[set] = None) -> dict[str, tuple[float, int, np.ndarray]]:
     """One pass over a video's frames: per slot, its sharpest usable candidate as (sharpness, frame number, image at
-    MAX_SIDE). Sharpness and brightness are judged on the full frame, as in colon-build."""
+    MAX_SIDE). Sharpness and brightness are judged on the full frame, as in colon-build. `seen` collects the wanted
+    frame numbers that were met (to tell a complete pass from a cut-off one)."""
     best: dict[str, tuple[float, int, np.ndarray]] = {}
     for member, read in members:
         n = frame_number(member)
         if n not in slot_of or member.lower().endswith(".xml"):
             continue
+        if seen is not None:
+            seen.add(n)
         img = np.asarray(Image.open(io.BytesIO(read())).convert("RGB"))
         if not usable(img):
             continue
@@ -593,6 +597,20 @@ def lazy_members(path: Path) -> Iterator[tuple[str, callable]]:
                 yield m.name, (lambda m=m: t.extractfile(m).read())
 
 
+def stream_members(url: str) -> Iterator[tuple[str, callable]]:
+    """lazy_members() straight from the download, without writing the archive to disk (tar archives only)."""
+    import requests
+    with requests.get(url, stream=True, timeout=120) as r:
+        r.raise_for_status()
+        with tarfile.open(fileobj=r.raw, mode="r|*", bufsize=1 << 20) as t:
+            for m in t:
+                if m.isfile():
+                    yield m.name, (lambda m=m: t.extractfile(m).read())
+
+
+_DISK = __import__("threading").Lock()      # at most one archive on local disk at a time
+
+
 def fetch(url: str, dest: Path, tries: int = 3) -> Path:
     """download(), tried again after a dropped connection."""
     import time
@@ -627,17 +645,31 @@ def train_video(video: str, by_name: dict, fps: float, pairs: list[dict], out: P
         return {"video": video, "fold": fold_of(video), "train": [], "context": [], "stats": {why: 1}}
     print(f"  {video}: fold {fold_of(video)}, {len(slots)} training slots, {len(pairs)} R9 pairs; downloading frames "
           f"({by_name[fname]['size'] / 1e9:.1f} GB)", flush=True)
-    arch = fetch(by_name[fname]["download_url"], archives(out) / fname)
-    best = best_frames(lazy_members(arch), slot_of)
-    arch.unlink()
+    best = None
+    if os.environ.get("NP_STREAM", "1") == "1" and ".tar" in fname:
+        seen: set = set()
+        try:      # read the archive as it downloads; nothing is written to disk
+            best = best_frames(stream_members(by_name[fname]["download_url"]), slot_of, seen)
+            if len(seen) < len(slot_of):
+                print(f"  {video}: the stream held {len(seen)} of {len(slot_of)} wanted frames; reading it from disk "
+                      "instead", flush=True)
+                best = None
+        except Exception as e:  # noqa: BLE001 - a dropped connection or a cut-off archive
+            print(f"  {video}: streaming failed ({type(e).__name__}: {str(e)[:100]}); downloading the archive instead",
+                  flush=True)
+    if best is None:
+        with _DISK:
+            arch = fetch(by_name[fname]["download_url"], archives(out) / fname)
+            best = best_frames(lazy_members(arch), slot_of)
+            arch.unlink()
     train, context, stats = video_views(video, frames, size, slots, pairs, best, out)
     return {"video": video, "fold": fold_of(video), "train": train, "context": context, "stats": dict(stats)}
 
 
-def colon_train(r9: Path, out: Path, max_videos: int, workers: int = 2) -> None:
+def colon_train(r9: Path, out: Path, max_videos: int, workers: int = 3) -> None:
     """Amendment 6: training frames from every video, and context-matched lesion-free frames for the R9 pairs.
-    Each video is handled on its own (annotations, then its frames archive, both deleted afterwards), `workers` at
-    a time; rerunning resumes with the videos not yet done."""
+    Each video is handled on its own (annotations, then one pass over its frames archive, read as it downloads),
+    `workers` at a time; rerunning resumes with the videos not yet done."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
     out.mkdir(parents=True, exist_ok=True)
     files = figshare_files()
@@ -924,7 +956,7 @@ def main() -> None:
     a.add_argument("--r9", required=True, help="the R9 colonoscopy folder (selection.jsonl, views_natural_colon.jsonl)")
     a.add_argument("--out", required=True)
     a.add_argument("--max-videos", type=int, default=60)
-    a.add_argument("--workers", type=int, default=2, help="videos handled at the same time")
+    a.add_argument("--workers", type=int, default=3, help="videos handled at the same time")
     args = ap.parse_args()
     if args.cmd == "colon-fetch":
         colon_fetch(Path(args.out), args.max_videos, args.inspect)
