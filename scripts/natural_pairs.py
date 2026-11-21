@@ -423,19 +423,24 @@ def cxr_build(csv: Path, images: Path, exclude: list[str], out: Path) -> None:
     print(report)
 
 
-def dedup(views_file: Path, against: list[str], max_distance: int = 4) -> None:
+def dedup(views_file: Path, against: list[str], max_distance: int = 4, min_correlation: float = 0.98) -> None:
     """Drop every pair whose either image near-copies an image in the given views files (any kind)."""
-    from medscope.data.quality import dhash, near_duplicates
+    from medscope.data.quality import correlation, dhash, near_duplicates
     from medscope.data.views import load_image
     rows = [json.loads(l) for l in views_file.open()]
-    ref = {}
+    ref, ref_path = {}, {}
     for f in against:
         for line in open(f):
             v = json.loads(line)
             if v.get("kind") in ("original", "natural_negative") and Path(v["image_path"]).exists():
                 ref[v["view_id"]] = dhash(load_image(v["image_path"]))
+                ref_path[v["view_id"]] = v["image_path"]
     q = {r["view_id"]: dhash(load_image(r["image_path"])) for r in rows}
-    hits = near_duplicates(q, ref, max_distance=max_distance)
+    q_path = {r["view_id"]: r["image_path"] for r in rows}
+    # a coarse hash match between two chest X-rays of different patients is common, so every match is confirmed by
+    # pixel correlation (>= 0.98, as in check_views.py) before a pair is dropped
+    confirm = lambda qid, rid: correlation(load_image(q_path[qid]), load_image(ref_path[rid])) >= min_correlation  # noqa: E731
+    hits = near_duplicates(q, ref, max_distance=max_distance, confirm=confirm)
     bad = {next(r["meta"]["pair"] for r in rows if r["view_id"] == vid) for vid in hits}
     keep = [r for r in rows if r["meta"]["pair"] not in bad]
     views_file.write_text("".join(json.dumps(r) + "\n" for r in keep))
