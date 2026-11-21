@@ -1431,3 +1431,12 @@ Drive and in a private release); it now points to the public Hugging Face releas
   extracted for 33 of 46 videos before the session stopped (22:33 UTC). Fixes for the rerun: API clients installed in
   notebooks 52-53b; video archives now download to local disk instead of Drive.
 
+## 2026-11-21 — R14 complete (notebook 53b, second session)
+
+claude-opus-5-5 added: reports the finding on 86.1% of unedited / 52.8% of erased images, free-text ESG 0.333
+[0.139, 0.528]; difference vs MedScope-4B +0.139 [-0.083, +0.333], p 0.232 (n = 36). **Pre-registered rule not
+met**: MedScope-4B's free-text ESG (0.472) is the highest of the five models but not above any flagship with the 95%
+interval above 0 (36 cases). Reported as a limit: the advantage is shown for the trained yes/no agent format and is
+directionally consistent, not established, for open-ended answers; MedScope-4B never reports an erased lesion in
+free text (0/36) but reports fewer real ones (47.2% vs 69-86% for the flagships).
+
