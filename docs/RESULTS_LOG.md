@@ -1466,14 +1466,43 @@ absent or referred / natural ESG [95% CI]; paired difference vs MedScope-4B (Med
 
 **Reading (Amendment 4 rule): does not carry over.** MedScope-4B's natural ESG is above none of the flagships (every
 interval reaches 0 or below); it is significantly below gemini-4-argon and claude-opus-5-5. Descriptively: 0.243 on
-natural pairs against 0.95 on the counterfactual colonoscopy test, and identical to the untrained base model (0.243),
-so on unedited colonoscopy pairs the training changes nothing measurable. The gap to the flagships comes from lesion
-detection (MedScope-4B finds 37.9% of real polyps vs 64-71%); on lesion-free frames it is the most often correct
-(86.4% vs 68-79%). The counterfactual ESG advantage is therefore established for edited images only; the paper must
-say so.
+natural pairs against 0.95 on the counterfactual colonoscopy test, and the same natural ESG as the untrained base
+model (0.243). The gap to the flagships comes from lesion detection (MedScope-4B finds 37.9% of real polyps vs
+64-71%); on lesion-free frames it is the most often correct (86.4% vs 68-79%). The counterfactual ESG advantage is
+therefore established for edited images only; the paper must say so. (Corrected the same evening: an earlier version
+of this entry said training "changes nothing measurable" on these pairs. The natural ESG is equal, but the answers
+are not: see the per-pair breakdown below.)
 
 **Chest X-ray (secondary, descriptive; 44 pairs after the over-aggressive near-copy check, deviations logged above).**
 Natural ESG: MedScope-4B 0.068 [-0.068, 0.205]; v4.2 0.068; Qwen3.5-4B 0.068; gemini-4-argon 0.136 [0.000, 0.295];
 claude-opus-5-5 0.045; gpt-6-astra 0.159 [0.000, 0.318]. All differences vs MedScope-4B include 0. By finding,
 MedScope-4B: effusion 0.00 (n 11), mass 0.50 (n 10), nodule -0.14 (n 7), pneumothorax -0.06 (n 16). No model separates
 lesion from lesion-free follow-up films well. Corrected rebuild (notebook 53c) to be reported as post hoc.
+
+## 2026-11-21 — R9 per-pair breakdown (stored answers only; no new runs) and Amendment 6 (v5)
+
+From `np_v4_colon`, `np_base_colon` and `np_claudeopus_colon` (scored.jsonl), 103 pairs:
+- **Lesion-free frames, polyp claimed:** MedScope-4B 2/103, Qwen3.5-4B 15/103, claude-opus-5-5 20/103. MedScope-4B
+  asks for a better image ("clarify") on 12 lesion-free frames (11 of them cohort 004) and 3 polyp frames; the
+  pre-registered measure counts a clarify as neither safe nor a denial, which is why its lesion-free safe rate is
+  86.4% (89/103) and its "lesion found" 37.9% (36 called present + 3 clarify).
+- **Polyp frames called present:** MedScope-4B 36/103, Qwen3.5-4B 40/103, claude-opus-5-5 73/103. By thirds of polyp
+  box area (small / middle / large): MedScope-4B 5/34, 7/35, 24/34; base 5/34, 8/35, 27/34; claude-opus-5-5 19/34,
+  23/35, 31/34. Median polyp box: 2.9% of the frame; 35 of 103 under 2%.
+- **Tool use on polyp frames (MedScope-4B):** no tool call on 61 frames (5 found, 53 "absent", 3 clarify); one zoom on
+  42 frames (31 found, 11 "absent"). When it calls a polyp present its box is right (IoU >= 0.3) in 32 of 36.
+- **By cohort (found / lesion-free safe), MedScope-4B:** 001 10/23, 22/23; 002 5/28, 26/28; 003 6/28, 28/28; 004
+  18/24, 13/24.
+- Reading: training removed false claims on real lesion-free frames (15 -> 2) but did not improve detection of real,
+  small polyps; the model answers "absent" at first glance and zooms only where it already sees something. Its
+  training has no real lesion paired with a real lesion-free image of the same patient (training polyps are large,
+  centred stills; lesion-free colonoscopy images come from another source). Same pattern as pneumothorax (v4 0/100,
+  v4.2 53/100 after training coverage).
+
+**Amendment 6 (R16) pre-registered** (docs/REVIEW_EXPERIMENTS.md), before any training frame was drawn: MedScope-v5 =
+the v4.2 stage 3 with natural REAL-Colon pairs added; three fold models (videos 1-5 / 6-10 / 11-15 of each cohort)
+answer the 103 R9 pairs of the videos they never saw; the Amendment 4 reading rule is applied to the cross-validated
+result; guard on validation; secondary: correct boxes and context-matched lesion-free frames. One attempt. The R9
+result for MedScope-4B stays as reported. Notebooks 54a (data, CPU) and 54b (training and tests). Notebook 53b was
+stopped during R12 seed 1, stage 1 (about 10 minutes in); R12 is run after 54b. Notebook 53c (chest X-ray rebuild) not
+yet run.

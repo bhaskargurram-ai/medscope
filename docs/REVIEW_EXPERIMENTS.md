@@ -289,3 +289,74 @@ training folders) and run on the main test with the evaluation code as released.
 **Reading.** Reproduced if main-test ESG is within 0.02 of the reported 0.758 and at least 97% of per-view decisions
 (action and stated presence) match the stored run. Greedy decoding on a different GPU can change a few tokens, which
 is why the rule is not exact equality.
+
+---
+
+# Amendment 6 (21 Nov 2026, 18:30 ET): R16, MedScope-v5 with natural pairs in training (post hoc; committed before any training frame was drawn or any v5 model trained)
+
+**Status of R9.** Unchanged. By the Amendment 4 rule, MedScope-4B's counterfactual advantage does not carry over to
+natural colonoscopy pairs (natural ESG 0.243 against 0.320-0.466 for the flagships; equal to the untrained base
+model). That result stays in the paper as reported. MedScope-4B (v4) stays the pre-registered model.
+
+**What was looked at before this plan was written.** The R9 tables and the per-pair answers of MedScope-4B, the
+untrained base model and claude-opus-5-5 on the 103 pairs (model outputs and the annotated boxes; no change to any
+pair). They show: MedScope-4B claims a polyp on 2 of 103 lesion-free frames (base 15, claude-opus-5-5 20) but calls
+only 36 of 103 real polyps present (claude-opus-5-5 73); 5 of the 34 smallest. It answers "absent" without a tool call
+on 53 polyp frames; when it zooms it is right on 31 of 42. Its training holds no real lesion paired with a real
+lesion-free image of the same patient: training polyps are large, centred still images, and lesion-free colonoscopy
+images come from another source. The same pattern as pneumothorax (v4 0/100, v4.2 53/100 after training coverage).
+
+**Question.** Does adding natural pairs to training carry the advantage over to unedited images of unseen patients?
+
+**Folds, fixed now.** REAL-Colon videos are cut by their number within each cohort: videos 1-5 (fold 0), 6-10
+(fold 1), 11-15 (fold 2). The primary measure pools all 103 R9 pairs, so the cut cannot select pairs.
+
+**Training frames, fixed now** (`scripts/natural_pairs.py colon-train`; tracks as in Amendment 4):
+- Per video, the 10 longest tracks. Per track, one lesion frame per 2 s of track, at most 6: the track's frames whose
+  largest box covers at least 0.5% of the frame are cut into that many consecutive parts; in each part, of 6 evenly
+  spaced candidates, the sharpest with mean brightness 40-215 is kept.
+- Lesion-free frames, as many as lesion frames per video: per track one "near" frame (the Amendment 4 rule: 10-30 s
+  before the track, after it if fewer than 3 qualify, at least 10 s from any boxed frame) and one "context" frame
+  (within 10 s of the track's ends and 3-10 s from the nearest boxed frame); the rest "far" frames spread over the
+  frames at least 30 s from any boxed frame. A video without tracks gives 12 far frames. Same candidate rule.
+- Question and answers as in R9 ("Is there a polyp in this image?"; Yes with the largest box / No).
+
+**Models.** The v4.2 stage-3 command (notebook 51: from the v4.2 stage-2 adapter, same data, options and seed, SIIM
+patients included) with the natural training frames added in full:
+- v5-fold-k (k = 0, 1, 2): frames of the videos outside fold k.
+- MedScope-v5: frames of all 60 videos. This is the model tested on every other set.
+One run each. No option is tuned, no checkpoint is chosen, and no other variant is trained under this amendment.
+
+**Primary measure.** Natural ESG on the 103 R9 pairs, each pair answered by the fold model that never saw its video
+("MedScope-v5, cross-validated"). The flagships' and MedScope-4B's stored R9 answers are used as they are. Paired
+differences, 2,000 bootstrap resamples of whole videos, two-sided.
+
+**Reading rule, fixed now.**
+- Cross-validated v5 above every flagship, each difference's 95% interval above 0: with natural pairs in training, the
+  advantage holds on unedited images of unseen patients from the same centres.
+- Above none of them (every interval reaching 0 or below): it does not, and the paper says so.
+- Otherwise: mixed, reported comparison by comparison.
+
+**Guard on MedScope-v5 (validation only, before any of its test results; the R8 rule).** Validation net utility not
+more than 0.02 below v4's and lesion-free claims not more than 2 points above v4's. If the guard fails, v5 is reported
+as failing it. MedScope-v5 is then run on the main test, external centres, fresh internal, fresh external, the new SIIM
+patients and standard VQA, and compared with v4 and v4.2 (paired). A main-test ESG more than 0.05 below v4's is
+reported as a trade of counterfactual discipline for sensitivity.
+
+**Secondary, descriptive (no reading rule).**
+- Grounded detection: polyps called present with a box of IoU >= 0.3 against the annotated polyp, for every model
+  (a model answering from context, not from the polyp, cannot place the box).
+- Context-matched lesion-free frames for the R9 pairs: per pair, a frame within 10 s of the track's ends and 3-10 s
+  from the nearest boxed frame (before the track; after it if fewer than 3 qualify), the sharpest usable of 12
+  candidates. Share answered "absent" or referred, and natural ESG against these frames, for cross-validated v5, v4,
+  v4.2, the base model and the three flagships (new API calls on these frames only).
+- Natural ESG by fold and by cohort.
+
+**Known limits, stated in advance.** v5 is designed after the R9 result was seen, and the 103 pairs are used a second
+time; cross-validation over unseen videos, a single run and no tuning limit this, but do not remove it. The fold
+models are trained on videos of the same four centres drawn by rules close to the test's, while the flagships are
+used as they are (as in the main test). Three fold models stand in for one. Frames near a track may show a polyp
+that was not boxed. No centre is held out.
+
+**Fixed.** One attempt. Every result is reported, whatever it shows. R12 (training seeds of v4) is still owed and is
+run after this. Code: `scripts/natural_pairs.py`, notebooks 54a (data) and 54b (training and tests).

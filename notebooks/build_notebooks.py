@@ -5360,6 +5360,238 @@ runtime.unassign()
     ]
 
 
+def nb54a_v5_data() -> list[dict]:
+    """Notebook 54a: R16 (Amendment 6), real colonoscopy pairs for training v5 and context frames for the R9 pairs."""
+    return [md("""
+# MedScope 54a: data for v5 - real colonoscopy pairs for training (review check R16, Amendment 6)
+
+MedScope-4B (v4) was trained on edited pairs only. On the 103 natural colonoscopy pairs of R9 it almost never claims
+a polyp that is not there (2 of 103 lesion-free frames) but misses most real ones (finds 36 of 103): its advantage
+did not carry over. v5 adds real pairs to training. This notebook builds them, by the rules fixed in
+`docs/REVIEW_EXPERIMENTS.md` (Amendment 6) before any training frame was drawn:
+
+- every REAL-Colon video gives polyp frames from its tracks and as many lesion-free frames (near a track, in the same
+  stretch of the examination, and far from any polyp);
+- videos are cut into three folds by their number (1-5, 6-10, 11-15 of each centre), so every R9 pair can be answered
+  by a model that never saw its video;
+- for each R9 pair, one extra lesion-free frame taken 3-10 s from the polyp (a context-matched control).
+
+**Needs:** no GPU. Runtime > Change runtime type > CPU, High-RAM if you have it. About 4-6 hours: it reads all 60
+videos (about 950 GB, two at a time, nothing kept but the chosen frames). If the session ends, run all again: finished
+videos are kept. Notebook 52 (or 53b) must have been run: this uses its `natural_pairs/colon` folder.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE),
+        code(r"""
+doc = open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read()
+assert 'Amendment 6' in doc, 'Amendment 6 missing: pull the repository'
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+print('plan, latest commit:', plan[0])
+NP = f'{DRIVE}/natural_pairs'
+COLON, CT = f'{NP}/colon', f'{NP}/colon_train'
+RAW = f'{WORK}/raw/natural_pairs'
+os.environ['NP_ARCHIVES'] = f'{RAW}/archives'   # video archives (up to 44 GB each) go to local disk, not Drive
+os.makedirs(RAW, exist_ok=True)
+for need in ('selection.jsonl', 'views_natural_colon.jsonl', 'video_info.csv'):
+    assert os.path.exists(f'{COLON}/{need}'), f'{COLON}/{need} is missing: run notebook 52 (or 53b) first'
+import shutil
+free = shutil.disk_usage(WORK).free / 2 ** 30
+print(f'free local disk: {free:.0f} GB')
+WORKERS = 2 if free >= 110 else 1               # two videos at a time need room for two archives
+"""),
+        md("## 1. Training frames and context frames from all 60 videos (resumes video by video)"),
+        code(r"""
+sh(f'python scripts/natural_pairs.py colon-train --r9 {COLON} --out {CT} --workers {WORKERS}')
+"""),
+        md("## 2. What was built"),
+        code(r"""
+print(open(f'{CT}/report_train.txt').read())
+import collections
+rows = [json.loads(l) for l in open(f'{CT}/videos.jsonl')]
+stats = collections.Counter()
+for r in rows:
+    stats.update(r['stats'])
+print(dict(stats))
+print('by centre (training frames):', dict(collections.Counter(v['meta']['video'].split('-')[0] for r in rows for v in r['train'])))
+small = [v for r in rows for v in r['train'] if v['lesion_box'] and (v['lesion_box'][2] - v['lesion_box'][0]) * (v['lesion_box'][3] - v['lesion_box'][1]) < 20000]
+print('polyp frames with a polyp under 2% of the frame:', len(small))
+print('\nData ready. Next: notebook 54b (training and tests) on an A100.')
+"""),
+        code(r"""
+print('all done; releasing the runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
+def nb54b_v5_train() -> list[dict]:
+    """Notebook 54b: R16 (Amendment 6), MedScope-v5 = the v4.2 stage 3 with natural pairs; cross-validated on R9."""
+    c51 = nb51_v42()
+    siim_data = next(c for c in c51 if "MANUAL =" in "".join(c["source"]))
+    siim_build = next(c for c in c51 if "prepare_siim_train.py" in "".join(c["source"]))
+    s3 = ("--views {TRAIN_V4} {REPLAY} --negatives {TRAIN_NEG_V4} --subsample 5000 --lr 5e-5 --mode agentic "
+          "--min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    return [md("""
+# MedScope 54b: v5, natural pairs in training (review check R16, Amendment 6)
+
+Run notebook 54a first. This one follows `docs/REVIEW_EXPERIMENTS.md`, Amendment 6, fixed before any v5 model was
+trained:
+
+1. **Four trainings**, each the v4.2 stage 3 again (same data, options, seed) plus real colonoscopy pairs:
+   three fold models (each leaves out a third of the REAL-Colon videos) and MedScope-v5 (all videos).
+2. **Guard** on validation images, before any test result of v5.
+3. **The R9 pairs again**: each of the 103 pairs is answered by the fold model that never saw its video, and compared
+   with the stored answers of the three flagships (the rule of Amendment 6). Also: correct boxes, and the
+   context-matched lesion-free frames (new API calls on those frames only, about $10).
+4. **MedScope-v5 on every earlier test**, against v4 and v4.2.
+
+One run, nothing tuned, every result reported. MedScope-4B (v4) stays the pre-registered model and its R9 result
+stays as reported.
+
+**Needs:** an A100 (40 GB: about 12-13 hours; 80 GB or a G4: about 8 hours, two trainings at a time). Every step
+resumes. Secrets: `HF_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`; the SIIM-ACR `archive.zip` in
+`MyDrive/medscope/siim/` (as for notebook 51). Run all; nothing to set.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK),
+        code("!pip install -q -U kaggle pydicom openai anthropic google-genai"), code(LAMA_CELL),
+        code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(r"""
+doc = open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read()
+assert 'Amendment 6' in doc, 'Amendment 6 missing: pull the repository'
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+print('plan, latest commit:', plan[0])
+for k in ('KAGGLE_USERNAME', 'KAGGLE_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY'):
+    if secret(k):
+        os.environ[k] = secret(k)
+import torch, subprocess, shutil
+from concurrent.futures import ThreadPoolExecutor
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+print(torch.cuda.get_device_name(0) if GPU_GB else 'no GPU', f'({round(GPU_GB)} GB)')
+if GPU_GB < 35:
+    raise SystemExit('This GPU is too small. Runtime > Change runtime type > A100 (or G4), then run all again.')
+PAR = 2 if GPU_GB >= 70 else 1
+BATCH = 24 if GPU_GB >= 38 else 8
+def run_par(cmds):
+    if PAR == 1 or len(cmds) <= 1:
+        for cmd in cmds:
+            sh(cmd)
+    else:
+        with ThreadPoolExecutor(PAR) as ex:
+            list(ex.map(sh, cmds))
+BASE = 'Qwen/Qwen3.5-4B'
+NP = f'{DRIVE}/natural_pairs'
+COLON, CT = f'{NP}/colon', f'{NP}/colon_train'
+COLON_VIEWS = f'{COLON}/views_natural_colon.jsonl'
+CTX, CTX_PAIRS = f'{CT}/views_context_colon.jsonl', f'{CT}/views_contextpairs_colon.jsonl'
+FOLDS = (0, 1, 2)
+for need in [COLON_VIEWS, CTX, CTX_PAIRS, f'{CT}/views_train_all.jsonl'] + [f'{CT}/views_{w}_fold{k}.jsonl' for k in FOLDS for w in ('train', 'test')]:
+    assert os.path.exists(need), f'{need} is missing: run notebook 54a first'
+S2 = f'{ADAPTERS}/v42_s2/final'
+assert os.path.exists(f'{S2}/adapter_config.json'), 'the v4.2 stage-2 adapter (adapters/v42_s2) is missing: it comes from notebook 51'
+FINAL = json.load(open(f'{ADAPTERS}/final_choice_v4.json'))['adapter']
+V42 = f'{ADAPTERS}/v42_s3/final'
+for run in ('np_v4_colon', 'np_base_colon', 'np_gemini_colon', 'np_claudeopus_colon', 'np_gpt6astra_colon', 'v4_s3_val'):
+    assert os.path.exists(f'{RESULTS}/{run}/summary.json'), f'{RESULTS}/{run} is missing (R9: notebook 52/53b; validation: notebook 23)'
+print(open(f'{CT}/report_train.txt').read())
+print('GPU', round(GPU_GB), 'GB | trainings at a time:', PAR)
+"""),
+        md("## 1. The SIIM patients of v4.2 (same cells as notebook 51; about 20-30 minutes in a new session)"),
+        siim_data, siim_build,
+        md("## 2. Stage 3, four times: three fold models and MedScope-v5 (about 2-2.5 hours each; resumes)"),
+        code(r"""
+REPLAY = f'{DRIVE}/external/vqa_train/views_vqa_train.jsonl'
+S3 = f'@S3@'
+ARMS = [(f'v5_f{k}_s3', f'{CT}/views_train_fold{k}.jsonl') for k in FOLDS] + [('v5_s3', f'{CT}/views_train_all.jsonl')]
+cmds = [f'python scripts/train_sft.py --model {BASE} --init {S2} {S3} --extra-views {SIIM_TRAIN} {views} --out {ADAPTERS}/{name}'
+        for name, views in ARMS if not os.path.exists(f'{ADAPTERS}/{name}/final/adapter_config.json')]
+run_par(cmds)
+V5 = f'{ADAPTERS}/v5_s3/final'
+for name, _ in ARMS:
+    assert os.path.exists(f'{ADAPTERS}/{name}/final/adapter_config.json'), f'{name} did not finish: run all again'
+""".replace('@S3@', s3)),
+        md("## 3. Guard on validation images (before any test result of MedScope-v5)"),
+        code(r"""
+sh(f'python scripts/evaluate.py --model {BASE} --adapter {V5} --views {VAL_V4} {VAL_NEG_V4} --out {RESULTS}/v5_val --name medscope-v5 --split validation --batch-size {BATCH}')
+m = lambda run, k: json.load(open(f'{RESULTS}/{run}/summary.json'))['metrics'][k]['value']
+U5, U4 = m('v5_val', 'net_utility'), m('v4_s3_val', 'net_utility')
+H5, H4 = m('v5_val', 'natural_hallucination_rate'), m('v4_s3_val', 'natural_hallucination_rate')
+passed = U5 >= U4 - 0.02 and H5 <= H4 + 0.02
+GUARD = (f'validation net utility {U5:.3f} (v4 {U4:.3f}; limit >= {U4 - 0.02:.3f}), lesion-free claims {H5:.1%} '
+         f'(v4 {H4:.1%}; limit <= {H4 + 0.02:.1%}): ' + ('PASSED' if passed else 'NOT PASSED'))
+json.dump({'adapter': V5, 'passed': passed, 'rule': GUARD}, open(f'{ADAPTERS}/v5_choice.json', 'w'), indent=1)
+print(GUARD)
+"""),
+        md("""## 4. The R9 pairs: each answered by the fold model that never saw its video
+
+The context frames are also run here: by the fold models (with their fold's pairs), by v4, v4.2 and the base model,
+and by the three flagships over the API (these 103 lesion-free frames only)."""),
+        code(r"""
+API = [('gemini', 'gemini', 'gemini-4-argon'), ('claudeopus', 'anthropic', 'claude-opus-5-5'), ('gpt6astra', 'openai', 'gpt-6-astra')]
+missing = [m for _, p, m in API if not os.environ.get({'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}[p])]
+if missing:
+    raise SystemExit(f'API key missing for {missing}: add the secret (notebook access on) and rerun this cell.')
+procs = [subprocess.Popen(f'python scripts/evaluate.py --api {p} --model {m} --views {CTX} --out {RESULTS}/np_{t}_colonctx '
+                          f'--name {m}-context --split natural_colon_context --batch-size 8 > {NP}/log_{t}_colonctx.txt 2>&1',
+                          shell=True, cwd='/content/medscope') for t, p, m in API]
+for k in FOLDS:
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/v5_f{k}_s3/final --views {CT}/views_test_fold{k}.jsonl '
+       f'--out {RESULTS}/np_v5f{k}_colon --name v5-fold{k}-natural --split natural_colon_fold{k} --batch-size {BATCH}')
+for tag, adapter in [('v4', FINAL), ('v42', V42), ('base', '')]:
+    a = f'--adapter {adapter}' if adapter else ''
+    sh(f'python scripts/evaluate.py --model {BASE} {a} --views {CTX} --out {RESULTS}/np_{tag}_colonctx --name {tag}-context --split natural_colon_context --batch-size {BATCH}')
+for p in procs:
+    p.wait()
+for t, _, _ in API:
+    print(t, open(f'{NP}/log_{t}_colonctx.txt').read()[-400:])
+    assert os.path.exists(f'{RESULTS}/np_{t}_colonctx/summary.json'), f'{t}: the API run did not finish (see its log above); rerun this cell'
+"""),
+        code(r"""
+CV = '+'.join(f'{RESULTS}/np_v5f{k}_colon' for k in FOLDS)
+OTHERS = [('v4', 'MedScope-4B'), ('v42', 'MedScope-v4.2'), ('base', 'Qwen3.5-4B'), ('gemini', 'gemini-4-argon'),
+          ('claudeopus', 'claude-opus-5-5'), ('gpt6astra', 'gpt-6-astra')]
+RUNS = f'MedScope-v5-CV={CV} ' + ' '.join(f'{n}={RESULTS}/np_{t}_colon' for t, n in OTHERS)
+RUNS_CTX = f'MedScope-v5-CV={CV} ' + ' '.join(f'{n}={RESULTS}/np_{t}_colon+{RESULTS}/np_{t}_colonctx' for t, n in OTHERS)
+sh(f'python scripts/natural_pairs.py score --views {COLON_VIEWS} --runs {RUNS} --ref MedScope-v5-CV --by cohort --boxes --out {NP}/natural_colon_v5.md')
+sh(f'python scripts/natural_pairs.py score --views {COLON_VIEWS} --runs {RUNS} --ref MedScope-v5-CV --by fold --out {NP}/natural_colon_v5_folds.md')
+sh(f'python scripts/natural_pairs.py score --views {CTX_PAIRS} --runs {RUNS_CTX} --ref MedScope-v5-CV --by cohort --out {NP}/natural_colon_v5_context.md')
+for f in ('natural_colon_v5', 'natural_colon_v5_folds', 'natural_colon_v5_context'):
+    shutil.copy(f'{NP}/{f}.md', f'{RESULTS}/r16_{f}.md')
+"""),
+        md("## 5. MedScope-v5 on every earlier test, against v4 and v4.2 (about 2.5 hours)"),
+        code(r"""
+SIIM_TEST = f'{ST}/test/views/views_clean.jsonl {ST}/test/negatives.jsonl'
+SETS = {'test': f'{TEST_VIEWS} {TEST_NEG}', 'ext': EXT_VIEWS, 'fresh': FRESH, 'ext2': EXT2, 'siimte': SIIM_TEST, 'vqa': VQA_VIEWS}
+for split, views in SETS.items():
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {V5} --views {views} --out {RESULTS}/v5_{split} --name medscope-v5 --split {split} --batch-size {BATCH}')
+e5, e4 = m('v5_test', 'esg'), m('v4_final_test', 'esg')
+TRADE = (f'main-test ESG: v5 {e5:.3f}, v4 {e4:.3f} (difference {e5 - e4:+.3f}; more than 0.05 below v4 is reported as a '
+         f'trade of counterfactual discipline for sensitivity): ' + ('TRADE' if e5 < e4 - 0.05 else 'no trade'))
+print(TRADE)
+"""),
+        publish("MedScope report - 54b v5 natural pairs in training (R16)", """
+    ('What v5 is', 'The v4.2 stage 3 again (same data, options, seed) with real REAL-Colon pairs added to training. Three fold models answer the R9 pairs of the videos they never saw; MedScope-v5 (all videos) is tested on every other set. Post hoc: designed after the R9 result. MedScope-4B (v4) stays the pre-registered model and its R9 result stays as reported.'),
+    ('Training frames', read_text(f'{CT}/report_train.txt')),
+    ('Guard, fixed before any v5 test result', GUARD),
+    ('R9 pairs, cross-validated v5 against the stored answers (primary; rule in Amendment 6)', read_text(f'{NP}/natural_colon_v5.md')),
+    ('By fold', read_text(f'{NP}/natural_colon_v5_folds.md')),
+    ('Context-matched lesion-free frames (secondary, descriptive)', read_text(f'{NP}/natural_colon_v5_context.md')),
+    ('Counterfactual discipline', TRADE),
+    ('Main test: v5 vs v4 and v4.2 (paired)', significance_table(RESULTS, 'v5_test', ['v4_final_test', 'v42_test'])),
+    ('External centres: v5 vs v4 and v4.2', significance_table(RESULTS, 'v5_ext', ['v4_final_ext', 'v42_ext'])),
+    ('Fresh internal: v5 vs v4 and v4.2', significance_table(RESULTS, 'v5_fresh', ['v4_final_fresh', 'v42_fresh'])),
+    ('Fresh external: v5 vs v4 and v4.2', significance_table(RESULTS, 'v5_ext2', ['v4_final_ext2', 'v42_ext2'])),
+    ('New SIIM patients: v5 vs v4.2 and v4', significance_table(RESULTS, 'v5_siimte', ['v42_siimte', 'v4_final_siimte_r8'])),
+    ('By source', by_dataset(RESULTS, ['v5_test', 'v4_final_test', 'v5_ext2', 'v4_final_ext2'])),
+    ('Standard VQA', vqa_table(RESULTS, ['v5_vqa', 'v42_vqa', 'v4_final_vqa'])),
+"""),
+        code(r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -5444,6 +5676,8 @@ NOTEBOOKS = {
     "52_natural_pairs.ipynb": nb52_natural_pairs,
     "53_release_and_checks.ipynb": nb53_bulletproof,
     "53c_cxr_corrected.ipynb": nb53c_cxr_corrected,
+    "54a_v5_data.ipynb": nb54a_v5_data,
+    "54b_v5_train.ipynb": nb54b_v5_train,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
