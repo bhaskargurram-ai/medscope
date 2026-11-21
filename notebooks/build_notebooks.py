@@ -4986,7 +4986,7 @@ paired bootstrap over whole videos or patients.
 `KAGGLE_USERNAME` and `KAGGLE_KEY` (kaggle.com -> Settings -> API -> Create New Token), and `OPENAI_API_KEY`,
 `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`. Run all; nothing to set.
 """ + SECRETS_NOTE),
-        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code("!pip install -q kaggle"), code(RESTORE_ALL),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code("!pip install -q -U kaggle openai anthropic google-genai"), code(RESTORE_ALL),
         code(RESTORE_V4),
         code(r"""
 doc = open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read()
@@ -5004,6 +5004,7 @@ BATCH = 24 if GPU_GB >= 38 else 8
 BASE = 'Qwen/Qwen3.5-4B'
 NP = f'{DRIVE}/natural_pairs'          # on Drive: survives a disconnect
 RAW = f'{WORK}/raw/natural_pairs'      # large downloads: local disk only, deleted after use
+os.environ['NP_ARCHIVES'] = f'{RAW}/archives'   # video archives (several GB each) go to local disk, not Drive
 os.makedirs(NP, exist_ok=True); os.makedirs(RAW, exist_ok=True)
 FINAL = json.load(open(f'{ADAPTERS}/final_choice_v4.json'))['adapter']
 V42 = f'{ADAPTERS}/v42_s3/final'
@@ -5133,7 +5134,7 @@ the reported model, and every result is reported whatever it shows.
 after a disconnect. Colab secrets: `HF_TOKEN` (**write** access: huggingface.co -> Settings -> Access Tokens),
 `KAGGLE_USERNAME`, `KAGGLE_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`. Run all; nothing to set.
 """ + SECRETS_NOTE),
-        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code("!pip install -q kaggle huggingface_hub"),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK), code("!pip install -q -U kaggle huggingface_hub openai anthropic google-genai"),
         code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
         code(r"""
 doc = open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read()

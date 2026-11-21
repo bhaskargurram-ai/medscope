@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import re
 import sys
 import tarfile
@@ -190,6 +191,11 @@ def download(url: str, dest: Path) -> Path:
     return dest
 
 
+def archives(out: Path) -> Path:
+    """Where downloaded video archives go: NP_ARCHIVES (local disk in the notebooks), else out/archives."""
+    return Path(os.environ.get("NP_ARCHIVES", str(out / "archives")))
+
+
 def colon_fetch(out: Path, max_videos: int, inspect: bool) -> None:
     out.mkdir(parents=True, exist_ok=True)
     files = figshare_files()
@@ -208,8 +214,8 @@ def colon_fetch(out: Path, max_videos: int, inspect: bool) -> None:
         video = name.split("_annotations")[0]
         if video in done:
             continue
-        (out / "archives").mkdir(exist_ok=True)
-        arch = download(by_name[name]["download_url"], out / "archives" / name)
+        archives(out).mkdir(parents=True, exist_ok=True)
+        arch = download(by_name[name]["download_url"], archives(out) / name)
         frames, size = {}, (0, 0)
         for member, read in iter_archive(arch):
             if not member.lower().endswith(".xml"):
@@ -248,9 +254,9 @@ def colon_fetch(out: Path, max_videos: int, inspect: bool) -> None:
         if name is None:
             print(f"  {video}: frames archive not found")
             continue
-        (out / "archives").mkdir(exist_ok=True)
+        archives(out).mkdir(parents=True, exist_ok=True)
         print(f"  {video}: downloading frames ({by_name[name]['size'] / 1e9:.1f} GB) for {len(want)} candidates")
-        arch = download(by_name[name]["download_url"], out / "archives" / name)
+        arch = download(by_name[name]["download_url"], archives(out) / name)
         cand_dir.mkdir(parents=True, exist_ok=True)
         got = 0
         for member, read in iter_archive(arch):

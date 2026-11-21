@@ -1409,3 +1409,25 @@ them with R9 and makes the release public (MedScope-4B, MedScope-4B-v4.2, MedSco
 Manuscript v4: the data-availability text no longer says per-view outputs are in the GitHub repository (they were on
 Drive and in a private release); it now points to the public Hugging Face release.
 
+## 2026-11-20 — notebook 53b, first session: R15, R13 done; R14 partial; R9 colonoscopy selection done
+
+- **R15 reproduction (rule met: REPRODUCED).** MedScope-4B downloaded from huggingface.co/bhaskar-ai/MedScope-4B:
+  main-test ESG 0.763 (stored run 0.758); 1102/1115 per-view decisions identical (98.8%).
+- **R13 edit visibility (rule met).** Edit-trace detector test AUC: control edit vs unedited 0.826, erasure vs
+  unedited 0.841, erasure vs control edit 0.522. Median control-edit score 0.509: 111 low-visibility, 108 other
+  erasures. Erased-lesion claims, low-visibility vs other: MedScope-4B 16.2% vs 2.8%; gemini-4-argon 44.1% vs 38.0%;
+  claude-opus-5-5 59.5% vs 48.1%; gpt-6-astra 55.0% vs 63.0%. ESG on low-visibility cases: MedScope-4B 0.640
+  [0.550, 0.721]; difference vs argon +0.270 [+0.153, +0.387], opus +0.450 [+0.324, +0.568], astra +0.378
+  [+0.243, +0.514] (all p < 0.001). Reading: the advantage holds where edits are hard to see, but MedScope-4B's own
+  erased-lesion claims rise from 2.8% to 16.2% on those erasures, so part of its denial tracks edit visibility (or
+  those erasures keep more residual lesion; not separable here).
+- **R14 open-ended request (partial; claude-opus-5-5 run failed: anthropic package not installed in the notebook).**
+  36 cases with a lesion-specific question. Reports the finding on unedited / erased images; free-text ESG:
+  MedScope-4B 47.2% / 0.0%, 0.472 [0.306, 0.639]; Qwen3.5-4B 80.6% / 52.8%, 0.278; gemini-4-argon 69.4% / 38.9%,
+  0.306 (difference vs MedScope +0.167 [-0.028, +0.361], p 0.135); gpt-6-astra 83.3% / 47.2%, 0.361 (+0.111
+  [-0.056, +0.278], p 0.250). Rule (above each flagship, interval above 0) not met with 2 of 3 flagships; final after
+  the opus run. MedScope-4B never reports an erased lesion in free text but also reports fewer real lesions.
+- **R9 colonoscopy:** REAL-Colon selection complete (60 videos annotated; 46 with pairs; 103 pairs); candidate frames
+  extracted for 33 of 46 videos before the session stopped (22:33 UTC). Fixes for the rerun: API clients installed in
+  notebooks 52-53b; video archives now download to local disk instead of Drive.
+
