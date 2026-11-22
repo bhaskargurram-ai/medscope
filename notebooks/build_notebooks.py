@@ -5592,6 +5592,44 @@ runtime.unassign()
     ]
 
 
+def nb54p_peek() -> list[dict]:
+    """Notebook 54p: interim look at the two finished fold models on their own R9 pairs (separate output folders)."""
+    return [md("""
+# MedScope 54p: interim look - fold models 0 and 1 on their own R9 pairs
+
+Notebook 54b is still training (fold 2 and MedScope-v5). Folds 0 and 1 are finished, so this runs them on the R9
+pairs of the videos they never saw (73 of 103 pairs) and compares with the stored answers of the other models.
+
+This is an interim look only: the reported result is the one notebook 54b computes over all 103 pairs, and nothing in
+54b can change after this (one run, nothing tuned). Results go to separate folders (`peek_*`), never into 54b's.
+
+**Needs:** any GPU (L4 is enough), in a **second** Colab session; leave 54b running. About 20-30 minutes.
+""" + SECRETS_NOTE),
+        code(SETUP), code(GPU_STACK),
+        code(r"""
+BASE = 'Qwen/Qwen3.5-4B'
+NP = f'{DRIVE}/natural_pairs'
+COLON, CT = f'{NP}/colon', f'{NP}/colon_train'
+for k in (0, 1):
+    assert os.path.exists(f'{ADAPTERS}/v5_f{k}_s3/final/adapter_config.json'), f'fold {k} has not finished training yet'
+import torch
+BATCH = 24 if torch.cuda.get_device_properties(0).total_memory / 2 ** 30 >= 38 else 8
+for k in (0, 1):
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/v5_f{k}_s3/final --views {CT}/views_test_fold{k}.jsonl '
+       f'--out {RESULTS}/peek_v5f{k}_colon --name v5-fold{k}-peek --split natural_colon_fold{k}_peek --batch-size {BATCH}')
+OTHERS = [('v4', 'MedScope-4B'), ('v42', 'MedScope-v4.2'), ('base', 'Qwen3.5-4B'), ('gemini', 'gemini-4-argon'),
+          ('claudeopus', 'claude-opus-5-5'), ('gpt6astra', 'gpt-6-astra')]
+RUNS = f'v5-folds-0-1={RESULTS}/peek_v5f0_colon+{RESULTS}/peek_v5f1_colon ' + ' '.join(f'{n}={RESULTS}/np_{t}_colon' for t, n in OTHERS)
+sh(f'python scripts/natural_pairs.py score --views {COLON}/views_natural_colon.jsonl --runs {RUNS} --ref v5-folds-0-1 --by fold --boxes --out {RESULTS}/peek_v5_folds01.md')
+"""),
+        code(r"""
+print('done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -5678,6 +5716,7 @@ NOTEBOOKS = {
     "53c_cxr_corrected.ipynb": nb53c_cxr_corrected,
     "54a_v5_data.ipynb": nb54a_v5_data,
     "54b_v5_train.ipynb": nb54b_v5_train,
+    "54p_v5_peek.ipynb": nb54p_peek,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
