@@ -1652,3 +1652,80 @@ and R11 were never used (two script docstrings carried them for what became R13 
 **R16 by source, reading.** On the fresh external set v5's extra erased-lesion claims over MedScope-4B come from SIIM
 pneumothorax (35% against 0%) and, slightly, BUS-UCLM (8% against 2%); ETIS-Larib is 18% against 21% and BraTS
 meningioma 16% against 16%. The earlier note "SIIM 35%, ETIS 18%" listed v5's rates only.
+
+## 2026-11-22 — paper v5 checked by four independent agents and revised; corrections and sources (no new runs)
+
+Two reviewer agents (one ML venue, one clinical venue; each saw only the manuscript) and two number checkers (every
+number in the changed parts of paper v5 against this log). About 1,100 numbers were checked; none in the natural-pair
+sections disagreed with this log, and four elsewhere were wrong or unsourced as listed below.
+
+**Corrections to earlier entries of this log.**
+- Entry of 3 Nov, lesion-size quartiles: "flagships 0.2-0.45 in all" is wrong. Per quartile (Q1-Q4), ESG is
+  gemini-4-argon 0.400 / 0.556 / 0.418 / 0.509, claude-opus-5-5 0.200 / 0.352 / 0.345 / 0.418, gpt-6-astra 0.273 /
+  0.333 / 0.400 / 0.218: range 0.20-0.56, as the manuscript says.
+- MedGemma 1.5 4B, main test: the CCR of 0.660 in the first-look table predates the plain-prose re-scoring. Re-scored
+  (RESULTS/24_v4_everywhere_report.md): CCR 0.674 (MedScope-4B 0.849, +0.176 [0.116, 0.235]), ESG 0.283, erased claims
+  54.3%, lesion-free claims 24.0%, net utility -0.255.
+- v4.1 SIIM validation detection is 46% in its original run (notebook 27) and 48% when re-run in notebook 51 for R8:
+  one case apart; both are logged above. R8 passes with either.
+
+**Sources for numbers used in the manuscript (RESULTS/24_v4_everywhere_report.md unless stated).**
+- MedScope-4B main-test ESG 0.758 [0.701, 0.815] (RESULTS/v4_final_test/report.md).
+- Strict ESG (explicit "absent" answers only): MedScope-4B 0.758; gpt-6-sol 0.237, gpt-6-astra 0.311, gpt-6.1-sol
+  0.297, Claude Fable 5.1 0.342, Claude Opus 5.5 0.324, Claude Sonnet 5.5 0.397, gemini-4-argon 0.470,
+  gemini-3.1-pro 0.384, gemini-3.8-flash 0.269.
+- Net utility without the 170 degraded views: MedScope-4B 0.774; gpt-6-astra 0.310, claude-opus-5-5 0.361,
+  gemini-4-argon 0.579 (MedScope-4B minus model +0.464, +0.413, +0.195; each p < 0.001).
+- Grounded accuracy (IoU >= 0.3): 0.785 main test, 0.655 external centres.
+- Solved-examples prompt, 150 cases: gemini-4-argon claims 36.8% of erased lesions (the lowest of the 17 flagship
+  conditions); MedScope-4B on the same 150 cases ESG 0.750, erased claims 7.4%.
+- Fresh external, MedScope-4B minus gemini-4-argon, net utility: -0.363 [-0.496, -0.233], p < 0.001. Erased claims
+  8.3% against 31.5% / 42.3% / 35.7% (argon / opus / astra); ESG 0.393 against 0.435 / 0.292 / 0.268.
+- Held-out wordings (373 cases): net utility +0.006 [-0.033, 0.041], p 0.738.
+- Tools off: ESG 0.753 against 0.758 (p 0.918); net utility -0.092 (p 0.003); CCR -0.053 (p 0.001).
+- Lesion-size quartiles, MedScope-4B: ESG 0.545 / 0.741 / 0.836 / 0.909; erased claims 18.2 / 13.0 / 5.5 / 1.8%.
+- External centres by source, MedScope-4B ESG: CVC-ClinicDB 0.85, BraTS-Africa 0.71, BUS-BRA 0.58, QaTa-COV19 0.05.
+- Qwen3.5-4B (base), standard VQA closed / open / all: VQA-RAD 0.657 / 0.260 / 0.481; SLAKE 0.826 / 0.424 / 0.570;
+  PathVQA 0.545 / 0.021 / 0.293.
+- Erasures gemini-4-argon rated unedited (61) against edited (158): MedScope-4B claims 15% against 8%; the nine
+  frontier models 41-64% on the 61.
+- Reader study (entries of 12-13 Nov): the two trainee readers called a finding on 16/32 and 7/32 unedited
+  lesion-free images, 23/64 reads (35.9%), against 35/64 (54.7%) erased reads. "By majority" with two readers means
+  both: 13 erased images both called positive ("residual"), 19 at most one did ("majority-clean"), 10 neither
+  ("reader-clean") (scripts/reader_verified.py).
+- R9 stored answers, tool use on the 103 polyp frames: the untrained base calls a tool on every frame (97 once, 4
+  twice, 2 three times) and calls 40 present, 13 with a box on the polyp; MedScope-4B makes no tool call on 61. The
+  earlier sentence in the manuscript that MedScope-4B "like the base model" decides at first glance was wrong and is
+  removed.
+- Training zooms: in medscope/agent/trajectories.py a training trajectory zooms only on a view that has a lesion box,
+  and the zoom region is that box padded; lesion-free training images are answered without a zoom.
+- Critical findings (a miss costs -4.0): brain tumour, malignant breast lesion, pneumothorax or mass on chest X-ray,
+  SLAKE findings labelled cancer or tumour (medscope/data/loaders).
+
+**Still without a source in the reports read today (carried from manuscript v4; to re-read from RESULTS before
+submission).** C2 standard deviations (erased claims +-7.9 / +-4.0, CCR +-0.086 / +-0.026); the first trainee
+reader's edit AUC 0.54; tool-family 0.141, 0.067 and [0.045, 0.106]; R1 LaMa interval [-0.022, 0.050]; R8 interval
+[-0.074, 0.038]; why the fresh external set lists 168 lesion and 150 lesion-free images but 316 evaluated cases.
+
+**Manuscript v5, changes made after the review (text only).** Abstract, contributions, Section 4.7 lead and
+conclusion re-ordered around one finding (the trained agent rarely claims what is not shown; finding real lesions
+needed training coverage). Each negative result is now stated once in the results and once in a single Limitations
+paragraph. Over-claims removed: "keeps its advantage at external centres", "physicians support / reader-validated",
+"highest of seven models", "threshold-independent", "formal abstention ceiling", "perception limit", "every
+intervention shifted the threshold", "more than half", "fixed before the test sets were used", "no model had seen".
+Reader result now given next to the readers' lesion-free call rate. Strict ESG, net utility without degraded views and
+grounded accuracy reported. ETIS-Larib attribution, paired-frame rule, check numbering (R1-R9, R12-R16), "27
+comparisons" label, arm counts (4 checks + 8 one-seed pilots or screens), and four stale appendix lines corrected.
+Outcomes table: three declared analyses added (v4.1 rule not met; stage 4 not triggered; selection-rule test not
+run). Chest X-ray natural pairs and the error catalogue moved to the appendix. Limitations added: authors as
+readers, registration in our own repository, earlier versions run on the main test, generic questions, image
+resolution, single API runs, no task-specific baseline, no image-blind control, no natural-pairs-only arm.
+
+**Ratings by the two reviewer agents (their judgement, before the revision).** ML venue: NeurIPS Evaluations &
+Datasets 3 of 6 (borderline reject), "would move to 4-5 with the re-scoping and re-analyses"; TMLR leaning accept
+conditional on text and re-analysis changes. Clinical venue: Medical Image Analysis major revision. Estimated
+acceptance: TMLR about 60% (80% after text fixes), MIDL 40-55%, MICCAI about 35%, Medical Image Analysis about 35%
+(45% with the expert reader study, seeds and restructuring), NeurIPS E&D 18% (35% after fixes), npj Digital Medicine
+15-20%, Radiology: AI about 10%. Experiments both ask for: the finished expert reader study; independent
+confirmation of v5 (leave-one-centre-out, or a second colonoscopy video set); natural pairs without counterfactual
+views; seeds (R12); results by question type; an image-blind control.

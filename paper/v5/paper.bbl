@@ -1,4 +1,4 @@
-\begin{thebibliography}{39}
+\begin{thebibliography}{40}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -217,6 +217,16 @@ Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei
 \newblock {DeepSeekMath}: Pushing the limits of mathematical reasoning in open
   language models.
 \newblock \emph{arXiv preprint arXiv:2402.03300}, 2024.
+
+\bibitem[Sharma et~al.(2026)Sharma, Long, Shih, Eid, Bluethgen, Jacobson, Tsai,
+  {Global Radiology Consortium}, Alaa, and Langlotz]{sharma2026chexthought}
+Sonali Sharma, Jin Long, George Shih, Sarah Eid, Christian Bluethgen,
+  Francine~L. Jacobson, Emily~B. Tsai, {Global Radiology Consortium}, Ahmed~M.
+  Alaa, and Curtis~P. Langlotz.
+\newblock {CheXthought}: A global multimodal dataset of clinical
+  chain-of-thought reasoning and visual attention for chest {X}-ray
+  interpretation.
+\newblock \emph{arXiv preprint arXiv:2604.26288}, 2026.
 
 \bibitem[Sun et~al.(2026)Sun, Tu, Xue, Jiang, Xu, Yao, Qian, Sun, Zhou, Sun,
   and Lin]{sun2026prive}
