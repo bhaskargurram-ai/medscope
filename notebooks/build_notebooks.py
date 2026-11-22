@@ -6071,6 +6071,50 @@ open(f'{OUT}/schema.md', 'w').write('\n'.join(lines) + '\n')
 print('\n'.join(lines)[:6000])
 print(f'\nwritten to {OUT}/schema.md')
 """),
+        md("""## 2. Download the CheXthought CSV (about 500 MB) and summarise it
+
+If Redivis refuses the download ("cannot be exported to the requested environment"), the dataset's export rules do
+not allow Colab: the cell says so, and we ask Sonali which route the dataset allows."""),
+        code(r"""
+import pandas as pd, re, json
+CSV = f'{OUT}/chexthoughtdataset.csv'
+if not os.path.exists(CSV):
+    got, errs = False, []
+    for t in tables:
+        try:
+            for f in t.list_files():
+                name = getattr(f, 'name', None) or f.properties.get('name', '')
+                if name.endswith('.csv'):
+                    f.download(CSV)
+                    got = True
+        except Exception as e:
+            errs.append(f'{type(e).__name__}: {e}')
+    if not got:
+        print('\n'.join(errs))
+        raise SystemExit('The CSV could not be downloaded here (see above). If the error says the table cannot be exported '
+                         'to this environment, the dataset only allows analysis inside Redivis: send me this output.')
+print(f'{os.path.getsize(CSV) / 1e6:.0f} MB at {CSV}')
+df = pd.read_csv(CSV)
+S = ['# CheXthought CSV summary', '', f'rows: {len(df):,}; columns: {list(df.columns)}', '']
+for c in df.columns:
+    S.append(f'- {c}: {df[c].nunique():,} distinct; e.g. {str(df[c].dropna().iloc[0])[:300]!r}')
+idc = next((c for c in df.columns if 'image' in c.lower()), None)
+if idc:
+    reads = df.groupby(idc).size()
+    S += ['', f'reads per image: {reads.describe().round(2).to_dict()}; images read 2+ times: {(reads >= 2).sum():,}']
+cot = next((c for c in df.columns if 'chain' in c.lower() or 'reason' in c.lower()), None)
+sp = next((c for c in df.columns if 'spatial' in c.lower()), None)
+if cot:
+    S.append(f'words per reasoning trace: median {df[cot].astype(str).str.split().str.len().median():.0f}')
+    for word in ('pneumothorax', 'effusion', 'nodule', 'mass', 'uncertain', 'cannot exclude', 'possible'):
+        S.append(f'- traces mentioning {word!r}: {df[cot].astype(str).str.lower().str.contains(word).sum():,}')
+if sp:
+    S += ['', 'spatial_annotations, first two rows:', str(df[sp].iloc[0])[:800], str(df[sp].iloc[1])[:800]]
+if cot:
+    S += ['', 'reasoning, first row:', str(df[cot].iloc[0])[:2000]]
+open(f'{OUT}/csv_summary.md', 'w').write('\n'.join(S) + '\n')
+print('\n'.join(S))
+"""),
     ]
 
 
