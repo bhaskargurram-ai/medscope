@@ -6013,14 +6013,14 @@ it (tables, variables, a few rows). No experiment, no GPU.
 
 **Before running:**
 1. Open https://stanford.redivis.com/datasets/ds7j-75krm2btv signed in to Redivis and accept any access terms.
-2. On that page find the dataset's **owner** (the user or organisation name shown above or beside the title, also in
-   the page's "Cite" or "API" panel). Paste it into `OWNER` in the next cell.
+2. The images are in CheXpert Plus (https://stanford.redivis.com/datasets/5yyj-1a9f6ap0x), a separate dataset:
+   request access there too. This notebook reports whether it can open it.
 3. Run all. Redivis prints a sign-in link the first time: open it, approve, and the cell continues. Do **not** put
    an API token in Colab secrets for this; delete the one you made earlier on Redivis.
 """),
         code(SETUP),
         code(r"""
-OWNER = ''          # <- the dataset owner's name from the dataset page, e.g. 'sonalisharma' (not 'stanford')
+OWNER = 'AIMI'      # the owner shown on the dataset page (Stanford AIMI)
 REF = 'chexthought:ds7j'   # dataset name : reference id (the first 4 characters of ds7j-75krm2btv)
 !pip install -q -U redivis
 os.environ.pop('REDIVIS_API_TOKEN', None)
@@ -6054,6 +6054,19 @@ for t in tables:
         lines += ['', df.to_markdown(index=False)[:4000], '']
     except Exception as e:
         lines.append(f'(could not read: {type(e).__name__}: {e})')
+try:
+    files = dataset.list_files() if hasattr(dataset, 'list_files') else []
+    lines += ['## Files', ''] + [f"- {getattr(f, 'name', None) or getattr(f, 'properties', {}).get('name')}" for f in files] + ['']
+except Exception as e:
+    lines.append(f'(files not listed: {type(e).__name__}: {e})')
+# the images themselves are in CheXpert Plus (a separate dataset with its own access terms)
+try:
+    cp = redivis.organization(OWNER).dataset('chexpert_plus:5yyj')
+    lines += ['## CheXpert Plus (the images)', '', 'access OK; tables: ' + ', '.join(
+        str(getattr(x, 'name', None) or x.properties.get('name')) for x in cp.list_tables()), '']
+except Exception as e:
+    lines += ['## CheXpert Plus (the images)', '', f'not opened ({type(e).__name__}: {e}); request access at '
+              'https://stanford.redivis.com/datasets/5yyj-1a9f6ap0x before any training on CheXthought', '']
 open(f'{OUT}/schema.md', 'w').write('\n'.join(lines) + '\n')
 print('\n'.join(lines)[:6000])
 print(f'\nwritten to {OUT}/schema.md')
