@@ -361,7 +361,7 @@ that was not boxed. No centre is held out.
 **Fixed.** One attempt. Every result is reported, whatever it shows. R12 (training seeds of v4) is still owed and is
 run after this. Code: `scripts/natural_pairs.py`, notebooks 54a (data) and 54b (training and tests).
 
-# Amendment 7 (22 Nov 2026, 11:10 ET): R17-R22, after an independent review of manuscript v5 (committed before any of them ran)
+# Amendment 7 (22 Nov 2026, 11:06 ET): R17-R22, after an independent review of manuscript v5 (committed before any of them ran)
 
 An independent review of manuscript v5 (two reviewers who saw only the manuscript) asked for: confirmation of v5
 with no centre shared; natural pairs without counterfactual views; results by question type; an image-blind control;

@@ -5630,6 +5630,462 @@ runtime.unassign()
     ]
 
 
+R7_CONFIG = r"""
+doc = open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read()
+assert 'Amendment 7' in doc, 'Amendment 7 missing: pull the repository'
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+print('plan, latest commit:', plan[0])
+for k in ('KAGGLE_USERNAME', 'KAGGLE_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'HF_TOKEN'):
+    if secret(k):
+        os.environ[k] = secret(k)
+import torch, subprocess, shutil
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cuda.is_available() else 0
+print(torch.cuda.get_device_name(0) if GPU_GB else 'no GPU', f'({round(GPU_GB)} GB)')
+if GPU_GB < @MIN_GB@:
+    raise SystemExit('This GPU is too small. Runtime > Change runtime type > @GPU_NAME@, then run all again.')
+PAR = 2 if GPU_GB >= 70 else 1
+BATCH = 24 if GPU_GB >= 38 else 8
+def run_par(cmds):
+    if PAR == 1 or len(cmds) <= 1:
+        for cmd in cmds:
+            sh(cmd)
+    else:
+        with ThreadPoolExecutor(PAR) as ex:
+            list(ex.map(sh, cmds))
+BASE = 'Qwen/Qwen3.5-4B'
+NP = f'{DRIVE}/natural_pairs'
+COLON, CT = f'{NP}/colon', f'{NP}/colon_train'
+COLON_VIEWS = f'{COLON}/views_natural_colon.jsonl'
+CTX, CTX_PAIRS = f'{CT}/views_context_colon.jsonl', f'{CT}/views_contextpairs_colon.jsonl'
+FOLDS = (0, 1, 2)
+FINAL = json.load(open(f'{ADAPTERS}/final_choice_v4.json'))['adapter']
+OTHERS = [('v4', 'MedScope-4B'), ('v42', 'MedScope-v4.2'), ('base', 'Qwen3.5-4B'), ('gemini', 'gemini-4-argon'),
+          ('claudeopus', 'claude-opus-5-5'), ('gpt6astra', 'gpt-6-astra')]
+m = lambda run, k: json.load(open(f'{RESULTS}/{run}/summary.json'))['metrics'][k]['value']
+print('GPU', round(GPU_GB), 'GB | trainings at a time:', PAR)
+"""
+
+DONE_CELL = r"""
+print('all done; releasing the GPU runtime')
+from google.colab import runtime
+runtime.unassign()
+"""
+
+
+def r7_config(min_gb: int, gpu_name: str) -> str:
+    return R7_CONFIG.replace('@MIN_GB@', str(min_gb)).replace('@GPU_NAME@', gpu_name)
+
+
+def nb55a_review7_checks() -> list[dict]:
+    """Notebook 55a: R20 (question type, stored answers) and R19 (image-blind control), Amendment 7."""
+    return [md("""
+# MedScope 55a: results by question type (R20) and the image-blind control (R19)
+
+Two checks an independent review of manuscript v5 asked for (`docs/REVIEW_EXPERIMENTS.md`, Amendment 7, fixed before
+this ran):
+
+1. **R20, question type.** The stored main-test answers again, split by whether the question names a finding
+   ("Is there a polyp?") or is generic ("Is there an abnormality?"). Nothing is run; a few seconds.
+2. **R19, image-blind control.** Every lesion case's question is asked of a blank grey image and of a lesion-free
+   image of another imaging type: 9 frontier models over the API (about $40-60), MedScope-4B and the base model here.
+
+**Needs:** any GPU (a T4 is enough); about 40-60 minutes. Secrets: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+`GEMINI_API_KEY`. Every step resumes. Run all; nothing to set.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK),
+        code("!pip install -q -U openai anthropic google-genai"), code(RESTORE_ALL),
+        code(r7_config(12, 'T4 (or better)') + "\nFRONTIER = " + repr(FRONTIER) + "\n"),
+        md("## 1. R20: the main results by question type (stored answers only)"),
+        code(r"""
+RUNS20 = 'MedScope-4B=v4_final_test ' + ' '.join(f'{mid}={run}' for run, _, mid in FRONTIER) + ' Qwen3.5-4B=v2_base_qwen35_test'
+sh(f'python scripts/question_type.py --views {TEST_VIEWS} {TEST_NEG} --results {RESULTS} --runs {RUNS20} --ref MedScope-4B --out {RESULTS}/r20_question_type.md')
+"""),
+        md("## 2. R19: the same questions on a blank image and on an image of another imaging type"),
+        code(r"""
+BL = f'{DRIVE}/blind'
+BLIND = f'{BL}/views_blind.jsonl'
+if not os.path.exists(BLIND):
+    sh(f'python scripts/blind_views.py build --views {TEST_VIEWS} --negatives {TEST_NEG} --out {BL}')
+KEY = {'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}
+missing = sorted({p for _, p, _ in FRONTIER if not os.environ.get(KEY[p])})
+if missing:
+    raise SystemExit(f'API key missing for {missing}: add the secret (notebook access on) and rerun this cell.')
+tag = lambda run: run.replace('v2_', '').replace('_test', '')
+def provider_runs(provider):          # one provider's three models one after another; the providers side by side
+    for run, p, mid in FRONTIER:
+        out = f'{RESULTS}/blind_{tag(run)}'
+        if p == provider and not os.path.exists(f'{out}/summary.json'):
+            subprocess.run(f'python scripts/evaluate.py --api {p} --model {mid} --views {BLIND} --out {out} --name {mid}-blind '
+                           f'--split blind --batch-size 8 > {BL}/log_{tag(run)}.txt 2>&1', shell=True, cwd='/content/medscope')
+with ThreadPoolExecutor(3) as ex:
+    waiting = [ex.submit(provider_runs, p) for p in ('openai', 'anthropic', 'gemini')]
+    for tg, adapter in [('v4', FINAL), ('base', '')]:
+        a = f'--adapter {adapter}' if adapter else ''
+        sh(f'python scripts/evaluate.py --model {BASE} {a} --views {BLIND} --out {RESULTS}/blind_{tg} --name {tg}-blind --split blind --batch-size {BATCH}')
+    for w in waiting:
+        w.result()
+for run, _, mid in FRONTIER:
+    assert os.path.exists(f'{RESULTS}/blind_{tag(run)}/summary.json'), f'{mid}: the API run did not finish (see {BL}/log_{tag(run)}.txt); rerun this cell'
+RUNS19 = ('MedScope-4B=blind_v4:v4_final_test Qwen3.5-4B=blind_base:v2_base_qwen35_test '
+          + ' '.join(f'{mid}=blind_{tag(run)}:{run}' for run, _, mid in FRONTIER))
+sh(f'python scripts/blind_views.py report --views {BLIND} --results {RESULTS} --runs {RUNS19} --out {RESULTS}/r19_image_blind.md')
+"""),
+        publish("MedScope report - 55a question type and image-blind control (R20, R19)", """
+    ('R20: main results by question type (stored answers; rule in Amendment 7)', read_text(f'{RESULTS}/r20_question_type.md')),
+    ('R19: image-blind control (rule in Amendment 7)', read_text(f'{RESULTS}/r19_image_blind.md')),
+"""),
+        code(DONE_CELL),
+    ]
+
+
+def nb55b_loco() -> list[dict]:
+    """Notebook 55b: R18 (Amendment 7), the v5 recipe with every video of one centre left out, four times."""
+    c51 = nb51_v42()
+    siim_data = next(c for c in c51 if "MANUAL =" in "".join(c["source"]))
+    siim_build = next(c for c in c51 if "prepare_siim_train.py" in "".join(c["source"]))
+    s3 = ("--views {TRAIN_V4} {REPLAY} --negatives {TRAIN_NEG_V4} --subsample 5000 --lr 5e-5 --mode agentic "
+          "--min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    return [md("""
+# MedScope 55b: v5 with no centre shared (review check R18, Amendment 7)
+
+The independent review's main doubt about v5: its fold models were trained on other patients of the **same four
+centres**. This trains the v5 recipe four more times, each without every video of one centre, and has each of the 103
+natural pairs answered by the model that never saw its centre. Same training frames as notebook 54a (nothing is
+redrawn), same rule as before against the stored answers of the three flagships. One run, nothing tuned, every result
+reported.
+
+**Needs:** notebooks 54a and 54b done. An A100 (40 GB: about 10-11 hours; 80 GB: about 6 hours, two trainings at a
+time). Every step resumes. Secrets and the SIIM-ACR `archive.zip` as for notebook 54b. No API calls. Run all.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK),
+        code("!pip install -q -U kaggle pydicom"), code(LAMA_CELL),
+        code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(r7_config(35, 'A100 (or G4)') + r"""
+assert os.path.exists(f'{CT}/videos.jsonl'), f'{CT}/videos.jsonl is missing: run notebook 54a first'
+sh(f'python scripts/natural_pairs.py colon-loco --r9 {COLON_VIEWS} --dir {CT}')
+CENTRES = ('001', '002', '003', '004')
+S2 = f'{ADAPTERS}/v42_s2/final'
+assert os.path.exists(f'{S2}/adapter_config.json'), 'the v4.2 stage-2 adapter (adapters/v42_s2) is missing: it comes from notebook 51'
+for run in [f'np_{t}_colon' for t, _ in OTHERS] + [f'np_{t}_colonctx' for t, _ in OTHERS] + [f'np_v5f{k}_colon' for k in FOLDS]:
+    assert os.path.exists(f'{RESULTS}/{run}/summary.json'), f'{RESULTS}/{run} is missing: it comes from notebooks 52/53b and 54b'
+"""),
+        md("## 1. The SIIM patients of v4.2 (same cells as notebook 51; about 20-30 minutes in a new session)"),
+        siim_data, siim_build,
+        md("## 2. Stage 3, four times, each without one centre (about 2-2.5 hours each; resumes)"),
+        code(r"""
+REPLAY = f'{DRIVE}/external/vqa_train/views_vqa_train.jsonl'
+S3 = f'@S3@'
+cmds = [f'python scripts/train_sft.py --model {BASE} --init {S2} {S3} --extra-views {SIIM_TRAIN} {CT}/views_train_loco{c}.jsonl --out {ADAPTERS}/v5_loco{c}_s3'
+        for c in CENTRES if not os.path.exists(f'{ADAPTERS}/v5_loco{c}_s3/final/adapter_config.json')]
+run_par(cmds)
+for c in CENTRES:
+    assert os.path.exists(f'{ADAPTERS}/v5_loco{c}_s3/final/adapter_config.json'), f'v5_loco{c}_s3 did not finish: run all again'
+""".replace('@S3@', s3)),
+        md("## 3. Each natural pair answered by the model that never saw its centre"),
+        code(r"""
+for c in CENTRES:
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/v5_loco{c}_s3/final --views {CT}/views_test_loco{c}.jsonl '
+       f'--out {RESULTS}/np_v5loco{c}_colon --name v5-loco{c}-natural --split natural_colon_loco{c} --batch-size {BATCH}')
+LOCO = '+'.join(f'{RESULTS}/np_v5loco{c}_colon' for c in CENTRES)
+CV = '+'.join(f'{RESULTS}/np_v5f{k}_colon' for k in FOLDS)
+RUNS = f'MedScope-v5-LOCO={LOCO} MedScope-v5-CV={CV} ' + ' '.join(f'{n}={RESULTS}/np_{t}_colon' for t, n in OTHERS)
+RUNS_CTX = f'MedScope-v5-LOCO={LOCO} MedScope-v5-CV={CV} ' + ' '.join(f'{n}={RESULTS}/np_{t}_colon+{RESULTS}/np_{t}_colonctx' for t, n in OTHERS)
+sh(f'python scripts/natural_pairs.py score --views {COLON_VIEWS} --runs {RUNS} --ref MedScope-v5-LOCO --by cohort --boxes --out {NP}/natural_colon_loco.md')
+sh(f'python scripts/natural_pairs.py score --views {CTX_PAIRS} --runs {RUNS_CTX} --ref MedScope-v5-LOCO --by cohort --out {NP}/natural_colon_loco_context.md')
+for f in ('natural_colon_loco', 'natural_colon_loco_context'):
+    shutil.copy(f'{NP}/{f}.md', f'{RESULTS}/r18_{f}.md')
+"""),
+        publish("MedScope report - 55b v5 leave-one-centre-out (R18)", """
+    ('What this is', 'The v5 recipe of Amendment 6 trained four times, each without every video of one REAL-Colon centre; each of the 103 natural pairs is answered by the model that never saw its centre. Rule of Amendments 4, 6 and 7: above every flagship with the interval above zero, the advantage carries over to unseen centres; above none, it does not; otherwise mixed. The same 103 pairs are used a third time; the flagships are used as they are.'),
+    ('Training frames by held-out centre', read_text(f'{CT}/report_loco.txt')),
+    ('Natural pairs, leave-one-centre-out v5 against the stored answers (primary)', read_text(f'{NP}/natural_colon_loco.md')),
+    ('Context-matched lesion-free frames (secondary, descriptive)', read_text(f'{NP}/natural_colon_loco_context.md')),
+"""),
+        code(DONE_CELL),
+    ]
+
+
+def nb55c_factorial() -> list[dict]:
+    """Notebook 55c: R17 (Amendment 7), counterfactual views x natural pairs at stage 1."""
+    cont = "--subsample 5000 --lr 5e-5 --mode agentic --window-prob 0.3 --small-zoom --paraphrase-prob 0.5"
+    return [md("""
+# MedScope 55c: counterfactual views x natural pairs (review check R17, Amendment 7)
+
+Both reviewers asked what each ingredient contributes. Four stage-1 models answer the 103 natural pairs:
+
+| | without natural pairs | with natural pairs (new; three folds each) |
+| --- | --- | --- |
+| **without counterfactual views** | `v4q_nocf_s0` (exists) | natural-only |
+| **with counterfactual views** | `v4_s1`, the stage-1 recipe (exists) | CF-and-natural |
+
+The two new arms continue the existing models in the same way (5,000 replayed views of the arm's own training set
+plus the fold's natural frames). Primary: natural ESG of CF-and-natural minus natural-only. One run, nothing tuned.
+
+**Needs:** notebooks 25 (the two stage-1 adapters) and 54a done. An A100 (40 GB: about 12 hours; 80 GB: about 7
+hours). Every step resumes. No API calls. Run all.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK),
+        code(RESTORE_ALL), code(RESTORE_V4),
+        code(r7_config(35, 'A100 (or G4)') + r"""
+A, B = f'{ADAPTERS}/v4q_nocf_s0/final', f'{ADAPTERS}/v4_s1/final'
+for path in (A, B):
+    assert os.path.exists(f'{path}/adapter_config.json'), f'{path} is missing: the stage-1 adapters come from notebooks 23 and 25'
+for k in FOLDS:
+    for w in ('train', 'test'):
+        assert os.path.exists(f'{CT}/views_{w}_fold{k}.jsonl'), f'fold {k} files are missing: run notebook 54a first'
+for run in ('v4q_nocf_s0_test', 'v4q_cf_s0_test'):
+    assert os.path.exists(f'{RESULTS}/{run}/summary.json'), f'{RESULTS}/{run} is missing (notebook 25)'
+"""),
+        md("## 1. The two existing stage-1 models on the 103 natural pairs (inference only)"),
+        code(r"""
+for tag, adapter in [('s1nocf', A), ('s1cf', B)]:
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {adapter} --views {COLON_VIEWS} --out {RESULTS}/np_{tag}_colon --name {tag}-natural --split natural_colon --batch-size {BATCH}')
+"""),
+        md("## 2. Both continued with natural frames, three folds each (six trainings; resumes)"),
+        code(r"""
+CONT = '@CONT@'
+cmds = []
+for k in FOLDS:
+    arms = [(f'r17_nocf_np_f{k}', A, f'--views {TRAIN_V4_BASE} --negatives {TRAIN_NEG_V4} --kinds original natural_negative degraded'),
+            (f'r17_cf_np_f{k}', B, f'--views {TRAIN_V4} --negatives {TRAIN_NEG_V4}')]
+    for name, init, views in arms:
+        if not os.path.exists(f'{ADAPTERS}/{name}/final/adapter_config.json'):
+            cmds.append(f'python scripts/train_sft.py --model {BASE} --init {init} {views} {CONT} --extra-views {CT}/views_train_fold{k}.jsonl --out {ADAPTERS}/{name}')
+run_par(cmds)
+for k in FOLDS:
+    for arm in ('nocf', 'cf'):
+        assert os.path.exists(f'{ADAPTERS}/r17_{arm}_np_f{k}/final/adapter_config.json'), f'r17_{arm}_np_f{k} did not finish: run all again'
+""".replace('@CONT@', cont)),
+        md("## 3. The natural pairs, each answered by a model that never saw its video; the main test for fold 0"),
+        code(r"""
+for k in FOLDS:
+    for arm in ('nocf', 'cf'):
+        sh(f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/r17_{arm}_np_f{k}/final --views {CT}/views_test_fold{k}.jsonl '
+           f'--out {RESULTS}/np_r17{arm}_f{k}_colon --name r17-{arm}-fold{k} --split natural_colon_fold{k} --batch-size {BATCH}')
+for arm in ('nocf', 'cf'):
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/r17_{arm}_np_f0/final --views {TEST_VIEWS} {TEST_NEG} '
+       f'--out {RESULTS}/r17_{arm}_np_f0_test --name r17-{arm}-fold0 --split test --batch-size {BATCH}')
+C = '+'.join(f'{RESULTS}/np_r17nocf_f{k}_colon' for k in FOLDS)
+D = '+'.join(f'{RESULTS}/np_r17cf_f{k}_colon' for k in FOLDS)
+ARMS = {'CF-and-natural': D, 'natural-only': C, 'CF-only': f'{RESULTS}/np_s1cf_colon', 'neither': f'{RESULTS}/np_s1nocf_colon'}
+FLAG = ' '.join(f'{n}={RESULTS}/np_{t}_colon' for t, n in OTHERS if t in ('gemini', 'claudeopus', 'gpt6astra'))
+RUNS = ' '.join(f'{n}={d}' for n, d in ARMS.items())
+sh(f'python scripts/natural_pairs.py score --views {COLON_VIEWS} --runs {RUNS} {FLAG} --ref CF-and-natural --by fold --boxes --out {RESULTS}/r17_factorial.md')
+sh(f"python scripts/natural_pairs.py score --views {COLON_VIEWS} --runs natural-only={C} neither={ARMS['neither']} --ref natural-only --by fold --out {RESULTS}/r17_natural_only_vs_neither.md")
+import sys
+sys.path.insert(0, '/content/medscope/scripts')
+from pathlib import Path
+from natural_pairs import pooled_rows
+from medscope.eval.runner import read_jsonl
+R9 = {v['view_id'] for v in read_jsonl(Path(COLON_VIEWS))}
+lines = ['| Arm | Polyp-free frames: polyp claimed | asks for a better image | Polyp frames: no tool call |', '| --- | --- | --- | --- |']
+for n, d in ARMS.items():
+    rows = pooled_rows(d)
+    free = [r for r in rows if r['view_id'] in R9 and r['kind'] == 'natural_negative']
+    pos = [r for r in rows if r['view_id'] in R9 and r['kind'] == 'original']
+    lines.append(f"| {n} | {sum(r['action'] == 'answer' and not r.get('correct') for r in free)} of {len(free)} | "
+                 f"{sum(r['action'] == 'clarify' for r in free)} | {sum(int(r.get('tool_calls') or 0) == 0 for r in pos)} of {len(pos)} |")
+CLAIMS = '\n'.join(lines)
+print(CLAIMS)
+"""),
+        publish("MedScope report - 55c counterfactual views x natural pairs (R17)", """
+    ('What this is', 'Four stage-1 models (seed 0) on the 103 natural pairs: without and with counterfactual views, each without and with natural pairs in training. The two arms with natural pairs continue the existing stage-1 adapters in the same way and are cross-validated over videos. Primary (Amendment 7): natural ESG of CF-and-natural minus natural-only; interval above zero = counterfactual views add on unedited images beyond natural pairs; interval includes zero = not shown.'),
+    ('Natural pairs: CF-and-natural against the other three arms and the flagships (differences are CF-and-natural minus the model)', read_text(f'{RESULTS}/r17_factorial.md')),
+    ('What natural pairs add without counterfactual views: natural-only minus neither', read_text(f'{RESULTS}/r17_natural_only_vs_neither.md')),
+    ('Claims on the 103 polyp-free frames, and looking (counts)', CLAIMS),
+    ('Main test, fold-0 models: CF-and-natural against natural-only and the two existing stage-1 models (paired)', significance_table(RESULTS, 'r17_cf_np_f0_test', ['r17_nocf_np_f0_test', 'v4q_cf_s0_test', 'v4q_nocf_s0_test'])),
+"""),
+        code(DONE_CELL),
+    ]
+
+
+def nb56_look() -> list[dict]:
+    """Notebook 56: R21 (Amendment 7), rewarding the look: look-first training and a GRPO process reward (pilot)."""
+    c51 = nb51_v42()
+    siim_data = next(c for c in c51 if "MANUAL =" in "".join(c["source"]))
+    siim_build = next(c for c in c51 if "prepare_siim_train.py" in "".join(c["source"]))
+    s3 = ("--views {TRAIN_V4} {REPLAY} --negatives {TRAIN_NEG_V4} --subsample 5000 --lr 5e-5 --mode agentic "
+          "--min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    return [md("""
+# MedScope 56: rewarding the look (review check R21, Amendment 7; a suggestion of Sonali Sharma)
+
+On real polyp frames MedScope-4B answers "absent" without a tool call on 53 of 103, and finds 31 of the 42 it zooms
+on: it decides before it looks. Sonali Sharma (CheXthought) suggested rewarding the inspection of the relevant region,
+not only the answer. Three one-seed arms on fold 0 (so fold 0's 38 natural pairs are unseen by all of them):
+
+- **L1, look-first training:** fold 0's v5 stage 3 again, with inspection made the rule in the training trajectories.
+- **L2, process reward:** GRPO from the fold-0 v5 model; the reward adds 0.5 for a zoom that covers the lesion box or
+  the erased site and 0.25 for inspecting a lesion-free image before denying it.
+- **L0, control:** the same GRPO run with the usual reward only.
+
+The go signal is fixed in Amendment 7. This is a pilot: a go leads to a three-fold run; a no go is reported.
+
+**Needs:** notebooks 54a and 54b done. An A100 (about 8-12 hours). Every step resumes. Secrets and the SIIM-ACR
+`archive.zip` as for notebook 54b. No API calls. Run all.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK),
+        code("!pip install -q -U kaggle pydicom"), code(LAMA_CELL),
+        code(RESTORE_ALL), code(RESTORE_V4),
+        code(r7_config(35, 'A100 (or G4)') + r"""
+S2, V5F0 = f'{ADAPTERS}/v42_s2/final', f'{ADAPTERS}/v5_f0_s3/final'
+for path in (S2, V5F0):
+    assert os.path.exists(f'{path}/adapter_config.json'), f'{path} is missing (notebooks 51 and 54b)'
+assert os.path.exists(f'{RESULTS}/np_v5f0_colon/summary.json'), 'the fold-0 run of notebook 54b (np_v5f0_colon) is missing'
+"""),
+        md("## 1. The SIIM patients of v4.2 (same cells as notebook 51)"),
+        siim_data, siim_build,
+        md("## 2. L1: fold 0's stage 3 again with look-first trajectories (about 2.5 hours)"),
+        code(r"""
+REPLAY = f'{DRIVE}/external/vqa_train/views_vqa_train.jsonl'
+S3 = f'@S3@'
+L1 = f'{ADAPTERS}/r21_lookfirst_f0'
+if not os.path.exists(f'{L1}/final/adapter_config.json'):
+    sh(f'python scripts/train_sft.py --model {BASE} --init {S2} {S3} --look-first 0.8 --extra-views {SIIM_TRAIN} {CT}/views_train_fold0.jsonl --out {L1}')
+""".replace('@S3@', s3)),
+        md("## 3. L2 and L0: GRPO from the fold-0 v5 model, with and without the process reward (settings of pilot 39b)"),
+        code(r"""
+DRAW = 12 if GPU_GB >= 70 else 4
+for name, extra in (('r21_grpo_look_f0', '--look-bonus'), ('r21_grpo_plain_f0', '')):
+    out = f'{ADAPTERS}/{name}'
+    if not os.path.exists(f'{out}/final/adapter_config.json'):
+        sh(f'python scripts/train_grpo.py --model {BASE} --init {V5F0} --views {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl {CT}/views_train_fold0.jsonl '
+           f'--negatives {TRAIN_NEG_V4} --negative-share 0.2 --exclude-prefix lgg --steps 150 --views-per-step 4 --max-draws 12 '
+           f'--draw-batch {DRAW} --group-size 4 --lr 1e-5 --beta 0.05 --seed 0 --save-every 10 {extra} --out {out}')
+"""),
+        md("## 4. Fold 0's 38 natural pairs and the validation guard; the go signal of Amendment 7"),
+        code(r"""
+ARMS = [('L1 look-first training', 'r21_lookfirst_f0', 'l1'), ('L2 GRPO + process reward', 'r21_grpo_look_f0', 'l2'),
+        ('L0 GRPO, usual reward', 'r21_grpo_plain_f0', 'l0')]
+for _, adapter, tg in ARMS:
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/{adapter}/final --views {CT}/views_test_fold0.jsonl '
+       f'--out {RESULTS}/np_r21{tg}_f0_colon --name r21-{tg}-fold0 --split natural_colon_fold0 --batch-size {BATCH}')
+for tg, adapter in [('v5f0', V5F0)] + [(t, f'{ADAPTERS}/{a}/final') for _, a, t in ARMS]:
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {adapter} --views {VAL_V4} {VAL_NEG_V4} --out {RESULTS}/r21_{tg}_val --name r21-{tg} --split validation --batch-size {BATCH}')
+import sys
+sys.path.insert(0, '/content/medscope/scripts')
+from pathlib import Path
+from natural_pairs import natural_esg_rows, grounded, fold_of
+from medscope.eval.runner import scored_rows, read_jsonl
+V0 = {v['view_id']: v for v in read_jsonl(Path(COLON_VIEWS)) if fold_of(v['meta']['video']) == 0}
+def stats(run, val):
+    rows = scored_rows(f'{RESULTS}/{run}')
+    per = natural_esg_rows(rows, V0)
+    pos = [r for r in rows if r['view_id'] in V0 and r['kind'] == 'original']
+    return dict(pairs=len(per), esg=float(np.mean([v[2] for v in per.values()])), safe=float(np.mean([v[0] for v in per.values()])),
+                found=1 - float(np.mean([v[1] for v in per.values()])), boxed=int(grounded(rows, V0)[2]),
+                looked=sum(int(r.get('tool_calls') or 0) > 0 for r in pos),
+                util=m(val, 'net_utility'), claims=m(val, 'natural_hallucination_rate'))
+ref = stats('np_v5f0_colon', 'r21_v5f0_val')
+res = {label: stats(f'np_r21{tg}_f0_colon', f'r21_{tg}_val') for label, _, tg in ARMS}
+lines = ['| Model | Pairs | Natural ESG | Polyp not denied | Polyp-free absent or referred | Polyp frames with a correct box | Polyp frames inspected | Validation net utility | Validation lesion-free claims |',
+         '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
+for label, s in [('v5, fold-0 model (reference)', ref)] + list(res.items()):
+    lines.append(f"| {label} | {s['pairs']} | {s['esg']:.3f} | {s['found']:.1%} | {s['safe']:.1%} | {s['boxed']} | {s['looked']} | {s['util']:.3f} | {s['claims']:.1%} |")
+def go(s):
+    return (s['esg'] >= ref['esg'] + 0.05 and s['boxed'] >= ref['boxed'] + 3 and s['util'] >= ref['util'] - 0.02
+            and s['claims'] <= ref['claims'] + 0.02)
+l1, l2, l0 = (res[label] for label, _, _ in ARMS)
+verdict = [f"L1 look-first training: {'GO' if go(l1) else 'NO GO'} (natural ESG {l1['esg'] - ref['esg']:+.3f}, correct boxes {l1['boxed'] - ref['boxed']:+d}).",
+           f"L2 process reward: {'GO' if go(l2) and l2['esg'] > l0['esg'] else 'NO GO'} (natural ESG {l2['esg'] - ref['esg']:+.3f} against v5 and {l2['esg'] - l0['esg']:+.3f} against the GRPO control; correct boxes {l2['boxed'] - ref['boxed']:+d}).",
+           'Go signal (Amendment 7): natural ESG +0.05, at least 3 more polyp frames with a correct box, validation net utility not lower by more than 0.02 and lesion-free claims not higher by more than 0.02; L2 must also be above L0. One seed, 38 pairs: a pilot.']
+R21 = '\n'.join(lines) + '\n\n' + '\n\n'.join(verdict) + '\n'
+open(f'{RESULTS}/r21_look_reward.md', 'w').write(R21)
+print(R21)
+"""),
+        publish("MedScope report - 56 rewarding the look (R21, pilot)", """
+    ('What this is', 'A one-seed pilot of a suggestion by Sonali Sharma: reward the inspection of the relevant region, not only the answer. Three arms on fold 0 of Amendment 6, tested on the 38 natural pairs of fold 0 (videos no arm saw) against the fold-0 v5 model, with the go signal of Amendment 7.'),
+    ('Result and go signal', read_text(f'{RESULTS}/r21_look_reward.md')),
+"""),
+        code(DONE_CELL),
+    ]
+
+
+def nb57_chexthought() -> list[dict]:
+    """Notebook 57: R22 (Amendment 7), access to CheXthought and its schema; no experiment."""
+    return [md("""
+# MedScope 57: CheXthought access and schema (R22, Amendment 7)
+
+Sonali Sharma's other three ideas (targeted updates, training on reader disagreement, region and gaze supervision)
+need CheXthought itself. This notebook only checks that your account can read the dataset and writes down what is in
+it (tables, variables, a few rows), so the training code can be written against the real schema. No experiment.
+
+**Before running:** open https://stanford.redivis.com/datasets/ds7j-75krm2btv while signed in to Redivis and accept
+any access terms shown there. Then create an API token (Redivis: your account > Workspace settings > API tokens,
+with data access) and add it to Colab's secrets as `REDIVIS_API_TOKEN`. No GPU is needed.
+"""),
+        code(SETUP),
+        code(r"""
+!pip install -q -U redivis
+tok = secret('REDIVIS_API_TOKEN')
+if not tok:
+    raise SystemExit('Add the secret REDIVIS_API_TOKEN (notebook access on) and run again.')
+os.environ['REDIVIS_API_TOKEN'] = tok
+import redivis
+OUT = f'{DRIVE}/chexthought'
+os.makedirs(OUT, exist_ok=True)
+dataset, errors = None, []
+for make in (lambda: redivis.organization('stanford').dataset('ds7j'),
+             lambda: redivis.organization('stanford').dataset('chexthought:ds7j'),
+             lambda: redivis.organization('stanford').dataset('chexthought')):
+    try:
+        d = make()
+        tables = d.list_tables()
+        dataset = d
+        break
+    except Exception as e:
+        errors.append(f'{type(e).__name__}: {e}')
+if dataset is None:
+    print('\n'.join(errors))
+    raise SystemExit('Could not open the dataset. Check that access was granted on the dataset page, then copy the '
+                     '"API reference" shown there (Dataset > API) and send it with the errors above.')
+lines = ['# CheXthought: tables and variables', '']
+for t in tables:
+    name = getattr(t, 'name', None) or t.properties.get('name')
+    lines += [f'## {name}', '']
+    try:
+        for v in t.list_variables():
+            p = getattr(v, 'properties', {}) or {}
+            lines.append(f"- {p.get('name')} ({p.get('type')}): {str(p.get('label') or p.get('description') or '')[:160]}")
+        df = t.to_pandas_dataframe(max_results=5)
+        lines += ['', df.to_markdown(index=False)[:4000], '']
+    except Exception as e:
+        lines.append(f'(could not read: {type(e).__name__}: {e})')
+open(f'{OUT}/schema.md', 'w').write('\n'.join(lines) + '\n')
+print('\n'.join(lines)[:6000])
+print(f'\nwritten to {OUT}/schema.md')
+"""),
+    ]
+
+
+def nb58_release_v5() -> list[dict]:
+    """Notebook 58: add MedScope-v5 and the natural-pair runs to the public release."""
+    return [md("""
+# MedScope 58: release MedScope-v5 and the natural-pair runs
+
+The manuscript says the models and per-view outputs are public. This adds what is still missing to the public
+Hugging Face release: the post hoc **MedScope-4B-v5** adapter (its card says it is post hoc and gives its limits) and,
+in **MedScope-Bench**, every natural-pair and v5 run (judged decisions and transcripts), the natural-pair manifest
+(video and frame numbers, no images) and the reports of R16-R21 that exist. Nothing already released is changed.
+
+**This makes MedScope-4B-v5 public.** Run it once notebooks 55a-56 have finished, so their runs are included; running
+it again later only adds what is new. Needs the secret `HF_TOKEN` (write access). No GPU.
+"""),
+        code(SETUP),
+        code(r"""
+if secret('HF_TOKEN'):
+    os.environ['HF_TOKEN'] = secret('HF_TOKEN')
+NP = f'{DRIVE}/natural_pairs'
+V5 = f'{ADAPTERS}/v5_s3/final'
+assert os.path.exists(f'{V5}/adapter_config.json'), 'the MedScope-v5 adapter (adapters/v5_s3) is missing: notebook 54b'
+sh(f'python scripts/release_v5.py --adapter {V5} --results {RESULTS} --views {NP}/colon/views_natural_colon.jsonl '
+   f'{NP}/colon_train/views_context_colon.jsonl --out {DRIVE}/release_v5 --upload --public')
+print(open(f'{DRIVE}/release_v5/release_v5_urls.json').read())
+"""),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -5717,6 +6173,12 @@ NOTEBOOKS = {
     "54a_v5_data.ipynb": nb54a_v5_data,
     "54b_v5_train.ipynb": nb54b_v5_train,
     "54p_v5_peek.ipynb": nb54p_peek,
+    "55a_question_type_image_blind.ipynb": nb55a_review7_checks,
+    "55b_v5_leave_one_centre_out.ipynb": nb55b_loco,
+    "55c_cf_x_natural_pairs.ipynb": nb55c_factorial,
+    "56_look_reward.ipynb": nb56_look,
+    "57_chexthought_access.ipynb": nb57_chexthought,
+    "58_release_v5.ipynb": nb58_release_v5,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

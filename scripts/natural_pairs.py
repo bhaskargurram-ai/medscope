@@ -585,6 +585,49 @@ def assemble_folds(r9_views: list[dict], rows: list[dict], out: Path) -> str:
     return "\n".join(lines) + "\n"
 
 
+def cohort_of(video: str) -> str:
+    """'001-014' -> '001': the centre (cohort) of a REAL-Colon video."""
+    return str(video).split("-")[0]
+
+
+def assemble_centres(r9_views: list[dict], rows: list[dict], out: Path) -> str:
+    """Leave-one-centre-out files (R18, Amendment 7) from the per-video rows already drawn for Amendment 6:
+    for each centre, the training frames of every other centre and the R9 pairs (with their context frames) of
+    that centre. Nothing is redrawn. Returns the report."""
+    train = [v for r in rows for v in r["train"]]
+    r9_pairs = {v["meta"]["pair"] for v in r9_views}
+    context = [v for r in rows for v in r["context"] if v["meta"]["pair"] in r9_pairs]
+
+    def write(path: Path, vs: list[dict]) -> None:
+        path.write_text("".join(json.dumps(v) + "\n" for v in vs))
+
+    centres = sorted({cohort_of(r["video"]) for r in rows})
+    lines = [f"Leave-one-centre-out (Amendment 7, R18): {len(centres)} centres, {len(rows)} videos, "
+             f"{len(train)} training frames already drawn (Amendment 6).", "",
+             "| Centre held out | Training videos | Training polyp frames | Training lesion-free frames | Test videos | Test pairs |",
+             "| --- | --- | --- | --- | --- | --- |"]
+    for c in centres:
+        tr = [v for v in train if cohort_of(v["meta"]["video"]) != c]
+        te = [v for v in r9_views if cohort_of(v["meta"]["video"]) == c]
+        te_ctx = [v for v in context if cohort_of(v["meta"]["video"]) == c]
+        if {cohort_of(v["meta"]["video"]) for v in tr} & {c} or {v["patient_id"] for v in tr} & {v["patient_id"] for v in te + te_ctx}:
+            raise SystemExit(f"centre {c}: in both training and test")
+        write(out / f"views_train_loco{c}.jsonl", tr)
+        write(out / f"views_test_loco{c}.jsonl", te + te_ctx)
+        lines.append(f"| {c} | {len({v['patient_id'] for v in tr})} | {sum(v['kind'] == 'original' for v in tr)} | "
+                     f"{sum(v['kind'] != 'original' for v in tr)} | {len({v['patient_id'] for v in te})} | "
+                     f"{sum(v['kind'] == 'original' for v in te)} |")
+    return "\n".join(lines) + "\n"
+
+
+def colon_loco(r9_views_file: Path, folder: Path) -> None:
+    rows = [json.loads(l) for l in (folder / "videos.jsonl").open() if l.strip()]
+    r9_views = [json.loads(l) for l in r9_views_file.open() if l.strip()]
+    report = assemble_centres(r9_views, rows, folder)
+    (folder / "report_loco.txt").write_text(report)
+    print(report)
+
+
 def lazy_members(path: Path) -> Iterator[tuple[str, callable]]:
     """(member name, read()) of a frames archive; a member's bytes are read only when read() is called, which must
     happen before the next member is taken (as best_frames does)."""
@@ -957,6 +1000,9 @@ def main() -> None:
     a.add_argument("--out", required=True)
     a.add_argument("--max-videos", type=int, default=60)
     a.add_argument("--workers", type=int, default=3, help="videos handled at the same time")
+    a = sub.add_parser("colon-loco", help="leave-one-centre-out files from the frames colon-train drew (R18)")
+    a.add_argument("--r9", required=True, help="views_natural_colon.jsonl")
+    a.add_argument("--dir", required=True, help="the colon_train folder (videos.jsonl)")
     args = ap.parse_args()
     if args.cmd == "colon-fetch":
         colon_fetch(Path(args.out), args.max_videos, args.inspect)
@@ -968,6 +1014,8 @@ def main() -> None:
         dedup(Path(args.views), args.against)
     elif args.cmd == "colon-train":
         colon_train(Path(args.r9), Path(args.out), args.max_videos, args.workers)
+    elif args.cmd == "colon-loco":
+        colon_loco(Path(args.r9), Path(args.dir))
     else:
         score(args.views, args.runs, args.ref, Path(args.out), args.by, args.boxes)
 

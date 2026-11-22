@@ -102,6 +102,9 @@ def parser() -> argparse.ArgumentParser:
                          "an ablation arm uses the main arm's, so both follow the same schedule")
     ap.add_argument("--extra-views", nargs="*", default=[],
                     help="views added in full after subsampling (post-hoc v4.1: the SIIM pneumothorax training cases)")
+    ap.add_argument("--look-first", type=float, default=0.0,
+                    help="R21: zoom on the (former) lesion box with at least this probability, and inspect a "
+                         "lesion-free image (a zoom on a random region) with this probability before answering")
     ap.add_argument("--hard-repeat", type=int, default=1,
                     help="rejection sampling: repeat episodes kept from views the model mostly failed this many times")
     return ap
@@ -168,13 +171,20 @@ def main() -> None:
         policy = HFPolicy(args.model, adapter=args.init, trainable=True)
     else:
         policy = HFPolicy(args.model, trainable=True, new_lora=True, lora_r=args.lora_r, lora_vision=args.lora_vision)
+    sample_fn = None
+    if args.look_first > 0:
+        if replays:
+            raise SystemExit("--look-first builds synthetic trajectories; it cannot be combined with --replays")
+        from medscope.train.look import look_first_sample_fn
+        sample_fn = look_first_sample_fn(args.mode, args.window_prob, args.small_zoom, args.look_first)
+        print(f"look-first trajectories: inspection with probability {args.look_first}")
     trainable = sum(p.numel() for p in policy.model.parameters() if p.requires_grad)
     print(f"trainable LoRA parameters: {trainable / 1e6:.1f}M")
     train_sft(policy, views, args.mode, args.out, epochs=args.epochs, lr=args.lr,
               grad_accum=args.grad_accum, max_steps=args.max_steps, save_every=args.save_every,
               replays=replays, seed=args.seed, window_prob=args.window_prob, small_zoom=args.small_zoom,
               schedule_steps=args.schedule_steps, vision_lr_scale=args.vision_lr_scale,
-              vision_layer_decay=args.vision_layer_decay)
+              vision_layer_decay=args.vision_layer_decay, sample_fn=sample_fn)
 
 
 if __name__ == "__main__":

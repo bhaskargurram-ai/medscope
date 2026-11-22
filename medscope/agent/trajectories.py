@@ -119,12 +119,13 @@ def is_gray(img: np.ndarray, tol: int = 8) -> bool:
 
 def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.6,
                      direct_only: bool = False, image: np.ndarray | None = None,
-                     window_prob: float = 0.0) -> list[SFTSample]:
+                     window_prob: float = 0.0, look_first: float = 0.0) -> list[SFTSample]:
     """One correct trajectory for `view`, split into per-turn samples.
 
     direct_only=True gives single-turn samples without tools (used for the
     grounding-only adapter). window_prob > 0 (v4): on grey-scale images (CT, MRI, X-ray) the
-    trajectory sometimes starts by windowing the region of interest.
+    trajectory sometimes starts by windowing the region of interest. look_first > 0 (R21): a lesion-free
+    image without a box is inspected (a zoom on a random region) with this probability before it is answered.
     """
     img = image if image is not None else load_image(view.image_path)
     messages = start_messages(img, view.question)
@@ -157,6 +158,13 @@ def build_trajectory(view: View, rng: np.random.Generator, zoom_prob: float = 0.
         region = pad_box(view.lesion_box)
         emit(f"{pick(LOOK_CLOSER)} {_tool('zoom', box=region)}")
         messages[-1] = assistant_message(tool_text(ToolCall("zoom", {"box": region})))  # as run_episode keeps it
+        messages.append(tool_result_message(env.call("zoom", {"box": region})))
+    elif (look_first > 0 and not direct_only and not windowed and view.kind is ViewKind.NATURAL_NEGATIVE
+          and view.lesion_box is None and "benchmark" not in view.meta and rng.random() < look_first):
+        from ..train.look import random_region      # no draw is made when look_first is 0: earlier runs reproduce
+        region = random_region(rng)
+        emit(f"{pick(LOOK_CLOSER)} {_tool('zoom', box=region)}")
+        messages[-1] = assistant_message(tool_text(ToolCall("zoom", {"box": region})))
         messages.append(tool_result_message(env.call("zoom", {"box": region})))
 
     if view.kind in (ViewKind.TARGET_REMOVAL, ViewKind.NATURAL_NEGATIVE):

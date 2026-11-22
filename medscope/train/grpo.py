@@ -110,6 +110,7 @@ def train_grpo(
     eval_fn: Optional[Callable[[int], dict]] = None,
     max_draws: int = 0,
     draw_batch: int = 1,
+    reward_fn: Optional[Callable] = None,   # episode -> reward used for the advantages (default: the cost-matrix reward)
 ) -> Path:
     import torch
 
@@ -159,7 +160,7 @@ def train_grpo(
 
     for step in range(start, steps):
         t0 = time.time()
-        groups, cursor = collect_groups(rollout, lambda eps_: [e.outcome.reward for e in eps_],
+        groups, cursor = collect_groups(rollout, lambda eps_: [reward_fn(e) if reward_fn else e.outcome.reward for e in eps_],
                                         cursor, views_per_step, max_draws,
                                         rollout_many=rollout_many if draw_batch > 1 else None, draw_batch=draw_batch)
 

@@ -60,9 +60,13 @@ def main() -> None:
                     help="share of training views that are natural negatives (repeated if needed)")
     ap.add_argument("--eval-negatives", default=None, help="natural-negative validation views")
     ap.add_argument("--eval-negative-cases", type=int, default=30)
+    ap.add_argument("--look-bonus", action="store_true",
+                    help="R21: add the process reward of medscope/train/look.py (a zoom that covers the lesion box or "
+                         "the erased site; a lesion-free image inspected before it is denied) to the cost-matrix reward")
     args = ap.parse_args()
 
     from medscope.train.hf_policy import HFPolicy
+    from medscope.train import look
 
     views = [v for f in args.views for v in load_views(f)]
     if args.exclude_prefix:
@@ -93,7 +97,8 @@ def main() -> None:
                views_per_step=args.views_per_step, group_size=args.group_size, lr=args.lr,
                beta=args.beta, ref_adapter=args.init if args.beta > 0 else None,
                save_every=args.save_every, eval_every=args.eval_every, eval_fn=eval_fn,
-               max_draws=args.max_draws, seed=args.seed, draw_batch=args.draw_batch)
+               max_draws=args.max_draws, seed=args.seed, draw_batch=args.draw_batch,
+               reward_fn=look.episode_reward() if args.look_bonus else None)
 
 
 if __name__ == "__main__":
