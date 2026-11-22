@@ -360,3 +360,124 @@ that was not boxed. No centre is held out.
 
 **Fixed.** One attempt. Every result is reported, whatever it shows. R12 (training seeds of v4) is still owed and is
 run after this. Code: `scripts/natural_pairs.py`, notebooks 54a (data) and 54b (training and tests).
+
+# Amendment 7 (22 Nov 2026, 11:10 ET): R17-R22, after an independent review of manuscript v5 (committed before any of them ran)
+
+An independent review of manuscript v5 (two reviewers who saw only the manuscript) asked for: confirmation of v5
+with no centre shared; natural pairs without counterfactual views; results by question type; an image-blind control;
+the training seeds (R12, Amendment 5, still owed and unchanged); and the finished expert reader study (R5,
+unchanged, open). S. Sharma (CheXthought) suggested rewarding the inspection of the relevant region and not only the
+answer. This amendment fixes the plan for each before any of it runs. Nothing below changes an earlier result:
+MedScope-4B (v4) stays the pre-registered model, and v5 stays post hoc.
+
+## R17. Counterfactual views x natural pairs (what each contributes)
+
+**Question.** Do natural pairs help without counterfactual views, and do counterfactual views add anything once
+natural pairs are in training?
+
+**Arms (stage-1 models, seed 0).** Two exist: A, stage 1 without counterfactual views (`v4q_nocf_s0`), and B, the
+stage-1 recipe with them (`v4_s1`). Two are new, each trained three times on the folds of Amendment 6 (videos 1-5,
+6-10, 11-15 of each centre left out in turn): C = A continued with natural frames, D = B continued with natural
+frames. The continuation is the same for both except for the kinds of the replayed views: 5,000 views of the arm's
+own stage-1 training set (C: original, lesion-free and degraded views only; D: all kinds), learning rate 5e-5,
+agentic trajectories, window probability 0.3, small-lesion zoom, paraphrase probability 0.5, plus the fold's natural
+training frames in full (the frames of Amendment 6, nothing redrawn). No SIIM patients and no VQA replay, as in
+stage 1.
+
+**Tests.** The 103 R9 pairs: A and B as they are; C and D cross-validated (each pair answered by the fold model
+that never saw its video). The fold-0 models of C and D on the main test.
+
+**Primary measure and reading.** Natural ESG of D minus C on the 103 pairs, 2,000 resamples of whole videos. Interval
+above zero: counterfactual views add to evidence sensitivity on unedited images beyond natural pairs. Interval
+includes zero: not shown (the difference and interval are reported; no claim of equivalence). Interval below zero:
+they cost.
+
+**Secondary, descriptive.** C minus A and D minus B (what natural pairs add at each level); polyp claimed on
+polyp-free frames (counts) and grounded detection for all four; main-test ESG and erased-lesion claims of the fold-0
+models of C and D against A and B.
+
+**Known limits.** Stage-1 models, not the three-stage recipe; one seed; same four centres; the 103 pairs are used
+again.
+
+## R18. v5 with no centre shared (leave-one-centre-out)
+
+The v5 recipe of Amendment 6 (stage 3 of v4.2 plus natural frames; same data, options, seed) is trained four times,
+each without every video of one centre (cohorts 001-004), from the training frames already drawn. Each R9 pair is
+answered by the model that never saw its centre ("v5, leave-one-centre-out").
+
+**Primary measure and reading.** Natural ESG of these answers against the stored answers of the three flagships, by
+the rule of Amendments 4 and 6: above every flagship with the interval above zero, the advantage carries over to
+unseen centres; above none, it does not; otherwise mixed.
+
+**Secondary, descriptive.** Leave-one-centre-out minus cross-validated v5 (what holding out the centre costs); by
+centre; grounded detection; the context-matched frames with the stored flagship answers.
+
+**Known limits.** The same dataset and the same 103 pairs (a third use); the flagships are used as they are. One
+attempt, nothing tuned.
+
+**R18b (specified, not yet built).** A second public colonoscopy video set with per-frame polyp boxes that no model
+here has used (candidates: PolypGen, LDPolypVideo, SUN-SEG; access terms not yet checked). The pair rules of
+Amendment 4, v5 (all videos) as it is, the same reading rule. It is registered with the dataset named before any
+frame is drawn.
+
+## R19. Image-blind control
+
+For every main-test lesion case whose closed question is answered "Yes" on the unedited image, two extra views ask
+the same question: **blank** (a uniform mid-grey image of the same size) and **swapped** (a lesion-free main-test
+image of another imaging type, chosen by a fixed hash of the case id). Agent protocol unchanged. Models: the nine
+frontier models, MedScope-4B and the untrained base.
+
+**Reported.** Per model, the share of blank and of swapped views on which the finding is claimed, denied, referred
+or a better image is asked for, next to its stored claim rates on erased and on lesion-free images, and the paired
+difference erased-claim rate minus blank-claim rate (2,000 resamples of cases).
+
+**Reading, fixed in advance.** The blank-image claim rate is the part of a model's claims that needs no image. If a
+model's erased-claim rate is above its blank-claim rate with the interval above zero, its erased claims are not
+explained by the question alone, and the manuscript says "claims without support in the image" for that model, not
+"answers from the question". If the two rates do not differ, the question-prior reading stands for that model.
+
+## R20. Results by question type
+
+Main-test cases are split by their closed question: **finding-specific** (names a finding) or **generic** (matches
+"abnormal", "healthy" or "normal"; the rule already used for R14 in `scripts/freetext.py`). Stored answers only.
+
+**Reported.** Per stratum and model: cases, ESG, erased-lesion claims, lesion-free claims; MedScope-4B minus each of
+the nine frontier models on ESG (2,000 resamples of cases); the same for colonoscopy alone.
+
+**Reading.** The headline holds on finding-specific questions if MedScope-4B's ESG is above each of the three
+flagships' on that stratum with the interval above zero (the flagships of R13); all nine are reported. If it holds
+only with generic questions included, the manuscript's headline is restricted to what holds.
+
+## R21. Rewarding the look (pilot; a suggestion of S. Sharma)
+
+**Motivation.** On the R9 polyp frames MedScope-4B answers "absent" without a tool call on 53 of 103 and finds 31 of
+the 42 it zooms on: it decides before it looks.
+
+**Arms (one seed each; fold 0 of Amendment 6, so the 38 pairs of fold 0 are unseen by every arm).**
+- **L1, look-first training.** Fold 0's stage 3 of Amendment 6 again with one change: every training trajectory on a
+  lesion or erased view zooms on the (former) lesion box with probability at least 0.8, and a lesion-free view is
+  inspected (a zoom on a random region, 30-50% of the image on a side) with probability 0.8 before the answer
+  "absent".
+- **L2, process reward.** GRPO from the fold-0 model `v5_f0_s3`: 150 steps, the settings of pilot 39b, on the main
+  training views plus fold 0's natural training frames. Reward = the cost-matrix reward, plus 0.5 if a zoom covers at
+  least half of the lesion box (lesion and control-edited views) or of the erased site (erased views) before the
+  answer, plus 0.25 if a lesion-free view is inspected at all before it is denied.
+- **L0, control for L2.** The same GRPO run with the cost-matrix reward only.
+
+**Go signal (L1 and L2, each against `v5_f0_s3` on the same 38 pairs).** Natural ESG higher by at least 0.05, AND at
+least 3 more polyp frames called present with a correct box (IoU >= 0.3), AND on validation net utility not lower
+than `v5_f0_s3`'s by more than 0.02 and lesion-free claims not higher by more than 0.02. L2 must also be above L0 on
+natural ESG, or the gain is GRPO's and not the process reward's. A go leads to a three-fold run registered
+separately; a no go is reported as a one-seed pilot.
+
+**Known limits.** 38 pairs; one seed; the R9 pairs are used again.
+
+## R22. CheXthought (S. Sharma's ideas 2-4): access and schema only
+
+No experiment yet. Notebook 57 checks access to CheXthought and prints its tables. Training on reader disagreement
+(idea 3) and region or gaze supervision of the encoder (idea 4) are registered once the schema is known. Targeted
+model editing (idea 2) is not planned for this version.
+
+**Fixed.** One attempt each. Every result is reported, whatever it shows. Code: `scripts/natural_pairs.py`
+(`colon-loco`), `scripts/question_type.py`, `scripts/blind_views.py`, `medscope/train/look.py`; notebooks 55a
+(R20, R19), 55b (R18), 55c (R17), 56 (R21), 57 (R22); R12 and the chest X-ray rebuild stay in notebooks 53b and 53c.
