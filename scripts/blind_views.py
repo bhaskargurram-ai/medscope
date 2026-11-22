@@ -35,7 +35,9 @@ VARIANTS = ("blank", "swap")
 
 
 def modality_of(view: dict) -> str:
-    return str(view.get("meta", {}).get("modality", "")).lower()
+    """The imaging type, from the case id (views do not all carry meta['modality'])."""
+    from medscope.colab import dataset_of
+    return dataset_of(view["case_id"])
 
 
 def pick_swap(case_id: str, modality: str, negatives: list[dict]) -> dict:
@@ -94,6 +96,12 @@ def decision(row: dict) -> str:
     return "denied" if row.get("correct") else "claimed"
 
 
+def other_type(meta: dict) -> bool:
+    """True if the swapped-in image is of another imaging type than the lesion case (checked from the case ids)."""
+    from medscope.colab import dataset_of
+    return dataset_of(meta["swap_from"].split("__")[0]) != dataset_of(meta["source_case"])
+
+
 def model_rows(views: list[dict], blind: list[dict], main: list[dict]) -> dict:
     """Per-case claim indicators for one model: blank, swapped (blind run) and erased, lesion-free (main run)."""
     info = {v["view_id"]: v["meta"] for v in views}
@@ -102,6 +110,8 @@ def model_rows(views: list[dict], blind: list[dict], main: list[dict]) -> dict:
         m = info.get(r["view_id"])
         if m is None:
             continue
+        if m["blind"] == "swap" and m.get("swap_from") and not other_type(m):
+            continue                     # a swapped image of the same imaging type is not image-blind: left out
         d = decision(r)
         out[m["blind"]][m["source_case"]] = float(d == "claimed")
         out["decisions"][m["blind"]].append(d)
@@ -123,7 +133,7 @@ def report(views: list[dict], per_model: dict[str, dict]) -> str:
         cells = []
         for variant in VARIANTS:
             ds = m["decisions"][variant]
-            cells.append(" / ".join(f"{share(ds, k):.1%}" for k in ("claimed", "denied", "referred", "clarify")))
+            cells.append(" / ".join(f"{share(ds, k):.1%}" for k in ("claimed", "denied", "referred", "clarify")) + f" (n = {len(ds)})")
         common = m["erased"].keys() & m["blank"].keys()
         erased = float(np.mean([m["erased"][c] for c in common])) if common else float("nan")
         cmp = "--"
@@ -132,7 +142,7 @@ def report(views: list[dict], per_model: dict[str, dict]) -> str:
             cmp = f"{d:+.3f} [{lo:+.3f}, {hi:+.3f}], p = {p:.3f}"
         lines.append(f"| {name} | {len(common)} | {cells[0]} | {cells[1]} | {erased:.1%} | {m['lesion_free']:.1%} | {cmp} |")
     lines += ["", "Blank: a uniform grey image of the same size. Swapped: a lesion-free main-test image of another imaging "
-              "type. Both ask the question of the lesion case. Erased and lesion-free rates are the stored main-test "
+              "type (cases whose swapped-in image turned out to be of the same imaging type are left out of that column). Both ask the question of the lesion case. Erased and lesion-free rates are the stored main-test "
               "answers (erased: the same cases). Erased minus blank: paired over cases, 2,000 resamples. Reading "
               "(Amendment 7): an erased-claim rate above the blank-claim rate with the interval above zero means the "
               "erased claims are not explained by the question alone."]

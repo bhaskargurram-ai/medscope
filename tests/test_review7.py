@@ -78,26 +78,26 @@ class QuestionType(unittest.TestCase):
         for i in range(20):
             q = "Is there a polyp in this image?" if i < 10 else "Is there an abnormality in this image?"
             for kind in ("original", "target_removal", "random_removal"):
-                views.append({"view_id": f"c{i}__{kind}", "case_id": f"c{i}", "kind": kind, "question": q,
+                views.append({"view_id": f"kvasir{i}__{kind}", "case_id": f"kvasir{i}", "kind": kind, "question": q,
                               "meta": {"modality": "endoscopy"}})
-            views.append({"view_id": f"n{i}__natural_negative", "case_id": f"n{i}", "kind": "natural_negative",
+            views.append({"view_id": f"hkneg{i}__natural_negative", "case_id": f"hkneg{i}", "kind": "natural_negative",
                           "question": q, "meta": {"modality": "endoscopy"}})
             # the good model: denies every erasure, keeps every intact lesion, never claims on a lesion-free image
-            good += [scored(f"c{i}", "target_removal", "answer", correct=True, claims_absent=True),
-                     scored(f"c{i}", "random_removal", "answer", correct=True, claims_absent=False),
-                     scored(f"n{i}", "natural_negative", "answer", correct=True, claims_absent=True)]
+            good += [scored(f"kvasir{i}", "target_removal", "answer", correct=True, claims_absent=True),
+                     scored(f"kvasir{i}", "random_removal", "answer", correct=True, claims_absent=False),
+                     scored(f"hkneg{i}", "natural_negative", "answer", correct=True, claims_absent=True)]
             # the other: claims every erasure of a finding-specific case, behaves like the good one on generic cases
             claims = i < 10
-            bad += [scored(f"c{i}", "target_removal", "answer", correct=not claims, claims_absent=not claims),
-                    scored(f"c{i}", "random_removal", "answer", correct=True, claims_absent=False),
-                    scored(f"n{i}", "natural_negative", "answer", correct=not claims, claims_absent=not claims)]
+            bad += [scored(f"kvasir{i}", "target_removal", "answer", correct=not claims, claims_absent=not claims),
+                    scored(f"kvasir{i}", "random_removal", "answer", correct=True, claims_absent=False),
+                    scored(f"hkneg{i}", "natural_negative", "answer", correct=not claims, claims_absent=not claims)]
         text = question_type.report(views, {"good": good, "bad": bad}, "good")
         specific, generic = text.split("### Generic questions")[0], text.split("### Generic questions")[1].split("###")[0]
         self.assertIn("finding-specific: 10 lesion and 10 lesion-free; generic: 10 lesion and 10 lesion-free", text)
         self.assertIn("| good | 10 | 1.000 [1.000, 1.000] | 0.0% | 10 | 0.0% | -- |", specific)
         self.assertIn("| bad | 10 | 0.000 [0.000, 0.000] | 100.0% | 10 | 100.0% | +1.000 [+1.000, +1.000]", specific)
         self.assertIn("| bad | 10 | 1.000 [1.000, 1.000] | 0.0% | 10 | 0.0% | +0.000 [+0.000, +0.000]", generic)
-        self.assertIn("### endoscopy: finding-specific questions", text)
+        self.assertIn("### Colonoscopy (Kvasir-SEG, HyperKvasir): finding-specific questions", text)
 
 
 class ImageBlind(unittest.TestCase):
@@ -106,21 +106,23 @@ class ImageBlind(unittest.TestCase):
             "view_id": f"{case}__{kind}", "case_id": case, "patient_id": f"p_{case}", "kind": kind,
             "image_path": f"{case}_{kind}.png", "question": q, "answer": answer, "answer_aliases": [], "lesion_box": None,
             "critical": False, "meta": {"modality": mod}}
-        self.views = [v("a", "original", "Yes", "endoscopy"), v("a", "target_removal", "No", "endoscopy"),
-                      v("b", "original", "No", "xray", "Is the lung healthy?"), v("b", "target_removal", "Yes", "xray"),
-                      v("c", "original", "Yes", "mri")]                               # c has no erasure: not a lesion case
-        self.negs = [v("n1", "natural_negative", "No", "endoscopy"), v("n2", "natural_negative", "No", "xray"),
-                     v("n3", "natural_negative", "No", "mri")]
+        self.views = [v("kvasir1", "original", "Yes", "endoscopy"), v("kvasir1", "target_removal", "No", "endoscopy"),
+                      v("chestxdet1", "original", "No", "xray", "Is the lung healthy?"),
+                      v("chestxdet1", "target_removal", "Yes", "xray"),
+                      v("lgg1", "original", "Yes", "mri")]                            # no erasure: not a lesion case
+        self.negs = [v("hkneg1", "natural_negative", "No", "endoscopy"), v("chestxdetneg1", "natural_negative", "No", "xray"),
+                     v("lggneg1", "natural_negative", "No", "mri")]
 
     def test_only_yes_questions_with_an_erasure_and_a_swap_of_another_imaging_type(self):
         rows = blind_views.blind_rows(self.views, self.negs, lambda v: f"blank_{v['case_id']}.png")
-        self.assertEqual([r["case_id"] for r in rows], ["ablank", "aswap"])
+        self.assertEqual([r["case_id"] for r in rows], ["kvasir1blank", "kvasir1swap"])
         blank, swap = rows
-        self.assertEqual((blank["kind"], blank["answer"], blank["image_path"]), ("natural_negative", "No", "blank_a.png"))
+        self.assertEqual((blank["kind"], blank["answer"], blank["image_path"]), ("natural_negative", "No", "blank_kvasir1.png"))
         self.assertEqual(blank["question"], "Is there a polyp in this image?")
-        self.assertEqual(blank["meta"]["source_case"], "a")
-        self.assertNotEqual(swap["meta"]["swap_modality"], "endoscopy")
-        self.assertIn(swap["image_path"], ("n2_natural_negative.png", "n3_natural_negative.png"))
+        self.assertEqual(blank["meta"]["source_case"], "kvasir1")
+        self.assertTrue(blind_views.other_type(swap["meta"]))
+        self.assertIn(swap["image_path"], ("chestxdetneg1_natural_negative.png", "lggneg1_natural_negative.png"))
+        self.assertFalse(blind_views.other_type({"swap_from": "hkneg1__natural_negative", "source_case": "kvasir1"}))
         again = blind_views.blind_rows(self.views, list(reversed(self.negs)), lambda v: "x")
         self.assertEqual(again[1]["meta"]["swap_from"], swap["meta"]["swap_from"])    # the same choice every time
 
@@ -144,7 +146,7 @@ class ImageBlind(unittest.TestCase):
         self.assertEqual(sum(m["erased"].values()), 5)
         self.assertAlmostEqual(m["lesion_free"], 0.1)
         text = blind_views.report(views, {"model": m})
-        self.assertIn("| model | 10 | 0.0% / 0.0% / 0.0% / 100.0% | 20.0% / 80.0% / 0.0% / 0.0% | 50.0% | 10.0% | +0.500 [", text)
+        self.assertIn("| model | 10 | 0.0% / 0.0% / 0.0% / 100.0% (n = 10) | 20.0% / 80.0% / 0.0% / 0.0% (n = 10) | 50.0% | 10.0% | +0.500 [", text)
 
 
 def view(kind, box=None, meta=None):

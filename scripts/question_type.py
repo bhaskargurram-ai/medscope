@@ -65,7 +65,8 @@ def stratum_table(per_run: dict[str, list[dict]], cases: set[str], ref: str) -> 
 
 def report(views: list[dict], per_run: dict[str, list[dict]], ref: str) -> str:
     qtype = {v["case_id"]: question_type(v["question"]) for v in views}
-    modality = {v["case_id"]: str(v.get("meta", {}).get("modality", "")).lower() for v in views}
+    from medscope.colab import dataset_of
+    modality = {v["case_id"]: dataset_of(v["case_id"]) for v in views}
     lesion_cases = {v["case_id"] for v in views if v["kind"] == "target_removal"}
     free_cases = {v["case_id"] for v in views if v["kind"] == "natural_negative"}
     count = Counter((qtype[c], "lesion") for c in lesion_cases) + Counter((qtype[c], "lesion-free") for c in free_cases)
