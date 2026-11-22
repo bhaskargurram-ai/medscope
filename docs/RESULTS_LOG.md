@@ -1833,3 +1833,28 @@ highest in point estimate and above its base, not above the flagships; pneumotho
 
 57b: first run stopped at the labels step (the notebook copy had the old cell); the statement reader and label
 download were fixed in 83c8fc7 and the script now continues without labels if the label file is wrong.
+
+## 2026-11-22 — CheXthought statistics (notebook 57b; R22, descriptive)
+
+103,592 traces, 50,312 images. Statements read by rules (scripts/chexthought.py, NegEx-style), spot-checked by eye:
+about 90% of the 160 sampled sentences read correctly; the misreadings found ("resolution of", "evacuation of",
+"survey ... for", "any ... masses") were fixed after this run (the counts below predate that fix).
+
+| Finding | Traces positive / uncertain / negative | Images both readers positive | Images readers disagree | Positive traces with click points | Images CheXpert label 1 |
+| --- | --- | --- | --- | --- | --- |
+| pneumothorax | 8,149 / 1,919 / 67,943 | 2,072 | 4,695 | 7,062 | 4,504 |
+| pleural effusion | 40,900 / 10,364 / 31,636 | 12,075 | 15,467 | 34,811 | 21,916 |
+| consolidation | 14,077 / 12,610 / 32,142 | 1,884 | 15,627 | 12,685 | 3,301 |
+| nodule | 2,402 / 602 / 1,967 | 306 | 2,149 | 2,201 | (lung lesion 1,926) |
+| mass | 1,001 / 927 / 6,997 | 161 | 1,434 | 794 | (lung lesion 1,926) |
+| cardiomegaly | 22,385 / 3,135 / 3,468 | 4,479 | 14,053 | 15,880 | 7,663 |
+| edema | 19,496 / 10,102 / 9,670 | 4,225 | 12,687 | 14,078 | 13,059 |
+| atelectasis | 21,621 / 21,659 / 1,155 | 3,436 | 19,389 | 18,508 | 7,504 |
+
+Against the CheXbert impression labels of CheXpert Plus (a different radiologist's report): traces on label-1 images
+positive or uncertain 68.7% (pneumothorax), 81.2% (effusion), 61.4% (consolidation), 68.5% (cardiomegaly), 70.9%
+(edema), 70.4% (atelectasis); on label-0 or blank images negative or silent 96.7%, 77.7%, 81.8%, 83.5%, 90.1%, 70.8%.
+Reading: for pneumothorax, the finding MedScope-4B missed entirely, CheXthought offers about 2,000-4,500 positive
+images, about 7,000 positive statements with click points, and about 4,700 images on which two radiologists
+disagree, against 4 pneumothorax images in our training set. Designs for Sonali Sharma's ideas 1, 3 and 4 on this
+data are to be registered (Amendment 8) before any training.

@@ -33,7 +33,8 @@ CHEXPERT = {"pneumothorax": "Pneumothorax", "pleural effusion": "Pleural Effusio
             "atelectasis": "Atelectasis"}
 # NegEx-style: a negation cue before the finding negates it unless a termination word comes between them;
 # a post-negation after the finding (same scope) negates it too. Uncertainty and "looking for" are checked first.
-NEG_PRE = re.compile(r"\b(no|not|without|free of|negative for|absence of|clear of|nor|"
+NEG_PRE = re.compile(r"\b(no|not|without|free of|negative for|absence of|clear of|nor|resolution of|resolved|"
+                     r"evacuation of|re-?expansion of|removal of|"
                      r"do not (?:see|identify|appreciate|note)|cannot (?:see|identify)|"
                      r"no (?:evidence|sign|signs) of|neither)\b", re.I)
 NEG_POST = re.compile(r"^[^.;]{0,60}?\b(is|are|was|were|has|have)\s+(?:been\s+)?(?:now\s+)?(absent|not\s+(?:seen|identified|"
@@ -44,7 +45,7 @@ UNC = re.compile(r"\b(possible|possibly|probable|probably|may|might|could|cannot
                  r"can ?not (?:be )?(?:fully )?exclude[d]?|(?:to|ability to) exclude|not (?:be )?excluded|uncertain\w*|"
                  r"equivocal|questionable|suspicious for|suspect\w*|concern(?:ing)? for|suggest\w*|likely|"
                  r"indeterminate|versus|vs\.?|differential|whether|either|favou?r\w*)\b|\?", re.I)
-LOOKING = re.compile(r"\b(evaluat\w* for|assess\w* for|examin\w* (?:\w+ ){0,6}for|look\w* for|check\w* for|search\w* for|"
+LOOKING = re.compile(r"\b(evaluat\w* for|assess\w* for|(?:examin|survey|inspect|scan|review|check)\w* (?:[\w,-]+ ){0,20}for|look\w* for|search\w* for|"
                      r"to assess|to evaluate|such as|complications?|in (?:the )?setting of suspected|"
                      r"risk of|history of|known history)\b", re.I)
 MARK = re.compile(r"\[#(\d+)\]")
@@ -60,7 +61,8 @@ def sentence_status(sentence: str, term: re.Pattern) -> Optional[str]:
     if not m:
         return None
     before, after = s[:m.start()], s[m.end():]
-    if LOOKING.search(before[-80:]) and not re.search(r"\b(is|are|was|were)\b", after[:40]):
+    if (LOOKING.search(before[-160:]) or re.search(r"\bany\b[^.;]{0,30}$", before)) \
+            and not NEG_PRE.search(before) and not re.search(r"\b(is|are|was|were)\b", after[:40]):
         return None
     neg = None
     for cue in NEG_PRE.finditer(before):
