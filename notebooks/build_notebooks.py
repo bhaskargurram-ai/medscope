@@ -6137,21 +6137,31 @@ import redivis
 OUT = f'{DRIVE}/chexthought'
 CSV = f'{OUT}/chexthoughtdataset.csv'
 assert os.path.exists(CSV), 'the CheXthought CSV is missing: run notebook 57 first'
-LAB = f'{OUT}/chexpert_labels.csv'
+LAB = f'{OUT}/chexpert_labels_impression.json'
+if os.path.exists(f'{OUT}/chexpert_labels.csv'):
+    os.remove(f'{OUT}/chexpert_labels.csv')          # an earlier run saved the file list, not the labels
 if not os.path.exists(LAB):
-    try:
-        t = redivis.organization('AIMI').dataset('chexpert_plus:5yyj').table('CheXpert Labels')
-        t.to_pandas_dataframe().to_csv(LAB, index=False)
-    except Exception as e:
+    # the 'CheXpert Labels' table of CheXpert Plus is a folder of CheXbert label files (findings, impression, report);
+    # the impression labels are the usual CheXpert labels
+    errs = []
+    for kind in ('organization', 'user'):
         try:
-            t = redivis.user('AIMI').dataset('chexpert_plus:5yyj').table('CheXpert Labels')
-            t.to_pandas_dataframe().to_csv(LAB, index=False)
-        except Exception as e2:
-            print(f'labels not downloaded ({type(e).__name__}: {e}; {type(e2).__name__}: {e2}); the statistics run without them')
-import pandas as pd
+            tab = getattr(redivis, kind)('AIMI').dataset('chexpert_plus:5yyj').table('CheXpert Labels')
+            for f in tab.list_files():
+                name = getattr(f, 'name', None) or f.properties.get('name', '')
+                if name.startswith('impression'):
+                    f.download(LAB)
+            break
+        except Exception as e:
+            errs.append(f'{kind}: {type(e).__name__}: {e}')
+    if not os.path.exists(LAB):
+        print('\n'.join(errs), '\nlabels not downloaded; the statistics run without them')
+import pandas as pd, sys
+sys.path.insert(0, '/content/medscope/scripts')
+from chexthought import read_labels
 if os.path.exists(LAB):
-    lab = pd.read_csv(LAB, nrows=3)
-    print('labels columns:', list(lab.columns))
+    lab = read_labels(__import__('pathlib').Path(LAB))
+    print(f'{len(lab):,} label rows; columns:', list(lab.columns))
     print(lab.head(3).to_string()[:1500])
 """),
         code(r"""

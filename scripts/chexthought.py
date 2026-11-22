@@ -19,41 +19,60 @@ from pathlib import Path
 from typing import Optional
 
 FINDINGS = {
-    "pneumothorax": r"pneumothora(?:x|ces)",
-    "pleural effusion": r"(?:pleural )?effusions?",
+    "pneumothorax": r"(?<!hydro)pneumothora(?:x|ces)",
+    "pleural effusion": r"(?<!pericardial )(?:pleural )?effusions?",
     "consolidation": r"consolidat\w*",
-    "nodule": r"nodul\w*",
-    "mass": r"\bmass(?:es)?\b",
-    "cardiomegaly": r"cardiomegaly|enlarged (?:cardiac|heart)|cardiac enlargement",
-    "edema": r"(?:pulmonary )?o?edema",
+    "nodule": r"(?<!reticulo)(?<!micro)\bnodul(?:e|es|ar)\b(?! opacities related)",
+    "mass": r"\bmass(?:es)?\b(?! effect)(?!-like)",
+    "cardiomegaly": r"cardiomegaly|enlarged (?:cardiac|heart)|cardiac enlargement|heart (?:size )?is enlarged",
+    "edema": r"(?:pulmonary |interstitial )?o?edema",
     "atelectasis": r"atelecta\w*",
 }
 CHEXPERT = {"pneumothorax": "Pneumothorax", "pleural effusion": "Pleural Effusion", "consolidation": "Consolidation",
             "nodule": "Lung Lesion", "mass": "Lung Lesion", "cardiomegaly": "Cardiomegaly", "edema": "Edema",
             "atelectasis": "Atelectasis"}
-NEG = re.compile(r"\b(no|not|without|free of|negative for|absent|absence of|resolved|clear of|nor|rule[sd]? out|"
-                 r"do not (?:see|identify|appreciate)|cannot (?:see|identify)|there is no|there are no|"
-                 r"no evidence of|no definite|no sizable|no visible|no gross)\b", re.I)
-UNC = re.compile(r"\b(possible|possibly|probable|probably|may|might|could|cannot (?:be )?exclude[d]?|can ?not exclude|"
-                 r"uncertain|equivocal|questionable|suspicious for|concern(?:ing)? for|suggest\w*|likely|subtle|"
-                 r"indeterminate|versus|vs\.?|differential)\b|\?", re.I)
+# NegEx-style: a negation cue before the finding negates it unless a termination word comes between them;
+# a post-negation after the finding (same scope) negates it too. Uncertainty and "looking for" are checked first.
+NEG_PRE = re.compile(r"\b(no|not|without|free of|negative for|absence of|clear of|nor|"
+                     r"do not (?:see|identify|appreciate|note)|cannot (?:see|identify)|"
+                     r"no (?:evidence|sign|signs) of|neither)\b", re.I)
+NEG_POST = re.compile(r"^[^.;]{0,60}?\b(is|are|was|were|has|have)\s+(?:been\s+)?(?:now\s+)?(absent|not\s+(?:seen|identified|"
+                      r"present|visible|evident|demonstrated|appreciated)|resolved|excluded|ruled out)\b", re.I)
+TERMINATE = re.compile(r"\b(but|however|whereas|although|though|except|apart from|aside from|yet|while|which|"
+                       r"there is|there are|i see|i note|i identify|consistent with|compatible with|representing)\b|;|:", re.I)
+UNC = re.compile(r"\b(possible|possibly|probable|probably|may|might|could|cannot (?:be )?(?:fully |entirely )?exclude[d]?|"
+                 r"can ?not (?:be )?(?:fully )?exclude[d]?|(?:to|ability to) exclude|not (?:be )?excluded|uncertain\w*|"
+                 r"equivocal|questionable|suspicious for|suspect\w*|concern(?:ing)? for|suggest\w*|likely|"
+                 r"indeterminate|versus|vs\.?|differential|whether|either|favou?r\w*)\b|\?", re.I)
+LOOKING = re.compile(r"\b(evaluat\w* for|assess\w* for|examin\w* (?:\w+ ){0,6}for|look\w* for|check\w* for|search\w* for|"
+                     r"to assess|to evaluate|such as|complications?|in (?:the )?setting of suspected|"
+                     r"risk of|history of|known history)\b", re.I)
 MARK = re.compile(r"\[#(\d+)\]")
 SENT = re.compile(r"(?<=[.!?])\s+|\n+")
 STATUS_ORDER = ("positive", "uncertain", "negative")
 
 
 def sentence_status(sentence: str, term: re.Pattern) -> Optional[str]:
-    """positive / negative / uncertain for the first mention of `term` in the sentence, None if not mentioned.
-    A negation cue before the mention (same clause) makes it negative; an uncertainty cue anywhere makes it uncertain."""
-    m = term.search(sentence)
+    """positive / negative / uncertain for the first mention of `term` in the sentence, None if not mentioned or only
+    looked for ("I examine the right hemithorax for pneumothorax")."""
+    s = MARK.sub("", sentence)
+    m = term.search(s)
     if not m:
         return None
-    clause_start = max(sentence.rfind(sep, 0, m.start()) for sep in (",", ";", ":", " but ", " whereas ", " although "))
-    before = sentence[clause_start + 1 if clause_start >= 0 else 0:m.start()]
-    if NEG.search(before):
-        return "negative"
-    if UNC.search(sentence):
-        return "uncertain"
+    before, after = s[:m.start()], s[m.end():]
+    if LOOKING.search(before[-80:]) and not re.search(r"\b(is|are|was|were)\b", after[:40]):
+        return None
+    neg = None
+    for cue in NEG_PRE.finditer(before):
+        neg = cue
+    if neg is not None and not TERMINATE.search(before[neg.end():]):
+        # "cannot exclude" style cues are uncertainty, not negation
+        if not re.search(r"\b(cannot|can ?not)\b", neg.group(0), re.I):
+            return "negative"
+    if NEG_POST.search(after) and not re.search(r"\bnot (?:be )?(?:fully )?excluded\b", after[:60], re.I):
+        return "uncertain" if re.search(r"\bcannot be (?:fully )?excluded\b", after[:60], re.I) else "negative"
+    if UNC.search(s) or re.search(r"\b(?:or|and/or)\b", s[max(0, m.start() - 30):m.end() + 30], re.I):
+        return "uncertain"       # "atelectasis or consolidation": one of two alternatives
     return "positive"
 
 
@@ -84,10 +103,22 @@ def chexpert_key(image_id: str) -> Optional[str]:
     return f"{m.group(1)}/{m.group(2)}/{m.group(3)}" if m else None
 
 
-def label_index(labels_csv: Path) -> dict[str, dict[str, float]]:
+def read_labels(path: Path):
+    """CheXpert labels as a DataFrame: a CSV, a JSON list, or JSON lines (the CheXbert files of CheXpert Plus)."""
     import pandas as pd
-    df = pd.read_csv(labels_csv)
-    pcol = next(c for c in df.columns if "path" in c.lower())
+    if path.suffix == ".csv":
+        return pd.read_csv(path)
+    try:
+        return pd.read_json(path, lines=True)
+    except ValueError:
+        return pd.read_json(path)
+
+
+def label_index(labels_csv: Path) -> dict[str, dict[str, float]]:
+    df = read_labels(labels_csv)
+    pcol = next((c for c in df.columns if "path" in c.lower()), None)
+    if pcol is None:
+        raise SystemExit(f"{labels_csv}: no image path column (columns: {list(df.columns)[:12]})")
     out = {}
     for _, r in df.iterrows():
         m = re.search(r"(patient\d+)/(study\d+)/(view\d+_\w+)", str(r[pcol]))
