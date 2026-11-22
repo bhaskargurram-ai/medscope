@@ -1,0 +1,311 @@
+\begin{thebibliography}{39}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Agarwal et~al.(2020)Agarwal, Shetty, and Fritz]{agarwal2020towards}
+Vedika Agarwal, Rakshith Shetty, and Mario Fritz.
+\newblock Towards causal {VQA}: Revealing and reducing spurious correlations by
+  invariant and covariant semantic editing.
+\newblock In \emph{IEEE/CVF Conference on Computer Vision and Pattern
+  Recognition (CVPR)}, pages 9690--9698, 2020.
+
+\bibitem[Agrawal et~al.(2018)Agrawal, Batra, Parikh, and
+  Kembhavi]{agrawal2018vqacp}
+Aishwarya Agrawal, Dhruv Batra, Devi Parikh, and Aniruddha Kembhavi.
+\newblock Don't just assume; look and answer: Overcoming priors for visual
+  question answering.
+\newblock In \emph{IEEE/CVF Conference on Computer Vision and Pattern
+  Recognition (CVPR)}, pages 4971--4980, 2018.
+
+\bibitem[Al-Dhabyani et~al.(2020)Al-Dhabyani, Gomaa, Khaled, and
+  Fahmy]{al2020dataset}
+Walid Al-Dhabyani, Mohammed Gomaa, Hussien Khaled, and Aly Fahmy.
+\newblock Dataset of breast ultrasound images.
+\newblock \emph{Data in Brief}, 28:\penalty0 104863, 2020.
+
+\bibitem[Alain and Bengio(2017)]{alain2016understanding}
+Guillaume Alain and Yoshua Bengio.
+\newblock Understanding intermediate layers using linear classifier probes.
+\newblock In \emph{International Conference on Learning Representations (ICLR)
+  Workshop}, 2017.
+
+\bibitem[Biffi et~al.(2024)Biffi, Antonelli, Bernhofer, Hassan, Hirata,
+  Iwatate, Maieron, Salvagnini, and Cherubini]{biffi2024realcolon}
+Carlo Biffi, Giulio Antonelli, Sebastian Bernhofer, Cesare Hassan, Daizen
+  Hirata, Mineo Iwatate, Andreas Maieron, Pietro Salvagnini, and Andrea
+  Cherubini.
+\newblock {REAL-Colon}: A dataset for developing real-world {AI} applications
+  in colonoscopy.
+\newblock \emph{Scientific Data}, 11:\penalty0 539, 2024.
+
+\bibitem[Borgli et~al.(2020)Borgli, Thambawita, Smedsrud, Hicks, Jha, Eskeland,
+  Randel, Pogorelov, Lux, Nguyen, et~al.]{borgli2020hyperkvasir}
+Hanna Borgli, Vajira Thambawita, Pia~H. Smedsrud, Steven Hicks, Debesh Jha,
+  Sigrun~L. Eskeland, Kristin~Ranheim Randel, Konstantin Pogorelov, Mathias
+  Lux, Duc Tien~Dang Nguyen, et~al.
+\newblock {HyperKvasir}, a comprehensive multi-class image and video dataset
+  for gastrointestinal endoscopy.
+\newblock \emph{Scientific Data}, 7:\penalty0 283, 2020.
+
+\bibitem[Buda et~al.(2019)Buda, Saha, and Mazurowski]{buda2019association}
+Mateusz Buda, Ashirbani Saha, and Maciej~A. Mazurowski.
+\newblock Association of genomic subtypes of lower-grade gliomas with shape
+  features automatically extracted by a deep learning algorithm.
+\newblock \emph{Computers in Biology and Medicine}, 109:\penalty0 218--225,
+  2019.
+
+\bibitem[Chang et~al.(2025)Chang, Huang, Bhatia, Kass-Hout, Ma, and
+  Xiao]{chang2024medheval}
+Aofei Chang, Le~Huang, Parminder Bhatia, Taha Kass-Hout, Fenglong Ma, and Cao
+  Xiao.
+\newblock {MedHEval}: Benchmarking hallucinations and mitigation strategies in
+  medical large vision-language models.
+\newblock \emph{arXiv preprint arXiv:2503.02157}, 2025.
+
+\bibitem[Chen et~al.(2024)Chen, Yang, Wu, Jiang, Hou, Li, Wang, Xiao, Li, and
+  Zhang]{chen2024medhallmark}
+Jiawei Chen, Dingkang Yang, Tong Wu, Yue Jiang, Xiaolu Hou, Mingcheng Li,
+  Shunli Wang, Dongling Xiao, Ke~Li, and Lihua Zhang.
+\newblock Detecting and evaluating medical hallucinations in large vision
+  language models.
+\newblock \emph{arXiv preprint arXiv:2406.10185}, 2024.
+
+\bibitem[Geifman and El-Yaniv(2017)]{geifman2017selective}
+Yonatan Geifman and Ran El-Yaniv.
+\newblock Selective classification for deep neural networks.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, volume~30, 2017.
+
+\bibitem[Gu et~al.(2024)Gu, Yin, Liu, and Zhang]{gu2024medvh}
+Zishan Gu, Changchang Yin, Fenglin Liu, and Ping Zhang.
+\newblock {MedVH}: Towards systematic evaluation of hallucination for large
+  vision language models in the medical context.
+\newblock \emph{arXiv preprint arXiv:2407.02730}, 2024.
+
+\bibitem[Gurram(2026)]{gurram2026medscope}
+Bhaskar Gurram.
+\newblock Seeing is not believing: Counterfactual lesion erasure teaches a
+  small medical vision--language agent to report only what the image shows.
+\newblock \emph{arXiv preprint arXiv:2611.13006}, 2026.
+
+\bibitem[He et~al.(2020)He, Zhang, Mou, Xing, and Xie]{he2020pathvqa}
+Xuehai He, Yichen Zhang, Luntian Mou, Eric Xing, and Pengtao Xie.
+\newblock {PathVQA}: 30000+ questions for medical visual question answering.
+\newblock \emph{arXiv preprint arXiv:2003.10286}, 2020.
+
+\bibitem[Huang et~al.(2026)Huang, Zhu, Huang, Zhang, Zhang, and
+  Wu]{huang2026medcap}
+Zaiqiang Huang, Zhihong Zhu, Zixuan Huang, Yunyan Zhang, Hui Zhang, and Xian
+  Wu.
+\newblock {Med-CAP}: Counterfactual evidence and adaptive prior suppression for
+  robust medical visual question answering.
+\newblock In \emph{Medical Image Computing and Computer Assisted Intervention
+  (MICCAI)}, 2026.
+
+\bibitem[Jha et~al.(2020)Jha, Smedsrud, Riegler, Halvorsen, de~Lange, Johansen,
+  and Johansen]{jha2020kvasir}
+Debesh Jha, Pia~H. Smedsrud, Michael~A. Riegler, P{\aa}l Halvorsen, Thomas
+  de~Lange, Dag Johansen, and H{\aa}vard~D. Johansen.
+\newblock {Kvasir-SEG}: A segmented polyp dataset.
+\newblock In \emph{International Conference on Multimedia Modeling (MMM)},
+  pages 451--462, 2020.
+
+\bibitem[Jiang et~al.(2025)Jiang, Zhang, Chen, Hu, Jin, He, Feng, Wu, and
+  Liu]{jiang2025mfpo}
+Songtao Jiang, Yan Zhang, Ruizhe Chen, Tianxiang Hu, Yeying Jin, Qinglin He,
+  Yang Feng, Jian Wu, and Zuozhu Liu.
+\newblock Modality-fair preference optimization for trustworthy {MLLM}
+  alignment.
+\newblock In \emph{International Joint Conference on Artificial Intelligence
+  (IJCAI)}, pages 403--411, 2025.
+
+\bibitem[Lau et~al.(2018)Lau, Gayen, Ben~Abacha, and
+  Demner-Fushman]{lau2018vqarad}
+Jason~J. Lau, Soumya Gayen, Asma Ben~Abacha, and Dina Demner-Fushman.
+\newblock A dataset of clinically generated visual questions and answers about
+  radiology images.
+\newblock \emph{Scientific Data}, 5:\penalty0 180251, 2018.
+
+\bibitem[Li et~al.(2023)Li, Du, Zhou, Wang, Zhao, and Wen]{li2023pope}
+Yifan Li, Yifan Du, Kun Zhou, Jinpeng Wang, Wayne~Xin Zhao, and Ji-Rong Wen.
+\newblock Evaluating object hallucination in large vision-language models.
+\newblock In \emph{Conference on Empirical Methods in Natural Language
+  Processing (EMNLP)}, pages 292--305, 2023.
+
+\bibitem[Lian et~al.(2021)Lian, Liu, Zhang, Gao, Liu, Zhang, and
+  Yu]{liu2020chestxdet}
+Jie Lian, Jingyu Liu, Shu Zhang, Kai Gao, Xiaoqing Liu, Dingwen Zhang, and
+  Yizhou Yu.
+\newblock A structure-aware relation network for thoracic diseases detection
+  and segmentation.
+\newblock \emph{IEEE Transactions on Medical Imaging}, 2021.
+
+\bibitem[Lin et~al.(2026)Lin, Zhu, Kneuertz, Bai, and Xue]{lin2026medcausalx}
+Jianxin Lin, Chunzheng Zhu, Peter~J. Kneuertz, Yunfei Bai, and Yuan Xue.
+\newblock When models learn to ask why: Adaptive causal reasoning for
+  trustworthy medical vision--language models.
+\newblock \emph{arXiv preprint arXiv:2603.23085}, 2026.
+
+\bibitem[Liu et~al.(2021)Liu, Zhan, Xu, Ma, Yang, and Wu]{liu2021slake}
+Bo~Liu, Li-Ming Zhan, Li~Xu, Lin Ma, Yan Yang, and Xiao-Ming Wu.
+\newblock {SLAKE}: A semantically-labeled knowledge-enhanced dataset for
+  medical visual question answering.
+\newblock In \emph{IEEE International Symposium on Biomedical Imaging (ISBI)},
+  pages 1650--1654, 2021.
+
+\bibitem[Mongan et~al.(2020)Mongan, Moy, and Kahn]{mongan2020claim}
+John Mongan, Linda Moy, and Charles~E. Kahn, Jr.
+\newblock Checklist for artificial intelligence in medical imaging ({CLAIM}): A
+  guide for authors and reviewers.
+\newblock \emph{Radiology: Artificial Intelligence}, 2\penalty0 (2):\penalty0
+  e200029, 2020.
+
+\bibitem[Nguyen et~al.(2025)Nguyen, Ho, Ta, Nguyen, Chen, Rav, Dang,
+  Ramchandre, Phung, Liao, To, Verjans, Nguyen, and Phan]{healmedvqa2024}
+Dung Nguyen, Minh~Khoi Ho, Huy Ta, Thanh~Tam Nguyen, Qi~Chen, Kumar Rav,
+  Quy~Duong Dang, Satwik Ramchandre, Son~Lam Phung, Zhibin Liao, Minh-Son To,
+  Johan Verjans, Phi~Le Nguyen, and Vu~Minh~Hieu Phan.
+\newblock Localizing before answering: A hallucination evaluation benchmark for
+  grounded medical multimodal {LLMs}.
+\newblock In \emph{International Joint Conference on Artificial Intelligence
+  (IJCAI)}, 2025.
+\newblock arXiv:2505.00744.
+
+\bibitem[P{\'e}rez-Garc{\'\i}a et~al.(2024)P{\'e}rez-Garc{\'\i}a, Bond-Taylor,
+  Sanchez, van Overschelde, Lungren, Hyland, Castro, Alvarez-Valle, and
+  Ilse]{perez2024radedit}
+Fernando P{\'e}rez-Garc{\'\i}a, Sam Bond-Taylor, Pedro~P. Sanchez, Boris van
+  Overschelde, Matthew~P. Lungren, Stephanie~L. Hyland, Daniel~C. Castro,
+  Javier Alvarez-Valle, and Maximilian Ilse.
+\newblock {RadEdit}: Stress-testing biomedical vision models via diffusion
+  image editing.
+\newblock In \emph{European Conference on Computer Vision (ECCV)}, 2024.
+
+\bibitem[Rafailov et~al.(2023)Rafailov, Sharma, Mitchell, Manning, Ermon, and
+  Finn]{rafailov2023dpo}
+Rafael Rafailov, Archit Sharma, Eric Mitchell, Christopher~D. Manning, Stefano
+  Ermon, and Chelsea Finn.
+\newblock Direct preference optimization: Your language model is secretly a
+  reward model.
+\newblock \emph{Advances in Neural Information Processing Systems (NeurIPS)},
+  36, 2023.
+
+\bibitem[Rombach et~al.(2022)Rombach, Blattmann, Lorenz, Esser, and
+  Ommer]{rombach2022high}
+Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bj{\"o}rn
+  Ommer.
+\newblock High-resolution image synthesis with latent diffusion models.
+\newblock In \emph{IEEE/CVF Conference on Computer Vision and Pattern
+  Recognition (CVPR)}, pages 10684--10695, 2022.
+
+\bibitem[Rong et~al.(2022)Rong, Leemann, Borisov, Kasneci, and
+  Kasneci]{rong2022road}
+Yao Rong, Tobias Leemann, Vadim Borisov, Gjergji Kasneci, and Enkelejda
+  Kasneci.
+\newblock A consistent and efficient evaluation strategy for attribution
+  methods.
+\newblock In \emph{International Conference on Machine Learning (ICML)}, pages
+  18770--18795, 2022.
+
+\bibitem[Shao et~al.(2024)Shao, Wang, Zhu, Xu, Song, Bi, Zhang, Zhang, Li, Wu,
+  et~al.]{shao2024deepseekmath}
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei
+  Zhang, Mingchuan Zhang, Y.~K. Li, Y.~Wu, et~al.
+\newblock {DeepSeekMath}: Pushing the limits of mathematical reasoning in open
+  language models.
+\newblock \emph{arXiv preprint arXiv:2402.03300}, 2024.
+
+\bibitem[Sun et~al.(2026)Sun, Tu, Xue, Jiang, Xu, Yao, Qian, Sun, Zhou, Sun,
+  and Lin]{sun2026prive}
+Jingyu Sun, Jiachen Tu, Yuyang Xue, Yaoxin Jiang, Guoyi Xu, Zhengtao Yao, Rui
+  Qian, Yizheng Sun, Hongpeng Zhou, Jingyuan Sun, and Yan Lin.
+\newblock Seeing what is actually there: {PriVE-Bench} and {PriVE-Tools} for
+  counterfactual evaluation of agentic visual evidence in {VLMs}.
+\newblock \emph{arXiv preprint arXiv:2607.16311}, 2026.
+
+\bibitem[Suvorov et~al.(2022)Suvorov, Logacheva, Mashikhin, Remizova, Ashukha,
+  Silvestrov, Kong, Goka, Park, and Lempitsky]{suvorov2022lama}
+Roman Suvorov, Elizaveta Logacheva, Anton Mashikhin, Anastasia Remizova,
+  Arsenii Ashukha, Aleksei Silvestrov, Naejin Kong, Harshith Goka, Kiwoong
+  Park, and Victor Lempitsky.
+\newblock Resolution-robust large mask inpainting with {Fourier} convolutions.
+\newblock In \emph{IEEE/CVF Winter Conference on Applications of Computer
+  Vision (WACV)}, pages 2149--2159, 2022.
+
+\bibitem[Tejani et~al.(2024)Tejani, Klontzas, Gatti, Mongan, Moy, Park, and
+  Kahn]{tejani2024claim}
+Ali~S. Tejani, Michail~E. Klontzas, Anthony~A. Gatti, John~T. Mongan, Linda
+  Moy, Seong~Ho Park, and Charles~E. Kahn, Jr.
+\newblock Checklist for artificial intelligence in medical imaging ({CLAIM}):
+  2024 update.
+\newblock \emph{Radiology: Artificial Intelligence}, 6\penalty0 (4):\penalty0
+  e240300, 2024.
+
+\bibitem[Telea(2004)]{telea2004image}
+Alexandru Telea.
+\newblock An image inpainting technique based on the fast marching method.
+\newblock \emph{Journal of Graphics Tools}, 9\penalty0 (1):\penalty0 23--34,
+  2004.
+
+\bibitem[Wang et~al.(2017)Wang, Peng, Lu, Lu, Bagheri, and
+  Summers]{wang2017chestx}
+Xiaosong Wang, Yifan Peng, Le~Lu, Zhiyong Lu, Mohammadhadi Bagheri, and
+  Ronald~M. Summers.
+\newblock {ChestX-ray8}: Hospital-scale chest {X}-ray database and benchmarks
+  on weakly-supervised classification and localization of common thorax
+  diseases.
+\newblock In \emph{IEEE Conference on Computer Vision and Pattern Recognition
+  (CVPR)}, pages 2097--2106, 2017.
+
+\bibitem[Wu et~al.(2025{\natexlab{a}})Wu, Shi, Wang, Huang, Yin, Yan, Cao, and
+  Zhang]{wu2025empo}
+Jiulong Wu, Zhengliang Shi, Shuaiqiang Wang, Jizhou Huang, Dawei Yin, Lingyong
+  Yan, Min Cao, and Min Zhang.
+\newblock Mitigating hallucinations in large vision-language models via
+  entity-centric multimodal preference optimization.
+\newblock In \emph{Conference on Empirical Methods in Natural Language
+  Processing (EMNLP)}, 2025{\natexlab{a}}.
+
+\bibitem[Wu et~al.(2025{\natexlab{b}})Wu, Sun, Wen, and Haber]{svco2024}
+Shengguang Wu, Fan-Yun Sun, Kaiyue Wen, and Nick Haber.
+\newblock Symmetrical visual contrastive optimization: Aligning vision-language
+  models with minimal contrastive images.
+\newblock In \emph{Annual Meeting of the Association for Computational
+  Linguistics (ACL)}, 2025{\natexlab{b}}.
+
+\bibitem[Xia et~al.(2024)Xia, Chen, Tian, Gong, Hou, Xu, Wu, Fan, Zhou, Zhu,
+  et~al.]{xia2024cares}
+Peng Xia, Ze~Chen, Juanxi Tian, Yangrui Gong, Ruibo Hou, Yue Xu, Zhenbang Wu,
+  Zhiyuan Fan, Yiyang Zhou, Kangyu Zhu, et~al.
+\newblock {CARES}: A comprehensive benchmark of trustworthiness in medical
+  vision language models.
+\newblock \emph{Advances in Neural Information Processing Systems (NeurIPS)},
+  2024.
+
+\bibitem[Yan et~al.(2025)Yan, He, Yue, and Wang]{yan2024probmed}
+Qianqi Yan, Xuehai He, Xiang Yue, and Xin~Eric Wang.
+\newblock Worse than random? {An} embarrassingly simple probing evaluation of
+  large multimodal models in medical {VQA}.
+\newblock In \emph{Findings of the Association for Computational Linguistics:
+  ACL 2025}, 2025.
+
+\bibitem[Zafar et~al.(2026)Zafar, Murali, Bharadwaj, Vashist, and
+  Wu]{zafar2026coral}
+Anas Zafar, Leema~Krishna Murali, Siddhant Bharadwaj, Ashish Vashist, and Jia
+  Wu.
+\newblock Do medical vision language models actually see? {A} counterfactual
+  grounding framework and hard-negative contrastive training for
+  visually-reliant medical {VLMs}.
+\newblock \emph{arXiv preprint arXiv:2607.03647}, 2026.
+
+\bibitem[Zhu et~al.(2025)Zhu, Xia, Li, Zhu, Wang, and Yao]{zhu2024mmedpo}
+Kangyu Zhu, Peng Xia, Yun Li, Hongtu Zhu, Sheng Wang, and Huaxiu Yao.
+\newblock {MMedPO}: Aligning medical vision-language models with clinical-aware
+  multimodal preference optimization.
+\newblock In \emph{International Conference on Machine Learning (ICML)}, volume
+  267 of \emph{PMLR}, pages 80207--80222, 2025.
+
+\end{thebibliography}
