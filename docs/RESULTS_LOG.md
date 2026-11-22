@@ -1506,3 +1506,46 @@ result; guard on validation; secondary: correct boxes and context-matched lesion
 result for MedScope-4B stays as reported. Notebooks 54a (data, CPU) and 54b (training and tests). Notebook 53b was
 stopped during R12 seed 1, stage 1 (about 10 minutes in); R12 is run after 54b. Notebook 53c (chest X-ray rebuild) not
 yet run.
+
+## 2026-11-22 — R16 result: MedScope-v5 with natural pairs in training (notebook 54b; Amendment 6; post hoc)
+
+Ran on an A100 80 GB, 00:47-09:01 ET (two trainings at a time). Training data (notebook 54a): 60 REAL-Colon videos,
+1,727 polyp frames (772 with the polyp under 2% of the frame) and 1,881 lesion-free frames; folds of 40 training videos
+each; 96 context frames for the 103 R9 pairs (7 pairs had no usable frame 3-10 s from a box). The interim look of
+notebook 54p was offered but not run.
+
+**Guard (validation, before any test result): PASSED.** Net utility 0.654 (v4 0.613; limit >= 0.593), lesion-free
+claims 9.1% (v4 7.7%; limit <= 9.7%).
+
+**Primary: R9 pairs, cross-validated v5 (each pair answered by the fold model that never saw its video), 103 pairs.**
+Lesion found / lesion-free safe / natural ESG [95% CI]; difference v5 minus model, bootstrap over videos:
+- MedScope-v5 (CV): 63.1% / 92.2% / 0.553 [0.430, 0.670]
+- MedScope-4B: 37.9% / 86.4% / 0.243; +0.311 [+0.200, +0.423], p < 0.001
+- MedScope-v4.2: 39.8% / 86.4% / 0.262; +0.291 [+0.172, +0.402], p < 0.001
+- Qwen3.5-4B: 38.8% / 85.4% / 0.243; +0.311 [+0.194, +0.427], p < 0.001
+- gemini-4-argon: 68.0% / 78.6% / 0.466; +0.087 [-0.030, +0.207], p 0.155
+- claude-opus-5-5: 70.9% / 73.8% / 0.447; +0.107 [-0.019, +0.233], p 0.115
+- gpt-6-astra: 64.1% / 68.0% / 0.320; +0.233 [+0.096, +0.369], p < 0.001
+
+**Reading (Amendment 6 rule): mixed, comparison by comparison.** Cross-validated v5 has the highest natural ESG of all
+seven models and is above gpt-6-astra with the interval above 0; above gemini-4-argon and claude-opus-5-5 the
+intervals reach below 0 (not established). By fold: 0.63 / 0.49 / 0.53 (flagships 0.20-0.58). By cohort: 0.61 / 0.50
+/ 0.39 / 0.75.
+
+**Secondary (descriptive).** Grounded detection (polyp called present with a box of IoU >= 0.3): v5-CV 53/103
+(51.5%), gemini-4-argon 52 (50.5%), claude-opus-5-5 50 (48.5%), gpt-6-astra 41 (39.8%), v4 32 (31.1%), base 13
+(12.6%). Context-matched lesion-free frames (96 pairs): lesion-free safe v5-CV 88.5% vs flagships 55.2-66.7%; natural
+ESG 0.500 vs 0.333 / 0.323 / 0.188 (differences +0.167 [+0.045, +0.280], +0.177 [+0.063, +0.292], +0.312 [+0.167,
++0.446]).
+
+**MedScope-v5 (all videos) on the earlier tests.** Main test: ESG 0.744 vs v4 0.758 (-0.014 [-0.062, +0.036]; no
+trade), net utility 0.707 vs 0.732 (n.s.), CCR 0.854 vs 0.849. External centres vs v4: net utility +0.115 [+0.018,
++0.217], CCR +0.071, ESG +0.084 [-0.000, +0.172]; vs v4.2 erased claims 11.8% vs 6.7% (p 0.005). Fresh internal: no
+significant difference. Fresh external vs v4: net utility 0.088 vs -0.053 (+0.141 [+0.044, +0.241]), CCR +0.101, but
+erased-lesion claims 19.6% vs 8.3% (+0.113 [+0.052, +0.175]; SIIM 35%, ETIS 18%); vs v4.2 erased claims +0.083
+(p 0.003). New SIIM patients: ESG 0.400 (v4.2 0.360, v4 0.000). Standard VQA: VQA-RAD 0.517, SLAKE 0.747, PathVQA
+0.503 (v4 0.514 / 0.730 / 0.477).
+
+Post hoc, one run, nothing tuned; the 103 pairs were used a second time; flagships used as they are, fold models
+trained on other videos of the same four centres. MedScope-4B (v4) stays the pre-registered model; its R9 result stays
+as reported. Source: RESULTS/54b_v5_natural_pairs_in_training_(r16)_report.md.
