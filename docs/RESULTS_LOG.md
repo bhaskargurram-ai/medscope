@@ -1549,3 +1549,70 @@ erased-lesion claims 19.6% vs 8.3% (+0.113 [+0.052, +0.175]; SIIM 35%, ETIS 18%)
 Post hoc, one run, nothing tuned; the 103 pairs were used a second time; flagships used as they are, fold models
 trained on other videos of the same four centres. MedScope-4B (v4) stays the pre-registered model; its R9 result stays
 as reported. Source: RESULTS/54b_v5_natural_pairs_in_training_(r16)_report.md.
+
+## 2026-11-22 — R16, complete tables (copied from RESULTS/54b_v5_natural_pairs_in_training_(r16)_report.md)
+
+So that every number used in paper v5 (Table 7, Appendix Tables A.9 and A.11) is in this log.
+
+**Primary, natural ESG by fold (0 / 1 / 2):** v5-CV 0.63 (n=38) / 0.49 (n=35) / 0.53 (n=30); MedScope-4B 0.32 / 0.23 /
+0.17; v4.2 0.34 / 0.31 / 0.10; Qwen3.5-4B 0.26 / 0.23 / 0.23; gemini-4-argon 0.58 / 0.43 / 0.37; claude-opus-5-5 0.55 /
+0.43 / 0.33; gpt-6-astra 0.29 / 0.46 / 0.20.
+**By cohort (001 / 002 / 003 / 004; n = 23 / 28 / 28 / 24):** v5-CV 0.61 / 0.50 / 0.39 / 0.75; MedScope-4B 0.39 / 0.11 /
+0.21 / 0.29; v4.2 0.52 / 0.11 / 0.21 / 0.25; Qwen3.5-4B 0.35 / 0.04 / 0.14 / 0.50; gemini-4-argon 0.57 / 0.43 / 0.36 /
+0.54; claude-opus-5-5 0.43 / 0.43 / 0.29 / 0.67; gpt-6-astra 0.39 / 0.21 / 0.25 / 0.46.
+
+**Context-matched lesion-free frames (96 pairs): lesion found / context frame safe / natural ESG [95% CI]; v5-CV minus
+model [95% CI], p:**
+- v5-CV: 61.5% / 88.5% / 0.500 [0.367, 0.629]
+- MedScope-4B: 36.5% / 84.4% / 0.208 [0.089, 0.333]; +0.292 [+0.174, +0.404], p < 0.001
+- v4.2: 37.5% / 86.5% / 0.240 [0.132, 0.352]; +0.260 [+0.126, +0.384], p 0.001
+- Qwen3.5-4B: 37.5% / 81.2% / 0.188 [0.032, 0.346]; +0.312 [+0.165, +0.478], p < 0.001
+- gemini-4-argon: 66.7% / 66.7% / 0.333 [0.211, 0.458]; +0.167 [+0.045, +0.280], p 0.007
+- claude-opus-5-5: 69.8% / 62.5% / 0.323 [0.177, 0.466]; +0.177 [+0.063, +0.292], p 0.004
+- gpt-6-astra: 63.5% / 55.2% / 0.188 [0.033, 0.353]; +0.312 [+0.167, +0.446], p < 0.001
+By cohort (n = 21 / 27 / 26 / 22): v5-CV 0.62 / 0.44 / 0.27 / 0.73; MedScope-4B 0.48 / 0.11 / -0.04 / 0.36; v4.2 0.43 /
+0.19 / 0.08 / 0.32; Qwen3.5-4B 0.43 / -0.04 / -0.19 / 0.68; gemini-4-argon 0.48 / 0.33 / 0.00 / 0.59; claude-opus-5-5
+0.52 / 0.15 / 0.12 / 0.59; gpt-6-astra 0.29 / 0.15 / -0.15 / 0.55.
+
+**MedScope-v5 (all videos) on the earlier tests: v5 value, other value, v5 minus other [95% CI], p.**
+Main test (507), vs v4: net utility 0.707, 0.732, -0.025 [-0.082, +0.029], 0.420; ESG 0.744, 0.758, -0.014 [-0.062,
++0.036], 0.652; CCR 0.854, 0.849, +0.005 [-0.026, +0.036], 0.840; erased claims 0.110, 0.096, +0.014 [-0.027, +0.055],
+0.608; lesion-free claims 0.087, 0.076, +0.010 [-0.021, +0.042], 0.572. vs v4.2: net utility 0.714, -0.007 [-0.054,
++0.038], 0.757; ESG 0.740, +0.005 [-0.044, +0.051], 0.956; CCR 0.856, -0.002 [-0.027, +0.022], 0.907; erased claims
+0.110, +0.000 [-0.036, +0.035], 1.000; lesion-free claims 0.090, -0.003 [-0.034, +0.026], 0.907.
+External centres (169), vs v4: net utility 0.645, 0.530, +0.115 [+0.018, +0.217], 0.022; ESG 0.681, 0.597, +0.084
+[-0.000, +0.172], 0.073; CCR 0.798, 0.727, +0.071 [+0.014, +0.131], 0.019; erased claims 0.118, 0.118, +0.000 [-0.050,
++0.052], 1.000; lesion-free claims 0.020, 0.040, -0.020 [-0.093, +0.042], 0.802. vs v4.2: net utility 0.696, -0.050
+[-0.131, +0.032], 0.270; ESG 0.739, -0.059 [-0.132, +0.017], 0.156; CCR 0.815, -0.017 [-0.068, +0.036], 0.618; erased
+claims 0.067, +0.050 [+0.017, +0.095], 0.005; lesion-free claims 0.060, -0.040 [-0.104, +0.000], 0.276.
+Fresh internal (76), vs v4: net utility 0.484, 0.402, +0.082 [-0.176, +0.349], 0.533; ESG 0.500, 0.472, +0.028 [-0.189,
++0.270], 0.858; CCR 0.819, 0.681, +0.139 [-0.029, +0.324], 0.127; erased claims 0.333, 0.194, +0.139 [-0.026, +0.296],
+0.132; lesion-free claims 0.200, 0.125, +0.075 [-0.095, +0.244], 0.470. vs v4.2: net utility 0.500, -0.016 [-0.192,
++0.143], 0.879; ESG 0.528, -0.028 [-0.154, +0.103], 0.760; CCR 0.778, +0.042 [-0.088, +0.167], 0.617; erased claims
+0.250, +0.083 [+0.000, +0.184], 0.106; lesion-free claims 0.175, +0.025 [-0.105, +0.158], 0.861.
+Fresh external (316), vs v4: net utility 0.088, -0.053, +0.141 [+0.044, +0.241], 0.006; ESG 0.387, 0.393, -0.006
+[-0.074, +0.058], 0.880; CCR 0.577, 0.476, +0.101 [+0.043, +0.162], 0.003; erased claims 0.196, 0.083, +0.113 [+0.052,
++0.175], 0.001; lesion-free claims 0.041, 0.047, -0.007 [-0.042, +0.028], 0.880. vs v4.2: net utility 0.048, +0.040
+[-0.048, +0.128], 0.355; ESG 0.417, -0.030 [-0.088, +0.032], 0.349; CCR 0.536, +0.042 [-0.006, +0.092], 0.106; erased
+claims 0.113, +0.083 [+0.031, +0.138], 0.003; lesion-free claims 0.068, -0.027 [-0.066, +0.008], 0.216.
+New SIIM patients (200), vs v4.2: net utility -0.028, -0.096, +0.068 [-0.116, +0.253], 0.470; ESG 0.400, 0.360, +0.040
+[-0.060, +0.140], 0.482; CCR 0.585, 0.540, +0.045 [-0.043, +0.131], 0.342; erased claims 0.200, 0.190, +0.010 [-0.063,
++0.083], 0.933; lesion-free claims 0.070, 0.050, +0.020 [+0.000, +0.052], 0.284. vs v4: net utility -1.100, +1.072
+[+0.873, +1.263]; ESG 0.000, +0.400 [+0.299, +0.500]; CCR 0.000, +0.585 [+0.490, +0.670]; erased claims 0.000, +0.200
+[+0.125, +0.280]; lesion-free claims 0.000, +0.070 [+0.021, +0.125] (all p <= 0.001).
+By source, v5 (v4): correct on lesion images / ESG / erased claims / lesion-free claims / net utility. Main test: brain
+MRI 0.82 / 0.75 / 0.06 / 0.00 / 0.68 (0.88 / 0.75 / 0.14 / 0.00 / 0.75); breast ultrasound 0.92 / 0.76 / 0.17 / 0.13 /
+0.82 (0.88 / 0.74 / 0.14 / 0.07 / 0.78); chest X-ray 0.72 / 0.44 / 0.24 / 0.18 / 0.38 (0.70 / 0.51 / 0.17 / 0.20 /
+0.40); colonoscopy 0.98 / 0.95 / 0.04 / 0.04 / 1.04 (0.96 / 0.95 / 0.01 / 0.00 / 1.06); SLAKE 0.47 / 0.41 / 0.12 / 0.11
+/ 0.16 (0.53 / 0.47 / 0.12 / 0.12 / 0.22). Fresh external: BraTS meningioma 0.42 / 0.22 / 0.16 / 0.06 / -0.20 (0.53 /
+0.41 / 0.16 / 0.08 / -0.03); BUS-UCLM 0.73 / 0.67 / 0.08 / 0.06 / 0.64 (0.73 / 0.71 / 0.02 / 0.06 / 0.67); SIIM
+pneumothorax 0.36 / 0.04 / 0.35 / 0.00 / -0.56 (0.00 / 0.00 / 0.00 / 0.00 / -1.10); ETIS-Larib 0.77 / 0.59 / 0.18 / n/a
+/ 0.55 (0.69 / 0.46 / 0.21 / n/a / 0.38).
+Standard VQA, closed / open / all: v5 PathVQA 0.840 / 0.139 / 0.503, SLAKE 0.881 / 0.670 / 0.747, VQA-RAD 0.725 / 0.255
+/ 0.517; v4.2 0.833 / 0.111 / 0.487, 0.872 / 0.681 / 0.750, 0.773 / 0.245 / 0.539; v4 0.801 / 0.125 / 0.477, 0.881 /
+0.644 / 0.730, 0.741 / 0.230 / 0.514.
+
+Paper v5 (paper/v5): natural-pairs section, Table 7, Figure 7, checks R13-R15, Appendix Tables A.9 (every registered
+analysis and its outcome) and A.11; abstract and contributions rewritten; corrections from a line-by-line audit of this
+log against paper v4 (training lesion-free counts, cost-matrix timing, C1-C4 wording, prompting range, earlier model
+versions disclosed, longer-training observation added).
