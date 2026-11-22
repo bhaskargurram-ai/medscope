@@ -209,3 +209,68 @@ class LookReward(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+import chexthought  # noqa: E402
+
+
+class CheXthoughtR23(unittest.TestCase):
+    def test_click_box(self):
+        self.assertIsNone(chexthought.click_box([]))
+        self.assertEqual(chexthought.click_box([(0.5, 0.5)]), [425, 425, 575, 575])          # minimum 15% square
+        self.assertEqual(chexthought.click_box([(0.2, 0.1), (0.6, 0.3)]), [150, 50, 650, 350])  # padded by 5%
+        self.assertEqual(chexthought.click_box([(0.0, 0.99)])[3], 1000)                         # clamped to the image
+
+    def test_selection_splits_by_patient_and_balances(self):
+        reads, labels = [], {}
+        for i in range(400):
+            img = f"patient{i:05d}_study1_view1_frontal"
+            key = chexthought.chexpert_key(img)
+            if i % 4 == 0:                       # pneumothorax with clicks
+                labels[key] = {"Pneumothorax": 1}
+                reads.append({"image_id": img, "finding": "pneumothorax", "status": "positive", "points": [[0.6, 0.2]]})
+            elif i % 4 == 1:                     # label 1 but no click points: not usable
+                labels[key] = {"Pneumothorax": 1}
+                reads.append({"image_id": img, "finding": "pneumothorax", "status": "positive", "points": []})
+            elif i % 4 == 2:                     # healthy, readers say no
+                labels[key] = {"Pneumothorax": 0}
+                reads.append({"image_id": img, "finding": "pneumothorax", "status": "negative", "points": []})
+            else:                                # label blank but a reader suspects one: not a negative
+                labels[key] = {"Pneumothorax": float("nan")}
+                reads.append({"image_id": img, "finding": "pneumothorax", "status": "uncertain", "points": []})
+        reads.append({"image_id": "patient99999_study1_view2_lateral", "finding": "pneumothorax", "status": "positive",
+                      "points": [[0.5, 0.5]]})
+        labels["patient99999/study1/view2_lateral"] = {"Pneumothorax": 1}
+        sel = chexthought.select_pneumothorax(reads, labels, n_train=1000, n_test=1000)
+        tr, te = sel["train"], sel["test"]
+        self.assertEqual(len(tr["pos"]) + len(te["pos"]), 100)                 # only i % 4 == 0, frontal only
+        for s in (tr, te):                   # as many negatives as positives, when there are enough
+            self.assertLessEqual(len(s["neg"]), len(s["pos"]))
+            self.assertGreaterEqual(len(s["neg"]), len(s["pos"]) - 5)
+        pts = lambda s: {chexthought.patient_of(i) for i in list(s["pos"]) + s["neg"]}  # noqa: E731
+        self.assertFalse(pts(tr) & pts(te))
+        self.assertTrue(all(int(i[7:12]) % 4 == 2 for i in tr["neg"] + te["neg"]))
+        views = chexthought.views_for(te, lambda i: f"/img/{i}.png")
+        self.assertEqual({v["kind"] for v in views}, {"original", "natural_negative"})
+        self.assertTrue(all(v["question"] == chexthought.QUESTION for v in views))
+        self.assertTrue(all((v["lesion_box"] is not None) == (v["kind"] == "original") for v in views))
+
+    def test_score_youden(self):
+        import json
+        views = [{"view_id": f"p{i}__original", "patient_id": f"pt{i}", "kind": "original"} for i in range(10)] + \
+                [{"view_id": f"n{i}__natural_negative", "patient_id": f"pt{i + 10}", "kind": "natural_negative"} for i in range(10)]
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / "v.jsonl").write_text("".join(json.dumps(v) + "\n" for v in views))
+            run = d / "run"
+            run.mkdir()
+            rows = [{"view_id": f"p{i}__original", "case_id": f"p{i}", "kind": "original", "action": "answer",
+                     "claims_absent": i >= 6, "iou": 0.5 if i < 3 else 0.1} for i in range(10)] + \
+                   [{"view_id": f"n{i}__natural_negative", "case_id": f"n{i}", "kind": "natural_negative", "action": "answer",
+                     "claims_absent": i >= 2, "correct": i >= 2} for i in range(10)]
+            (run / "scored.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+            text = chexthought.score_test(d / "v.jsonl", [f"m={run}", f"same={run}"], "m")
+        # sensitivity 6/10, specificity 8/10 -> Youden 0.4; 3 correct boxes
+        self.assertIn("| m | 10 | 60.0% | 3 | 10 | 80.0% | 0.400 [", text)
+        self.assertIn("| same | 10 | 60.0% | 3 | 10 | 80.0% | 0.400 [", text)
+        self.assertIn("+0.000 [+0.000, +0.000], p = 1.000 | +0.000 [+0.000, +0.000], p = 1.000 | +0.000 [+0.000, +0.000] |", text)

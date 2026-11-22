@@ -482,7 +482,7 @@ model editing (idea 2) is not planned for this version.
 (`colon-loco`), `scripts/question_type.py`, `scripts/blind_views.py`, `medscope/train/look.py`; notebooks 55a
 (R20, R19), 55b (R18), 55c (R17), 56 (R21), 57 (R22); R12 and the chest X-ray rebuild stay in notebooks 53b and 53c.
 
-# Amendment 8 (22 Nov 2026, 14:58 ET): R23, CheXthought pneumothorax coverage (committed before any CheXthought image was downloaded or any model trained on it)
+# Amendment 8 (22 Nov 2026, 14:51 ET): R23, CheXthought pneumothorax coverage (committed before any CheXthought image was downloaded or any model trained on it)
 
 **Question.** MedScope-4B missed every pneumothorax on the fresh external set; training held 4 pneumothorax images.
 Adding 150 SIIM pneumothorax patients (v4.2) raised detection on new SIIM patients to 53/100. CheXthought (S. Sharma

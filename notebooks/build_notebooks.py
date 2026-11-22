@@ -6189,6 +6189,211 @@ print('\n'.join(lines)[:8000])
     ]
 
 
+def nb59_chexthought_pneumothorax() -> list[dict]:
+    """Notebook 59: R23 (Amendment 8), CheXthought pneumothorax coverage on top of v4.2."""
+    c51 = nb51_v42()
+    siim_data = next(c for c in c51 if "MANUAL =" in "".join(c["source"]))
+    siim_build = next(c for c in c51 if "prepare_siim_train.py" in "".join(c["source"]))
+    s3 = ("--views {TRAIN_V4} {REPLAY} --negatives {TRAIN_NEG_V4} --subsample 5000 --lr 5e-5 --mode agentic "
+          "--min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    return [md("""
+# MedScope 59: CheXthought pneumothorax coverage (review check R23, Amendment 8)
+
+MedScope-4B missed every pneumothorax on the fresh external set: training held 4 pneumothorax images. Adding 150 SIIM
+patients (v4.2) found 53 of 100 on new patients. CheXthought (Sonali Sharma et al.) adds radiologists' statements
+and the points they clicked on CheXpert Plus chest X-rays, a hospital no model here has seen. This notebook:
+
+1. picks pneumothorax and healthy frontal films from CheXthought by the rules of Amendment 8 (split by patient),
+2. downloads only those images from CheXpert Plus (about 3,600 films, resized to 768 px),
+3. trains v4.2's stage 3 again with them added ("v4.3-cxt"; one run, nothing tuned), checks the guard,
+4. tests on the 200 new SIIM patients (primary), the CheXthought test patients (with the three flagships over the
+   API, about $15-25), the fresh external set, the chest X-ray natural pairs and the main test.
+
+**Needs:** notebook 57b done (CheXthought statistics and labels on Drive); notebooks 51 and 53c done. An A100
+(about 6-8 hours; the image download is most of the first hour). Redivis asks you to sign in once (a link printed in
+step 2). Secrets: `HF_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, Kaggle as for notebook 51; the
+SIIM-ACR `archive.zip` in `MyDrive/medscope/siim/`. Every step resumes. Run all.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK),
+        code("!pip install -q -U kaggle pydicom openai anthropic google-genai redivis"), code(LAMA_CELL),
+        code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(r7_config(35, 'A100 (or G4)').replace("'Amendment 7' in doc, 'Amendment 7 missing", "'Amendment 8' in doc, 'Amendment 8 missing") + r"""
+CH = f'{DRIVE}/chexthought'
+READS, LABELS = f'{CH}/stats/reads.jsonl', f'{CH}/chexpert_labels_impression.json'
+for need in (READS, LABELS):
+    assert os.path.exists(need), f'{need} is missing: run notebook 57b first'
+CXT = f'{CH}/r23'
+os.makedirs(f'{CXT}/images', exist_ok=True)
+S2, V42 = f'{ADAPTERS}/v42_s2/final', f'{ADAPTERS}/v42_s3/final'
+for path in (S2, V42):
+    assert os.path.exists(f'{path}/adapter_config.json'), f'{path} is missing (notebook 51)'
+"""),
+        md("## 1. Which films (rules of Amendment 8; no image needed yet)"),
+        code(r"""
+if not os.path.exists(f'{CXT}/selection.json'):
+    sh(f'python scripts/chexthought.py build-views --reads {READS} --labels {LABELS} --out {CXT}')
+SEL = json.load(open(f'{CXT}/selection.json'))
+NEED = sorted({i for s in SEL.values() for i in list(s['pos']) + s['neg']})
+for s, v in SEL.items():
+    print(f"{s}: {len(v['pos'])} pneumothorax films, {len(v['neg'])} healthy films")
+print(len(NEED), 'films to download')
+"""),
+        md("## 2. Download those films from CheXpert Plus (Redivis; resized to 768 px; resumes)"),
+        code(r"""
+import re, redivis
+from concurrent.futures import ThreadPoolExecutor
+from PIL import Image
+os.environ.pop('REDIVIS_API_TOKEN', None)
+KEY = re.compile(r'(patient\d+)[/_](study\d+)[/_](view\d+_\w+?)\.(?:png|jpg|jpeg)$', re.I)
+def local(img):
+    return f'{CXT}/images/{img}.png'
+todo = [i for i in NEED if not os.path.exists(local(i))]
+print(len(todo), 'still to download')
+if todo:
+    ds = None
+    for kind in ('organization', 'user'):
+        try:
+            ds = getattr(redivis, kind)('AIMI').dataset('chexpert_plus:5yyj')
+            ds.list_tables()
+            break
+        except Exception as e:
+            print(kind, type(e).__name__, e)
+    files = {}
+    for tname in ('PNG_train', 'PNG_valid'):
+        try:
+            for f in ds.table(tname).list_files():
+                name = getattr(f, 'name', None) or f.properties.get('name', '')
+                path = f.properties.get('path', '') if hasattr(f, 'properties') else ''
+                m = KEY.search(str(path) or name) or KEY.search(name)
+                if m:
+                    files['_'.join(m.groups())] = f
+            print(tname, 'listed; matched so far:', len(files))
+        except Exception as e:
+            print(tname, type(e).__name__, e)
+    missing = [i for i in todo if i not in files]
+    if len(missing) == len(todo):
+        sample = list(ds.table('PNG_train').list_files(max_results=5))
+        print('first file names:', [getattr(f, 'name', None) or f.properties for f in sample])
+        raise SystemExit('The image files could not be matched to CheXthought image ids: send me the names printed above.')
+    print(len(missing), 'films not found in CheXpert Plus (left out)')
+    def get(img):
+        tmp = f'{WORK}/cxt_tmp_{img}.png'
+        try:
+            files[img].download(tmp, overwrite=True)
+            im = Image.open(tmp).convert('RGB')
+            im.thumbnail((768, 768))
+            im.save(local(img))
+        except Exception as e:
+            return f'{img}: {type(e).__name__}: {e}'
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+    with ThreadPoolExecutor(16) as ex:
+        errs = [e for e in ex.map(get, [i for i in todo if i in files]) if e]
+    print(len(errs), 'download errors', errs[:5])
+have = {i for i in NEED if os.path.exists(local(i))}
+print(len(have), 'of', len(NEED), 'films on Drive')
+import importlib.util
+spec = importlib.util.spec_from_file_location('chexthought', '/content/medscope/scripts/chexthought.py')
+ct = importlib.util.module_from_spec(spec); spec.loader.exec_module(ct)
+for s, v in SEL.items():
+    keep = {'pos': {i: b for i, b in v['pos'].items() if i in have}, 'neg': [i for i in v['neg'] if i in have]}
+    rows = ct.views_for(keep, local)
+    open(f'{CXT}/views_{s}.jsonl', 'w').write(''.join(json.dumps(r) + '\n' for r in rows))
+    print(s, len(rows), 'views')
+CXT_TRAIN, CXT_TEST = f'{CXT}/views_train.jsonl', f'{CXT}/views_test.jsonl'
+"""),
+        md("## 3. The SIIM patients of v4.2 (same cells as notebook 51)"),
+        siim_data, siim_build,
+        md("## 4. v4.2's stage 3 again, with the CheXthought films added (about 2.5 hours; resumes)"),
+        code(r"""
+REPLAY = f'{DRIVE}/external/vqa_train/views_vqa_train.jsonl'
+S3 = f'@S3@'
+V43 = f'{ADAPTERS}/v43cxt_s3'
+if not os.path.exists(f'{V43}/final/adapter_config.json'):
+    sh(f'python scripts/train_sft.py --model {BASE} --init {S2} {S3} --extra-views {SIIM_TRAIN} {CXT_TRAIN} --out {V43}')
+V43 = f'{V43}/final'
+""".replace('@S3@', s3)),
+        md("## 5. Guard on validation images (before any test result)"),
+        code(r"""
+for run, adapter in (('r23_v43_val', V43), ('r23_v42_val', V42)):
+    if not os.path.exists(f'{RESULTS}/{run}/summary.json'):
+        sh(f'python scripts/evaluate.py --model {BASE} --adapter {adapter} --views {VAL_V4} {VAL_NEG_V4} --out {RESULTS}/{run} --name {run} --split validation --batch-size {BATCH}')
+U3, U2 = m('r23_v43_val', 'net_utility'), m('r23_v42_val', 'net_utility')
+H3, H2 = m('r23_v43_val', 'natural_hallucination_rate'), m('r23_v42_val', 'natural_hallucination_rate')
+passed = U3 >= U2 - 0.02 and H3 <= H2 + 0.02
+GUARD = (f'validation net utility {U3:.3f} (v4.2 {U2:.3f}; limit >= {U2 - 0.02:.3f}), lesion-free claims {H3:.1%} '
+         f'(v4.2 {H2:.1%}; limit <= {H2 + 0.02:.1%}): ' + ('PASSED' if passed else 'NOT PASSED'))
+print(GUARD)
+"""),
+        md("## 6. Tests: new SIIM patients (primary), CheXthought test patients, and the earlier sets"),
+        code(r"""
+SIIMTE = f'{CXT}/views_siimte.jsonl'
+open(SIIMTE, 'w').write(''.join(open(f).read() for f in SIIM_TEST.split()))
+CXR2_VIEWS = f'{NP}/cxr_v2/views_natural_cxr.jsonl'
+SETS = {'siimte': SIIMTE, 'cxt': CXT_TEST, 'ext2': EXT2, 'test': f'{TEST_VIEWS} {TEST_NEG}'}
+if os.path.exists(CXR2_VIEWS):
+    SETS['cxr2'] = CXR2_VIEWS
+for split, views in SETS.items():
+    sh(f'python scripts/evaluate.py --model {BASE} --adapter {V43} --views {views} --out {RESULTS}/r23_v43_{split} --name v4.3-cxt --split {split} --batch-size {BATCH}')
+for tag, adapter in (('v42', V42), ('v4', FINAL), ('base', '')):
+    a = f'--adapter {adapter}' if adapter else ''
+    sh(f'python scripts/evaluate.py --model {BASE} {a} --views {CXT_TEST} --out {RESULTS}/r23_{tag}_cxt --name {tag}-cxt --split cxt --batch-size {BATCH}')
+API = [('gemini', 'gemini', 'gemini-4-argon'), ('claudeopus', 'anthropic', 'claude-opus-5-5'), ('gpt6astra', 'openai', 'gpt-6-astra')]
+KEYS = {'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}
+procs = [subprocess.Popen(f'python scripts/evaluate.py --api {p} --model {mid} --views {CXT_TEST} --out {RESULTS}/r23_{t}_cxt --name {mid}-cxt '
+                          f'--split cxt --batch-size 8 > {CXT}/log_{t}.txt 2>&1', shell=True, cwd='/content/medscope')
+         for t, p, mid in API if os.environ.get(KEYS[p]) and not os.path.exists(f'{RESULTS}/r23_{t}_cxt/summary.json')]
+for p in procs:
+    p.wait()
+"""),
+        code(r"""
+from medscope.colab import read_text
+def score(views, runs, ref, out):
+    have = ' '.join(f'{n}={RESULTS}/{r}' for n, r in runs if os.path.exists(f'{RESULTS}/{r}/summary.json'))
+    sh(f'python scripts/chexthought.py score-test --views {views} --runs {have} --ref {ref} --out {out}')
+    return read_text(out)
+PRIMARY = score(SIIMTE, [('v4.3-cxt', 'r23_v43_siimte'), ('v4.2', 'v42_siimte'), ('MedScope-4B', 'v4_final_siimte_r8')],
+                'v4.3-cxt', f'{RESULTS}/r23_siimte.md')
+CXTTAB = score(CXT_TEST, [('v4.3-cxt', 'r23_v43_cxt'), ('v4.2', 'r23_v42_cxt'), ('MedScope-4B', 'r23_v4_cxt'),
+                          ('Qwen3.5-4B', 'r23_base_cxt'), ('gemini-4-argon', 'r23_gemini_cxt'),
+                          ('claude-opus-5-5', 'r23_claudeopus_cxt'), ('gpt-6-astra', 'r23_gpt6astra_cxt')],
+               'v4.3-cxt', f'{RESULTS}/r23_cxt.md')
+from medscope.eval.runner import scored_rows
+def films(run, kind):
+    rows = [r for r in scored_rows(f'{RESULTS}/{run}') if r['kind'] == kind]
+    return sum(r['action'] == 'answer' and not r.get('claims_absent') for r in rows), len(rows)
+(p3, n3), (p2, n2) = films('r23_v43_siimte', 'original'), films('v42_siimte', 'original')
+(h3, k3), (h2, k2) = films('r23_v43_siimte', 'natural_negative'), films('v42_siimte', 'natural_negative')
+import sys
+sys.path.insert(0, '/content/medscope/scripts')
+from natural_pairs import cluster_boot
+a = {r['case_id']: r for r in scored_rows(f'{RESULTS}/r23_v43_siimte') if r['kind'] == 'original'}
+b = {r['case_id']: r for r in scored_rows(f'{RESULTS}/v42_siimte') if r['kind'] == 'original'}
+pres = lambda r: float(r['action'] == 'answer' and not r.get('claims_absent'))
+d, lo, hi, p = cluster_boot({c: pres(a[c]) - pres(b[c]) for c in a.keys() & b.keys()}, {c: c for c in a})
+raised = lo > 0 and (h3 / max(k3, 1)) - (h2 / max(k2, 1)) <= 0.05
+RULE = (f'New SIIM patients: pneumothorax films called present v4.3-cxt {p3}/{n3}, v4.2 {p2}/{n2} (difference {d:+.3f} '
+        f'[{lo:+.3f}, {hi:+.3f}], p = {p:.3f}); healthy films called positive {h3}/{k3} vs {h2}/{k2}. Rule (Amendment 8): '
+        + ('RAISED' if raised else 'NOT RAISED'))
+e3, e2 = m('r23_v43_test', 'esg'), m('v42_test', 'esg')
+COST = f'main-test ESG v4.3-cxt {e3:.3f}, v4.2 {e2:.3f} ({e3 - e2:+.3f}; a drop of more than 0.02 is a cost)'
+print(GUARD); print(RULE); print(COST)
+"""),
+        publish("MedScope report - 59 CheXthought pneumothorax coverage (R23)", """
+    ('What this is', 'v4.2 stage 3 again with CheXthought pneumothorax and healthy frontal films added (click-point boxes for the zoom). Post hoc model, one run, rules fixed in Amendment 8 before any image was downloaded.'),
+    ('Films used', json.dumps({s: {'pneumothorax': len(v['pos']), 'healthy': len(v['neg'])} for s, v in SEL.items()})),
+    ('Guard', GUARD),
+    ('Primary: new SIIM patients', RULE + '\\n\\n' + PRIMARY),
+    ('CheXthought test patients (secondary)', CXTTAB),
+    ('Main test', COST + '\\n\\n' + significance_table(RESULTS, 'r23_v43_test', ['v42_test', 'v4_final_test'])),
+    ('Fresh external set', significance_table(RESULTS, 'r23_v43_ext2', ['v42_ext2', 'v4_final_ext2'])),
+    ('By source, fresh external', by_dataset(RESULTS, ['r23_v43_ext2', 'v42_ext2', 'v4_final_ext2'])),
+"""),
+        code(DONE_CELL),
+    ]
+
+
 def nb58_release_v5() -> list[dict]:
     """Notebook 58: add MedScope-v5 and the natural-pair runs to the public release."""
     return [md("""
@@ -6310,6 +6515,7 @@ NOTEBOOKS = {
     "57_chexthought_access.ipynb": nb57_chexthought,
     "57b_chexthought_stats.ipynb": nb57b_chexthought_stats,
     "58_release_v5.ipynb": nb58_release_v5,
+    "59_chexthought_pneumothorax.ipynb": nb59_chexthought_pneumothorax,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
