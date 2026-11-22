@@ -1677,8 +1677,8 @@ sections disagreed with this log, and four elsewhere were wrong or unsourced as 
 - Net utility without the 170 degraded views: MedScope-4B 0.774; gpt-6-astra 0.310, claude-opus-5-5 0.361,
   gemini-4-argon 0.579 (MedScope-4B minus model +0.464, +0.413, +0.195; each p < 0.001).
 - Grounded accuracy (IoU >= 0.3): 0.785 main test, 0.655 external centres.
-- Solved-examples prompt, 150 cases: gemini-4-argon claims 36.8% of erased lesions (the lowest of the 17 flagship
-  conditions); MedScope-4B on the same 150 cases ESG 0.750, erased claims 7.4%.
+- Solved-examples prompt, 150 cases: gemini-4-argon claims 36.8% of erased lesions (the low end of the
+  manuscript's 36.8-66.2% range); MedScope-4B on the same 150 cases ESG 0.750, erased claims 7.4%.
 - Fresh external, MedScope-4B minus gemini-4-argon, net utility: -0.363 [-0.496, -0.233], p < 0.001. Erased claims
   8.3% against 31.5% / 42.3% / 35.7% (argon / opus / astra); ESG 0.393 against 0.435 / 0.292 / 0.268.
 - Held-out wordings (373 cases): net utility +0.006 [-0.033, 0.041], p 0.738.
