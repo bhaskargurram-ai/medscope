@@ -6009,37 +6009,39 @@ def nb57_chexthought() -> list[dict]:
 
 Sonali Sharma's other three ideas (targeted updates, training on reader disagreement, region and gaze supervision)
 need CheXthought itself. This notebook only checks that your account can read the dataset and writes down what is in
-it (tables, variables, a few rows), so the training code can be written against the real schema. No experiment.
+it (tables, variables, a few rows). No experiment, no GPU.
 
-**Before running:** open https://stanford.redivis.com/datasets/ds7j-75krm2btv while signed in to Redivis and accept
-any access terms shown there. Then create an API token (Redivis: your account > Workspace settings > API tokens,
-with data access) and add it to Colab's secrets as `REDIVIS_API_TOKEN`. No GPU is needed.
+**Before running:**
+1. Open https://stanford.redivis.com/datasets/ds7j-75krm2btv signed in to Redivis and accept any access terms.
+2. On that page find the dataset's **owner** (the user or organisation name shown above or beside the title, also in
+   the page's "Cite" or "API" panel). Paste it into `OWNER` in the next cell.
+3. Run all. Redivis prints a sign-in link the first time: open it, approve, and the cell continues. Do **not** put
+   an API token in Colab secrets for this; delete the one you made earlier on Redivis.
 """),
         code(SETUP),
         code(r"""
+OWNER = ''          # <- the dataset owner's name from the dataset page, e.g. 'sonalisharma' (not 'stanford')
+REF = 'chexthought:ds7j'   # dataset name : reference id (the first 4 characters of ds7j-75krm2btv)
 !pip install -q -U redivis
-tok = secret('REDIVIS_API_TOKEN')
-if not tok:
-    raise SystemExit('Add the secret REDIVIS_API_TOKEN (notebook access on) and run again.')
-os.environ['REDIVIS_API_TOKEN'] = tok
+os.environ.pop('REDIVIS_API_TOKEN', None)
+if not OWNER:
+    raise SystemExit('Set OWNER to the dataset owner shown on the dataset page, then run this cell again.')
 import redivis
 OUT = f'{DRIVE}/chexthought'
 os.makedirs(OUT, exist_ok=True)
-dataset, errors = None, []
-for make in (lambda: redivis.organization('stanford').dataset('ds7j'),
-             lambda: redivis.organization('stanford').dataset('chexthought:ds7j'),
-             lambda: redivis.organization('stanford').dataset('chexthought')):
+dataset, tables, errors = None, None, []
+for kind in ('user', 'organization'):
     try:
-        d = make()
+        d = getattr(redivis, kind)(OWNER).dataset(REF)
         tables = d.list_tables()
         dataset = d
+        print(f'opened {kind} {OWNER} / {REF}')
         break
     except Exception as e:
-        errors.append(f'{type(e).__name__}: {e}')
+        errors.append(f'{kind}: {type(e).__name__}: {e}')
 if dataset is None:
     print('\n'.join(errors))
-    raise SystemExit('Could not open the dataset. Check that access was granted on the dataset page, then copy the '
-                     '"API reference" shown there (Dataset > API) and send it with the errors above.')
+    raise SystemExit('Could not open the dataset: check OWNER (exact spelling) and that your access request was approved.')
 lines = ['# CheXthought: tables and variables', '']
 for t in tables:
     name = getattr(t, 'name', None) or t.properties.get('name')
