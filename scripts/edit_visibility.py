@@ -1,4 +1,4 @@
-"""Review check R10 (docs/REVIEW_EXPERIMENTS.md, Amendment 5): does edit visibility explain the erased-lesion result?
+"""Review check R13 (docs/REVIEW_EXPERIMENTS.md, Amendment 5): does edit visibility explain the erased-lesion result?
 
 A ResNet-18 edit-trace detector is trained, as in scripts/edit_detector.py, to tell a control-edited view
 (random_removal) from the unedited view (original) on the training split; both still show the lesion, so it can only

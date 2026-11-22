@@ -1,4 +1,4 @@
-"""Review check R11 (docs/REVIEW_EXPERIMENTS.md, Amendment 5): is the effect tied to yes/no questions?
+"""Review check R14 (docs/REVIEW_EXPERIMENTS.md, Amendment 5): is the effect tied to yes/no questions?
 
 The same 150 main-test cases used for the robustness checks (select_cases, seed 0) are asked an open request instead
 of the closed question, on the unedited lesion image and on its erasure: "Describe any abnormal findings in this
