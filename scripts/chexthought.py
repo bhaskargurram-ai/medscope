@@ -204,7 +204,12 @@ def main() -> None:
         if i % 20000 == 0:
             print(f"{i:,} traces read", flush=True)
     (out / "reads.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows if r["finding"] != "_trace"))
-    labels = label_index(Path(args.labels)) if args.labels else None
+    labels = None
+    if args.labels:
+        try:
+            labels = label_index(Path(args.labels))
+        except SystemExit as e:              # a wrong labels file should not throw away the statement statistics
+            print(f"labels left out: {e}")
     text = stats(rows, labels)
     (out / "stats.md").write_text(text)
     print(text)
