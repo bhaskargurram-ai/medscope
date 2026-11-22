@@ -1729,3 +1729,22 @@ acceptance: TMLR about 60% (80% after text fixes), MIDL 40-55%, MICCAI about 35%
 15-20%, Radiology: AI about 10%. Experiments both ask for: the finished expert reader study; independent
 confirmation of v5 (leave-one-centre-out, or a second colonoscopy video set); natural pairs without counterfactual
 views; seeds (R12); results by question type; an image-blind control.
+
+## 2026-11-22 — Amendment 7 pre-registered (R17-R22), code and notebooks 55a-58 (no results yet)
+
+After the independent review of manuscript v5, the plan for six further checks was committed at 11:06 ET (03eb83e)
+before any of them ran: R17 counterfactual views x natural pairs (stage-1 factorial, three folds); R18 the v5 recipe
+with every video of one centre left out (four trainings; the same reading rule against the stored flagship answers);
+R19 an image-blind control (blank and swapped images, nine frontier models, MedScope-4B, base); R20 the main results
+by question type (stored answers); R21 a one-seed pilot of rewarding the look, suggested by S. Sharma (look-first
+training; GRPO with a process reward and its control); R22 access to CheXthought and its schema only. R12 (seeds) and
+the chest X-ray rebuild stay in notebooks 53b and 53c; R5 (expert readers) stays open.
+
+Code: `scripts/natural_pairs.py colon-loco` (leave-one-centre-out files from the frames already drawn: 23 / 28 / 28 /
+24 test pairs for centres 001-004, 45 training videos each), `scripts/question_type.py`, `scripts/blind_views.py`,
+`medscope/train/look.py` with `--look-first` (train_sft) and `--look-bonus` (train_grpo), `scripts/release_v5.py`;
+11 new tests (225 pass). Notebooks: 55a (R20, R19), 55b (R18), 55c (R17), 56 (R21), 57 (R22), 58 (v5 release).
+
+Manuscript v5: new title ("MedScope-Bench: Do Medical Vision-Language Models Answer from the Image? Matched
+Counterfactual Erasures and Unedited Same-Patient Pairs"), abstract cut to 250 words, a draft AI-use declaration for
+the authors to confirm. No number changed.
