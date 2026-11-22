@@ -1748,3 +1748,15 @@ Code: `scripts/natural_pairs.py colon-loco` (leave-one-centre-out files from the
 Manuscript v5: new title ("MedScope-Bench: Do Medical Vision-Language Models Answer from the Image? Matched
 Counterfactual Erasures and Unedited Same-Patient Pairs"), abstract cut to 250 words, a draft AI-use declaration for
 the authors to confirm. No number changed.
+
+## 2026-11-22 — R22: CheXthought access confirmed (notebook 57); run status of Amendment 7
+
+Notebook 57 done. CheXthought (owner AIMI, `chexthought:ds7j`) opens and downloads to Colab: one file,
+chexthoughtdataset.csv (509 MB), 103,592 reasoning traces on 50,312 CheXpert Plus images (every image read at least
+twice; median 2, max 42 reads), columns image_id, chain_of_thought_reasoning, spatial_annotations (normalised click
+points linked to [#n] markers in the text), report. Median 277 words per trace. CheXpert Plus (images, CheXpert
+labels, reports, RadGraph) also opens. Keyword counts (pneumothorax in 78,369 traces) include negations; per-finding
+positive / negative / uncertain statements are computed in notebook 57b (scripts/chexthought.py).
+
+Running: 55a (R20, R19) and 53c (chest X-ray rebuild). Not yet started: 55b (R18), 55c (R17), 53b (R12 seeds),
+56 (R21), 57b, 58 (release, last).
