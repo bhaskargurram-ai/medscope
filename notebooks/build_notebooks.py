@@ -6171,7 +6171,8 @@ for f, pat in FINDINGS.items():
     term = re.compile(pat, re.I)
     hits = [(s.strip(), sentence_status(s, term)) for tr in sample for s in SENT.split(tr) if term.search(s)]
     random.shuffle(hits)
-    lines += [f'## {f}', ''] + [f'- **{st}**: {re.sub(r"\[#\d+\]", "", s)[:220]}' for s, st in hits[:20]] + ['']
+    strip = lambda s: re.sub(r'\[#\d+\]', '', s)[:220]
+    lines += [f'## {f}', ''] + [f'- **{st}**: {strip(s)}' for s, st in hits[:20]] + ['']
 open(f'{OUT}/stats/spot_check.md', 'w').write('\n'.join(lines) + '\n')
 print('\n'.join(lines)[:8000])
 """),
