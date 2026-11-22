@@ -1616,3 +1616,39 @@ Paper v5 (paper/v5): natural-pairs section, Table 7, Figure 7, checks R13-R15, A
 analysis and its outcome) and A.11; abstract and contributions rewritten; corrections from a line-by-line audit of this
 log against paper v4 (training lesion-free counts, cost-matrix timing, C1-C4 wording, prompting range, earlier model
 versions disclosed, longer-training observation added).
+
+## 2026-11-22 — sources added for numbers the manuscript uses (no new runs)
+
+Found by a number-by-number check of paper v5 against this log; each is copied from a stored report.
+
+**R16 grounded detection, complete (RESULTS/54b_v5_natural_pairs_in_training_(r16)_report.md): polyp frames called
+present / present with a box of IoU >= 0.3, of 103.** v5-CV 65 / 53; MedScope-4B 36 / 32; v4.2 37 / 34; Qwen3.5-4B
+40 / 13; gemini-4-argon 69 / 52; claude-opus-5-5 73 / 50; gpt-6-astra 66 / 41.
+
+**Main test by imaging type (RESULTS/24_v4_everywhere_report.md, 3 Nov): correct on lesion images / ESG / erased
+claims / lesion-free claims / net utility.**
+- MedScope-4B: brain MRI (78) 0.88 / 0.75 / 0.14 / 0.00 / 0.75; breast ultrasound (57) 0.88 / 0.74 / 0.14 / 0.07 /
+  0.78; chest X-ray (91) 0.70 / 0.51 / 0.17 / 0.20 / 0.40; colonoscopy (174) 0.96 / 0.95 / 0.01 / 0.00 / 1.06; SLAKE
+  CT/MRI (107) 0.53 / 0.47 / 0.12 / 0.12 / 0.22.
+- gemini-4-argon: 0.89 / 0.42 / 0.47 / 0.00 / 0.56; 0.89 / 0.40 / 0.48 / 0.13 / 0.53; 0.65 / 0.20 / 0.49 / 0.06 /
+  0.21; 1.00 / 0.69 / 0.31 / 0.11 / 0.83; 0.74 / 0.35 / 0.41 / 0.12 / 0.38 (same order of imaging types).
+- claude-opus-5-5: 0.93 / 0.31 / 0.61 / 0.14 / 0.51; 0.92 / 0.29 / 0.62 / 0.40 / 0.40; 0.60 / -0.05 / 0.66 / 0.20 /
+  -0.12; 0.96 / 0.57 / 0.40 / 0.37 / 0.53; 0.76 / 0.24 / 0.59 / 0.13 / 0.32.
+- gpt-6-astra: 0.83 / 0.50 / 0.31 / 0.10 / 0.43; 0.98 / 0.12 / 0.83 / 0.60 / 0.28; 0.79 / 0.15 / 0.66 / 0.26 / 0.14;
+  0.95 / 0.40 / 0.58 / 0.37 / 0.40; 0.68 / 0.29 / 0.47 / 0.22 / 0.17.
+So on counterfactual colonoscopy the three flagships score ESG 0.69, 0.57, 0.40, and on natural colonoscopy pairs
+0.466, 0.447, 0.320: the same order.
+
+**R9 paired-frame rule, wording against code.** Amendment 4's prose says the paired frame is taken after the track "if
+no frame qualifies before". The selection code committed in the same commit as the amendment (0e966c5, 19 Nov 00:11
+ET, before any frame was drawn) takes it after the track when fewer than three frames qualify before
+(`neg = before if len(before) >= 3 else after`), and that is what ran; Amendment 6 states the rule this way. Of the
+103 pairs, 75 take the lesion-free frame from before the track and 28 from after it. The two wordings differ only for
+tracks with one or two qualifying frames before; how many of the 28 these are was not stored.
+
+**Numbering of the review checks.** REVIEW_EXPERIMENTS.md holds R1-R9 and R12-R16: fourteen checks. The numbers R10
+and R11 were never used (two script docstrings carried them for what became R13 and R14; corrected in 2eafc91).
+
+**R16 by source, reading.** On the fresh external set v5's extra erased-lesion claims over MedScope-4B come from SIIM
+pneumothorax (35% against 0%) and, slightly, BUS-UCLM (8% against 2%); ETIS-Larib is 18% against 21% and BraTS
+meningioma 16% against 16%. The earlier note "SIIM 35%, ETIS 18%" listed v5's rates only.
