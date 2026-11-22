@@ -6118,6 +6118,66 @@ print('\n'.join(S))
     ]
 
 
+def nb57b_chexthought_stats() -> list[dict]:
+    """Notebook 57b: what the CheXthought radiologists said per finding, reader agreement, and the CheXpert labels."""
+    return [md("""
+# MedScope 57b: CheXthought statistics (R22, Amendment 7)
+
+Run notebook 57 first (it downloads the CheXthought CSV). This reads every reasoning trace and, for eight findings,
+records whether the radiologist called it positive, negative or uncertain, and where they clicked when they said so.
+It then measures how often the two readers of an image agree, and checks the statements against the CheXpert labels
+of CheXpert Plus. These numbers decide the design of the CheXthought experiments (registered as Amendment 8 before
+any training). No GPU; about 10-20 minutes. Redivis asks you to sign in once (a link).
+"""),
+        code(SETUP),
+        code(r"""
+!pip install -q -U redivis
+os.environ.pop('REDIVIS_API_TOKEN', None)
+import redivis
+OUT = f'{DRIVE}/chexthought'
+CSV = f'{OUT}/chexthoughtdataset.csv'
+assert os.path.exists(CSV), 'the CheXthought CSV is missing: run notebook 57 first'
+LAB = f'{OUT}/chexpert_labels.csv'
+if not os.path.exists(LAB):
+    try:
+        t = redivis.organization('AIMI').dataset('chexpert_plus:5yyj').table('CheXpert Labels')
+        t.to_pandas_dataframe().to_csv(LAB, index=False)
+    except Exception as e:
+        try:
+            t = redivis.user('AIMI').dataset('chexpert_plus:5yyj').table('CheXpert Labels')
+            t.to_pandas_dataframe().to_csv(LAB, index=False)
+        except Exception as e2:
+            print(f'labels not downloaded ({type(e).__name__}: {e}; {type(e2).__name__}: {e2}); the statistics run without them')
+import pandas as pd
+if os.path.exists(LAB):
+    lab = pd.read_csv(LAB, nrows=3)
+    print('labels columns:', list(lab.columns))
+    print(lab.head(3).to_string()[:1500])
+"""),
+        code(r"""
+labels = f'--labels {LAB}' if os.path.exists(LAB) else ''
+sh(f'python scripts/chexthought.py --csv {CSV} {labels} --out {OUT}/stats')
+"""),
+        code(r"""
+# twenty sentences per finding, to check the positive / negative / uncertain reading by eye
+import json, random, re, sys
+sys.path.insert(0, '/content/medscope/scripts')
+from chexthought import FINDINGS, SENT, sentence_status
+df = pd.read_csv(CSV, usecols=['chain_of_thought_reasoning'])
+random.seed(0)
+sample = df.sample(3000, random_state=0)['chain_of_thought_reasoning'].astype(str).tolist()
+lines = ['# Spot check: sentences and how they were read', '']
+for f, pat in FINDINGS.items():
+    term = re.compile(pat, re.I)
+    hits = [(s.strip(), sentence_status(s, term)) for tr in sample for s in SENT.split(tr) if term.search(s)]
+    random.shuffle(hits)
+    lines += [f'## {f}', ''] + [f'- **{st}**: {re.sub(r"\[#\d+\]", "", s)[:220]}' for s, st in hits[:20]] + ['']
+open(f'{OUT}/stats/spot_check.md', 'w').write('\n'.join(lines) + '\n')
+print('\n'.join(lines)[:8000])
+"""),
+    ]
+
+
 def nb58_release_v5() -> list[dict]:
     """Notebook 58: add MedScope-v5 and the natural-pair runs to the public release."""
     return [md("""
@@ -6237,6 +6297,7 @@ NOTEBOOKS = {
     "55c_cf_x_natural_pairs.ipynb": nb55c_factorial,
     "56_look_reward.ipynb": nb56_look,
     "57_chexthought_access.ipynb": nb57_chexthought,
+    "57b_chexthought_stats.ipynb": nb57b_chexthought_stats,
     "58_release_v5.ipynb": nb58_release_v5,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
