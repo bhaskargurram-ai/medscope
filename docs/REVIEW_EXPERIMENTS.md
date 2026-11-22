@@ -481,3 +481,41 @@ model editing (idea 2) is not planned for this version.
 **Fixed.** One attempt each. Every result is reported, whatever it shows. Code: `scripts/natural_pairs.py`
 (`colon-loco`), `scripts/question_type.py`, `scripts/blind_views.py`, `medscope/train/look.py`; notebooks 55a
 (R20, R19), 55b (R18), 55c (R17), 56 (R21), 57 (R22); R12 and the chest X-ray rebuild stay in notebooks 53b and 53c.
+
+# Amendment 8 (22 Nov 2026, 14:58 ET): R23, CheXthought pneumothorax coverage (committed before any CheXthought image was downloaded or any model trained on it)
+
+**Question.** MedScope-4B missed every pneumothorax on the fresh external set; training held 4 pneumothorax images.
+Adding 150 SIIM pneumothorax patients (v4.2) raised detection on new SIIM patients to 53/100. CheXthought (S. Sharma
+et al.) gives radiologists' statements and click points on CheXpert Plus images (Stanford; a source no model here
+has used). Does adding these images, with a zoom box from where the radiologists clicked, raise pneumothorax
+detection further, on two different sources, without more claims on lesion-free films?
+
+**Data (CheXthought statistics of notebook 57b; scripts/chexthought.py).** Frontal views only.
+- Positive: CheXpert label (CheXbert, impression) for Pneumothorax = 1, and at least one CheXthought reader states a
+  pneumothorax (positive, not uncertain) with click points. Box: the bounding box of those click points, padded by
+  5% of the image on each side, at least 15% wide and tall.
+- Negative: CheXpert label 0 or blank for Pneumothorax, and no CheXthought reader states or suspects one.
+- Question: "Is there a pneumothorax in this chest X-ray?" (the main test's wording). Pneumothorax is critical.
+- Split by patient (a fixed hash): 80% training pool, 20% test pool. Training: up to 1,500 positives and as many
+  negatives; test: up to 300 positives and 300 negatives, all from patients not in training. Images at most 768 px.
+
+**Model.** v4.2's stage 3 again (same data, options, seed, from v4.2 stage 2), with the CheXthought training views
+added in full ("v4.3-cxt"). One attempt, nothing tuned.
+
+**Guard, before any test result.** Validation net utility not lower than v4.2's by more than 0.02, lesion-free
+claims not higher by more than 0.02.
+
+**Primary measure and reading.** On the 200 new SIIM patients of R8 (100 with, 100 without pneumothorax),
+pneumothorax films called present, v4.3-cxt minus v4.2, paired over patients (2,000 resamples). Raised: difference
+interval above zero AND healthy films called positive not higher by more than 5 points. Otherwise: not raised.
+
+**Secondary, descriptive.** On the CheXthought test pool: films called present (sensitivity), healthy films answered
+absent or referred, their sum minus one (Youden), and correct boxes (IoU >= 0.3 against the click box), for
+v4.3-cxt, v4.2, MedScope-4B, the base model and the three flagships (API, test pool only). The fresh-external SIIM
+films (256-px copies), the corrected chest X-ray natural pairs (pneumothorax pairs and all), and the main test
+(ESG, erased-lesion claims; a drop of more than 0.02 in main-test ESG is reported as a cost).
+
+**Known limits.** Labels come from report mining (CheXbert) and from a rule-based reading of the traces, not from a
+reader of this study; click boxes are coarse. CheXpert Plus images may be used under its research-use agreement and
+are not redistributed; only adapters, view lists (image ids) and per-view outputs are released.
+Code: scripts/chexthought.py (`build-views`, `score-test`); notebook 59.
