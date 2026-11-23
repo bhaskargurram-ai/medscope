@@ -1887,3 +1887,24 @@ gemini-4-argon and Claude Opus 5.5 in point estimate, intervals include zero. Ho
 over MedScope-4B, v4.2 and the base model (+0.23 to +0.25) holds with no centre shared. v5 still answers the most
 polyp-free frames "absent" or refers them (91.3% against 68.0-78.6%), and finds fewer polyps than the flagships
 (58.3% against 64.1-70.9%).
+
+## 2026-11-23 — R12 seed 1 of the full v4 recipe (notebook 53b, section 6; Amendment 5): partial
+
+Seed 1 finished all three stages (adapter `seed1_s3/final`, 13:29 ET) and its four test runs (RESULTS/seed1_test,
+seed1_ext, seed1_fresh, seed1_ext2, summary.json; 14:06 ET). Seed 0 is MedScope-4B (v4 final evaluation, 2026-11-03).
+
+| Set (cases) | Seed | CCR | ESG [95% CI] | Erased-lesion claims | Lesion-free claims | Net utility |
+| --- | --- | --- | --- | --- | --- | --- |
+| Main test (507) | 0 | 0.849 | 0.758 | 9.6% | 7.6% | 0.732 |
+| Main test (507) | 1 | 0.861 | 0.744 [0.680, 0.805] | 11.4% | 17.0% | 0.672 |
+| External centres (169) | 0 | 0.73 | 0.597 | 11.8% | 4% | 0.530 |
+| External centres (169) | 1 | 0.739 | 0.605 [0.505, 0.704] | 11.8% | 12.0% | 0.542 |
+| Fresh internal (76) | 0 | -- | 0.47 | -- | -- | 0.402 |
+| Fresh internal (76) | 1 | 0.681 | 0.472 [0.314, 0.641] | 16.7% | 20.0% | 0.386 |
+| Fresh external (316) | 0 | -- | 0.393 | -- | -- | -0.053 |
+| Fresh external (316) | 1 | 0.494 | 0.333 [0.253, 0.410] | 15.5% | 6.1% | -0.099 |
+
+First reading (not the R12 test): ESG and erased-lesion claims reproduce within 0.06 on every set. Lesion-free claims
+on the main test are higher for seed 1 (17.0% against 7.6%), as at stage 1 in November (8.7% against 16.3% by seed).
+The R12 rule (each seed's main-test ESG above each flagship, paired interval above zero) is computed at the end of
+notebook 53b, after seed 2. Seed 2 stage 1 started 14:07 ET.
