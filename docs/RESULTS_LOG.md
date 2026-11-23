@@ -1858,3 +1858,32 @@ Reading: for pneumothorax, the finding MedScope-4B missed entirely, CheXthought 
 images, about 7,000 positive statements with click points, and about 4,700 images on which two radiologists
 disagree, against 4 pneumothorax images in our training set. Designs for Sonali Sharma's ideas 1, 3 and 4 on this
 data are to be registered (Amendment 8) before any training.
+
+## 2026-11-22 — R18 result: v5 with no centre shared (notebook 55b; Amendment 7): mixed, as before
+
+The v5 recipe trained four times, each without every video of one REAL-Colon centre (45 training videos each); each
+of the 103 R9 pairs answered by the model that never saw its centre (RESULTS/55b_v5_leave-one-centre-out_(r18)_report.md).
+
+| Model | Polyp not denied | Polyp-free: absent or refers | Natural ESG [95% CI] | v5-LOCO minus model [95% CI], p |
+| --- | --- | --- | --- | --- |
+| v5, leave-one-centre-out | 58.3% | 91.3% | 0.495 [0.370, 0.612] | -- |
+| v5, cross-validated (R16) | 63.1% | 92.2% | 0.553 [0.430, 0.670] | -0.058 [-0.132, +0.010], p 0.119 |
+| MedScope-4B | 37.9% | 86.4% | 0.243 | +0.252 [+0.147, +0.360], p < 0.001 |
+| v4.2 | 39.8% | 86.4% | 0.262 | +0.233 [+0.120, +0.343], p < 0.001 |
+| Qwen3.5-4B | 38.8% | 85.4% | 0.243 | +0.252 [+0.135, +0.367], p 0.001 |
+| gemini-4-argon | 68.0% | 78.6% | 0.466 | +0.029 [-0.091, +0.152], p 0.696 |
+| claude-opus-5-5 | 70.9% | 73.8% | 0.447 | +0.049 [-0.072, +0.174], p 0.494 |
+| gpt-6-astra | 64.1% | 68.0% | 0.320 | +0.175 [+0.039, +0.311], p 0.013 |
+
+By centre (held out): 0.61 / 0.39 / 0.29 / 0.75 (cross-validated v5 0.61 / 0.50 / 0.39 / 0.75). Grounded detection:
+60 called present, 50 with a correct box (v5-CV 65 / 53; gemini-4-argon 69 / 52; opus 73 / 50; astra 66 / 41).
+Context-matched frames (96 pairs): natural ESG 0.427 [0.286, 0.562]; minus gemini-4-argon +0.094 [-0.042, 0.220],
+opus +0.104 [-0.030, 0.239], astra +0.240 [0.101, 0.375]; 85.4% of context frames absent or referred (flagships
+55.2-66.7%).
+
+**Reading (rule of Amendments 4, 6 and 7): mixed.** Above gpt-6-astra with the interval above zero; above
+gemini-4-argon and Claude Opus 5.5 in point estimate, intervals include zero. Holding out the whole centre cost
+0.058 natural ESG against the cross-validated v5 (interval includes zero), mostly in centres 002 and 003. The gain
+over MedScope-4B, v4.2 and the base model (+0.23 to +0.25) holds with no centre shared. v5 still answers the most
+polyp-free frames "absent" or refers them (91.3% against 68.0-78.6%), and finds fewer polyps than the flagships
+(58.3% against 64.1-70.9%).
