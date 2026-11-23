@@ -6258,23 +6258,43 @@ if todo:
             break
         except Exception as e:
             print(kind, type(e).__name__, e)
-    files = {}
-    for tname in ('PNG_train', 'PNG_valid'):
+    files, probe = {}, []
+    for tname in ('png_train:s6cj', 'png_valid:41v9'):
         try:
-            for f in ds.table(tname).list_files():
-                name = getattr(f, 'name', None) or f.properties.get('name', '')
-                path = f.properties.get('path', '') if hasattr(f, 'properties') else ''
-                m = KEY.search(str(path) or name) or KEY.search(name)
-                if m:
-                    files['_'.join(m.groups())] = f
-            print(tname, 'listed; matched so far:', len(files))
+            tab = ds.table(tname)
+            objs = list(tab.list_files())
+            by_id = {}
+            for f in objs:
+                props = getattr(f, 'properties', {}) or {}
+                fid = getattr(f, 'id', None) or props.get('id') or props.get('fileId') or props.get('file_id')
+                by_id[str(fid)] = f
+                name = getattr(f, 'name', None) or props.get('name', '')
+                for v in [props.get('path'), props.get('directory'), props.get('folder'), name]:
+                    m = KEY.search(str(v or ''))
+                    if m:
+                        files['_'.join(m.groups())] = f
+                        break
+            # the file names are only 'view1_frontal.png': look for the full path in the table's own columns
+            if not files:
+                df = tab.to_pandas_dataframe()
+                probe.append(f'{tname}: columns {list(df.columns)}; first row {df.iloc[0].to_dict()}; '
+                             f'first file properties {getattr(objs[0], "properties", None)}')
+                idc = next((c for c in df.columns if c.lower() in ('file_id', 'fileid', 'id')), None)
+                for c in df.columns:
+                    s = df[c].astype(str)
+                    if idc and s.str.contains(r'patient\d+', regex=True).mean() > 0.5:
+                        for path, fid in zip(s, df[idc]):
+                            m = KEY.search(path)
+                            if m and str(fid) in by_id:
+                                files['_'.join(m.groups())] = by_id[str(fid)]
+                        break
+            print(tname, 'listed', len(objs), 'files; matched so far:', len(files))
         except Exception as e:
             print(tname, type(e).__name__, e)
     missing = [i for i in todo if i not in files]
     if len(missing) == len(todo):
-        sample = list(ds.table('PNG_train').list_files(max_results=5))
-        print('first file names:', [getattr(f, 'name', None) or f.properties for f in sample])
-        raise SystemExit('The image files could not be matched to CheXthought image ids: send me the names printed above.')
+        print('\n'.join(probe))
+        raise SystemExit('The image files could not be matched to CheXthought image ids: send me the lines printed above.')
     print(len(missing), 'films not found in CheXpert Plus (left out)')
     def get(img):
         tmp = f'{WORK}/cxt_tmp_{img}.png'
