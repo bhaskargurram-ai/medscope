@@ -6209,6 +6209,9 @@ and the points they clicked on CheXpert Plus chest X-rays, a hospital no model h
 4. tests on the 200 new SIIM patients (primary), the CheXthought test patients (with the three flagships over the
    API, about $15-25), the fresh external set, the chest X-ray natural pairs and the main test.
 
+**GPU:** steps 1-3 (choosing and downloading the films, about an hour) run on any runtime, a T4 or even CPU; the
+notebook then stops and asks for an A100 for the training. Run all again on the A100: nothing is downloaded twice.
+
 **Needs:** notebook 57b done (CheXthought statistics and labels on Drive); notebooks 51 and 53c done. An A100
 (about 6-8 hours; the image download is most of the first hour). Redivis asks you to sign in once (a link printed in
 step 2). Secrets: `HF_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, Kaggle as for notebook 51; the
@@ -6217,7 +6220,7 @@ SIIM-ACR `archive.zip` in `MyDrive/medscope/siim/`. Every step resumes. Run all.
         code(SETUP), code(AUTO_RELEASE), code(GPU_STACK),
         code("!pip install -q -U kaggle pydicom openai anthropic google-genai redivis"), code(LAMA_CELL),
         code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
-        code(r7_config(35, 'A100 (or G4)').replace("'Amendment 7' in doc, 'Amendment 7 missing", "'Amendment 8' in doc, 'Amendment 8 missing") + r"""
+        code(r7_config(0, 'A100 (or G4)').replace("'Amendment 7' in doc, 'Amendment 7 missing", "'Amendment 8' in doc, 'Amendment 8 missing") + r"""
 CH = f'{DRIVE}/chexthought'
 READS, LABELS = f'{CH}/stats/reads.jsonl', f'{CH}/chexpert_labels_impression.json'
 for need in (READS, LABELS):
@@ -6330,6 +6333,9 @@ CXT_TRAIN, CXT_TEST = f'{CXT}/views_train.jsonl', f'{CXT}/views_test.jsonl'
 REPLAY = f'{DRIVE}/external/vqa_train/views_vqa_train.jsonl'
 S3 = f'@S3@'
 V43 = f'{ADAPTERS}/v43cxt_s3'
+if not os.path.exists(f'{V43}/final/adapter_config.json') and GPU_GB < 35:
+    raise SystemExit(f'Steps 1-3 are done and saved. Training needs an A100 (this GPU has {round(GPU_GB)} GB): '
+                     'Runtime > Change runtime type > A100, then Run all; the films are not downloaded again.')
 if not os.path.exists(f'{V43}/final/adapter_config.json'):
     sh(f'python scripts/train_sft.py --model {BASE} --init {S2} {S3} --extra-views {SIIM_TRAIN} {CXT_TRAIN} --out {V43}')
 V43 = f'{V43}/final'
