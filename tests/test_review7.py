@@ -274,3 +274,23 @@ class CheXthoughtR23(unittest.TestCase):
         self.assertIn("| m | 10 | 60.0% | 3 | 10 | 80.0% | 0.400 [", text)
         self.assertIn("| same | 10 | 60.0% | 3 | 10 | 80.0% | 0.400 [", text)
         self.assertIn("+0.000 [+0.000, +0.000], p = 1.000 | +0.000 [+0.000, +0.000], p = 1.000 | +0.000 [+0.000, +0.000] |", text)
+
+
+class CheXthoughtCLI(unittest.TestCase):
+    def test_build_views_runs_from_the_command_line(self):
+        import json
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            reads = [{"image_id": f"patient{i:05d}_study1_view1_frontal", "finding": "pneumothorax",
+                      "status": "positive" if i % 2 else "negative", "points": [[0.6, 0.2]] if i % 2 else []}
+                     for i in range(40)]
+            (d / "reads.jsonl").write_text("".join(json.dumps(r) + "\n" for r in reads))
+            (d / "labels.json").write_text("\n".join(json.dumps({
+                "path_to_image": f"train/patient{i:05d}/study1/view1_frontal.jpg",
+                "Pneumothorax": 1.0 if i % 2 else None}) for i in range(40)))
+            r = subprocess.run([sys.executable, str(ROOT / "scripts" / "chexthought.py"), "build-views", "--reads",
+                                str(d / "reads.jsonl"), "--labels", str(d / "labels.json"), "--out", str(d / "out")],
+                               capture_output=True, text=True, cwd=ROOT)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertTrue((d / "out" / "selection.json").exists())

@@ -222,9 +222,6 @@ def main() -> None:
     print(text)
 
 
-if __name__ == "__main__":
-    main()
-
 
 # ---------------------------------------------------------------------------------------------------------------
 # R23 (Amendment 8): pneumothorax views from CheXthought, and scoring a run on them
@@ -410,3 +407,7 @@ def cli_extra(argv: list[str]) -> bool:
         Path(a.out).write_text(text)
         print(text)
     return True
+
+
+if __name__ == "__main__":
+    main()
