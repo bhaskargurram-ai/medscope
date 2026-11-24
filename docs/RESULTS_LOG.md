@@ -1993,3 +1993,34 @@ no metric different (ESG -0.005, p 0.946).
 (+0.180 [+0.065, +0.302], p 0.004). By source, the rise is in SIIM pneumothorax: erased claims 46% (v4.2 10%, v4 0%),
 lesion images correct 51% (22%, 0%). v4.3 finds more pneumothoraces and also says "present" on more films whose
 pneumothorax was erased.
+
+## 2026-11-24 — R17 complete: counterfactual views x natural pairs (notebook 55c; Amendment 7): NOT SHOWN
+
+RESULTS/55c_counterfactual_views_x_natural_pairs_(r17)_report.md (21:26 UTC). Four stage-1 arms (seed 0); the two
+arms with natural pairs are cross-validated over colonoscopy videos (three folds), 103 natural pairs.
+
+**Primary (Amendment 7): CF-and-natural minus natural-only, natural ESG: -0.058 [-0.168, +0.042], p 0.311.**
+Interval includes zero: counterfactual views add nothing shown on unedited frames beyond natural pairs.
+
+| Arm / model | Lesion found | Lesion-free: absent or refers | Natural ESG [95% CI] | Correct box (IoU >= 0.3) |
+| --- | --- | --- | --- | --- |
+| CF-and-natural | 62.1% | 88.3% | 0.505 [0.369, 0.629] | 48/103 |
+| natural-only | 68.9% | 87.4% | 0.563 [0.444, 0.676] | 57/103 |
+| CF-only | 35.9% | 86.4% | 0.223 [0.133, 0.309] | 33/103 |
+| neither | 52.4% | 68.9% | 0.214 [0.079, 0.343] | 43/103 |
+| gemini-4-argon | 68.0% | 78.6% | 0.466 | 52/103 |
+| claude-opus-5-5 | 70.9% | 73.8% | 0.447 | 50/103 |
+| gpt-6-astra | 64.1% | 68.0% | 0.320 | 41/103 |
+
+Natural pairs raise natural ESG: natural-only minus neither +0.350 [+0.227, +0.474]; CF-and-natural minus CF-only
++0.282 [+0.156, +0.405] (both p < 0.001). CF-and-natural vs flagships: gemini +0.039 (p 0.635), opus +0.058
+(p 0.409), astra +0.184 [+0.047, +0.321] (p 0.014). Polyp claimed on polyp-free frames: CF-and-natural 12/103,
+natural-only 13, CF-only 3, neither 27. By fold, CF-and-natural 0.63 / 0.40 / 0.47; natural-only 0.58 / 0.51 / 0.60.
+
+**Main test (507), fold-0 models, paired:** CF-and-natural ESG 0.744 vs natural-only 0.260 (+0.484 [+0.408, +0.558])
+and vs v4q_cf_s0 0.735 (+0.009, p 0.777); erased claims 13.7% vs 68.0% (natural-only) and 11.9% (v4q_cf_s0, n.s.);
+lesion-free claims 16.3% vs 9.4% for v4q_cf_s0 (+0.069 [+0.030, +0.111], p 0.001); net utility 0.684 vs 0.343
+(natural-only) and 0.692 (v4q_cf_s0, n.s.).
+
+**Reading:** the pre-registered primary is not shown. Natural pairs drive natural ESG; counterfactual views drive
+main-test ESG; only the arm with both does well on both tests, at the cost of more lesion-free claims on the main test.
