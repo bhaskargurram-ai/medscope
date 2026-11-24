@@ -1908,3 +1908,25 @@ First reading (not the R12 test): ESG and erased-lesion claims reproduce within 
 on the main test are higher for seed 1 (17.0% against 7.6%), as at stage 1 in November (8.7% against 16.3% by seed).
 The R12 rule (each seed's main-test ESG above each flagship, paired interval above zero) is computed at the end of
 notebook 53b, after seed 2. Seed 2 stage 1 started 14:07 ET.
+
+## 2026-11-24 — R23 CheXthought pneumothorax (notebook 59; Amendment 8): first results, before the paired report
+
+v4.3-cxt = v4.2 stage 3 with the CheXthought pneumothorax views added (adapter `v43cxt_s3/final`, 20:47 ET on 23 Nov).
+Guard on validation (fixed in Amendment 8): v4.3 net utility 0.628 and lesion-free claims 9.5% (RESULTS/r23_v43_val);
+v4.2 0.632 and 9.1% (2026-11-16 entry); limits 0.612 and 11.1%: within both (the notebook re-scored v4.2 as
+r23_v42_val and went on to the tests).
+
+| Set (cases) | Model | CCR | ESG [95% CI] | Erased-lesion claims | Lesion-free claims | Net utility |
+| --- | --- | --- | --- | --- | --- | --- |
+| New SIIM patients (200) | v4.3-cxt | 0.690 | 0.380 [0.278, 0.476] | 31.0% | 7.0% | 0.145 |
+| New SIIM patients (200) | v4.2 | 0.540 | 0.360 | 19.0% | 5.0% | -0.096 |
+| CheXthought test (300 + 300) | v4.3-cxt | 0.807 | -- | -- | 15.7% | 0.333 |
+| Main test (507) | v4.3-cxt | 0.840 | 0.753 [0.692, 0.811] | 7.3% | 7.6% | 0.725 |
+| Main test (507) | v4.2 | 0.856 | 0.740 | 11.0% | 9.0% | 0.714 |
+| Fresh external (316) | v4.3-cxt | 0.583 | 0.381 [0.298, 0.461] | 20.2% | 5.4% | 0.127 |
+| Fresh external (316) | v4.2 | 0.536 | 0.417 | 11.3% | 6.8% | 0.048 |
+
+(RESULTS/r23_v43_siimte, r23_v43_cxt, r23_v43_test, r23_v43_ext2, summary.json; v4.2 rows from the 2026-11-16 and
+later v4.2 entries.) On the new SIIM patients v4.3 finds pneumothorax on 69 of 100 originals against 54 for v4.2, with
+lesion-free claims 7.0% against 5.0%; it also claims more erased pneumothoraces (31.0% against 19.0%). The paired
+intervals and the R23 reading come from `chexthought.py score-test` at the end of notebook 59.
