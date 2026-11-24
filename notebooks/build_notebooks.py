@@ -5645,7 +5645,7 @@ GPU_GB = torch.cuda.get_device_properties(0).total_memory / 2 ** 30 if torch.cud
 print(torch.cuda.get_device_name(0) if GPU_GB else 'no GPU', f'({round(GPU_GB)} GB)')
 if GPU_GB < @MIN_GB@:
     raise SystemExit('This GPU is too small. Runtime > Change runtime type > @GPU_NAME@, then run all again.')
-PAR = 2 if GPU_GB >= 70 else 1
+PAR = 4 if GPU_GB >= 90 else 2 if GPU_GB >= 70 else 1      # jobs at a time: a 96 GB G4 holds four (about 12-18 GB each)
 BATCH = 24 if GPU_GB >= 38 else 8
 def run_par(cmds):
     if PAR == 1 or len(cmds) <= 1:
@@ -5860,13 +5860,13 @@ for k in FOLDS:
 """.replace('@CONT@', cont)),
         md("## 3. The natural pairs, each answered by a model that never saw its video; the main test for fold 0"),
         code(r"""
-for k in FOLDS:
-    for arm in ('nocf', 'cf'):
-        sh(f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/r17_{arm}_np_f{k}/final --views {CT}/views_test_fold{k}.jsonl '
-           f'--out {RESULTS}/np_r17{arm}_f{k}_colon --name r17-{arm}-fold{k} --split natural_colon_fold{k} --batch-size {BATCH}')
-for arm in ('nocf', 'cf'):
-    sh(f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/r17_{arm}_np_f0/final --views {TEST_VIEWS} {TEST_NEG} '
-       f'--out {RESULTS}/r17_{arm}_np_f0_test --name r17-{arm}-fold0 --split test --batch-size {BATCH}')
+cmds = [f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/r17_{arm}_np_f{k}/final --views {CT}/views_test_fold{k}.jsonl '
+        f'--out {RESULTS}/np_r17{arm}_f{k}_colon --name r17-{arm}-fold{k} --split natural_colon_fold{k} --batch-size {BATCH}'
+        for k in FOLDS for arm in ('nocf', 'cf') if not os.path.exists(f'{RESULTS}/np_r17{arm}_f{k}_colon/summary.json')]
+cmds += [f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/r17_{arm}_np_f0/final --views {TEST_VIEWS} {TEST_NEG} '
+         f'--out {RESULTS}/r17_{arm}_np_f0_test --name r17-{arm}-fold0 --split test --batch-size {BATCH}'
+         for arm in ('nocf', 'cf') if not os.path.exists(f'{RESULTS}/r17_{arm}_np_f0_test/summary.json')]
+run_par(cmds)
 C = '+'.join(f'{RESULTS}/np_r17nocf_f{k}_colon' for k in FOLDS)
 D = '+'.join(f'{RESULTS}/np_r17cf_f{k}_colon' for k in FOLDS)
 ARMS = {'CF-and-natural': D, 'natural-only': C, 'CF-only': f'{RESULTS}/np_s1cf_colon', 'neither': f'{RESULTS}/np_s1nocf_colon'}
