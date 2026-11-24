@@ -1930,3 +1930,66 @@ r23_v42_val and went on to the tests).
 later v4.2 entries.) On the new SIIM patients v4.3 finds pneumothorax on 69 of 100 originals against 54 for v4.2, with
 lesion-free claims 7.0% against 5.0%; it also claims more erased pneumothoraces (31.0% against 19.0%). The paired
 intervals and the R23 reading come from `chexthought.py score-test` at the end of notebook 59.
+
+## 2026-11-24 — R12 complete: training seeds 0, 1, 2 (notebook 53b; Amendment 5): HOLDS
+
+RESULTS/53_release_and_robustness_checks_report.md (07:17 UTC).
+
+| Set | Metric | Seed 0 (MedScope-4B) | Seed 1 | Seed 2 | Mean (sd) |
+| --- | --- | --- | --- | --- | --- |
+| Main test (507) | CCR | 0.849 | 0.861 | 0.840 | 0.850 (0.010) |
+| Main test (507) | ESG | 0.758 | 0.744 | 0.731 | 0.744 (0.014) |
+| Main test (507) | Erased claims | 9.6% | 11.4% | 10.5% | 10.5% (0.9) |
+| Main test (507) | Lesion-free claims | 7.6% | 17.0% | 9.0% | 11.2% (5.1) |
+| Main test (507) | Net utility | 0.732 | 0.672 | 0.698 | 0.701 (0.030) |
+| External centres (169) | ESG | 0.597 | 0.605 | 0.605 | 0.602 (0.005) |
+| External centres (169) | Net utility | 0.530 | 0.542 | 0.500 | 0.524 (0.022) |
+| Fresh internal (76) | ESG | 0.472 | 0.472 | 0.361 | 0.435 (0.064) |
+| Fresh internal (76) | Net utility | 0.402 | 0.386 | 0.283 | 0.357 (0.065) |
+| Fresh external (316) | ESG | 0.393 | 0.333 | 0.375 | 0.367 (0.031) |
+| Fresh external (316) | Net utility | -0.053 | -0.099 | -0.045 | -0.066 (0.029) |
+
+Main-test ESG minus flagship, paired [95% CI]: seed 1 vs gemini-4-argon +0.274 [+0.190, +0.359], claude-opus-5-5
++0.416 [+0.333, +0.495], gpt-6-astra +0.438 [+0.350, +0.526]; seed 2 +0.260 [+0.178, +0.341], +0.402 [+0.311, +0.484],
++0.425 [+0.332, +0.514] (all p < 0.001). Erased claims minus flagship: seed 1 -0.297 to -0.475, seed 2 -0.306 to
+-0.484 (all p < 0.001). Net utility: seed 1 +0.107 to +0.363, seed 2 +0.134 to +0.390 (p <= 0.015). Lesion-free claims:
+seed 1 higher than gemini-4-argon (+0.080 [+0.034, +0.130], p 0.002) and lower than opus and astra; seed 2 equal to
+gemini-4-argon (0.090 each) and lower than opus and astra (p < 0.001).
+
+**Reading (rule of Amendment 5): HOLDS.** Every seed's main-test ESG is above each of the three flagships with the
+paired interval above zero. Lesion-free claims vary with the seed (7.6% to 17.0%) and are reported as mean (sd).
+
+## 2026-11-24 — R23 complete: CheXthought pneumothorax (notebook 59; Amendment 8): RAISED
+
+RESULTS/59_chexthought_pneumothorax_coverage_(r23)_report.md (08:29 UTC); 1,500 + 1,500 CheXthought training films,
+300 + 300 test films. Guard as re-scored in the notebook: validation net utility 0.628 (v4.2 0.631; limit >= 0.611),
+lesion-free claims 9.5% (v4.2 8.6%; limit <= 10.6%): PASSED.
+
+**Primary, new SIIM patients (100 + 100):** pneumothorax called present v4.3-cxt 69/100 (49 with a correct box),
+v4.2 53/100 (33), MedScope-4B 0/100; difference vs v4.2 +0.160 [+0.070, +0.260], p 0.002; healthy films called
+positive 7/100 vs 5/100 (+0.020 [-0.020, +0.060]). Youden 0.620 [0.510, 0.730] vs 0.480 (+0.140 [+0.040, +0.250],
+p 0.010). **Rule (Amendment 8): RAISED.**
+
+**CheXthought test patients (300 + 300), secondary:**
+
+| Model | Pneumothorax called present | With a correct box | Healthy: absent or referred | Youden [95% CI] | v4.3-cxt minus model [95% CI] |
+| --- | --- | --- | --- | --- | --- |
+| v4.3-cxt | 80.7% | 61 | 84.3% | 0.650 [0.582, 0.716] | -- |
+| v4.2 | 35.7% | 38 | 93.0% | 0.287 | +0.363 [+0.264, +0.460] |
+| MedScope-4B | 0.0% | 0 | 100.0% | 0.000 | +0.650 [+0.503, +0.812] |
+| Qwen3.5-4B | 6.3% | 7 | 85.7% | -0.080 | +0.730 [+0.598, +0.865] |
+| gemini-4-argon | 62.0% | 82 | 84.0% | 0.460 | +0.190 [+0.108, +0.272] |
+| claude-opus-5-5 | 37.0% | 21 | 83.7% | 0.207 | +0.443 [+0.322, +0.551] |
+| gpt-6-astra | 41.0% | 35 | 96.7% | 0.377 | +0.273 [+0.176, +0.374] |
+
+All p < 0.001. Correct box: IoU >= 0.3 against the radiologists' click box.
+
+**Main test, v4.3-cxt vs v4.2:** ESG 0.753 vs 0.740 (+0.014 [-0.037, +0.064]); erased claims 7.3% vs 11.0% (-0.037
+[-0.071, -0.004], p 0.039); lesion-free claims 7.6% vs 9.0% (n.s.); net utility 0.725 vs 0.714 (n.s.). vs MedScope-4B:
+no metric different (ESG -0.005, p 0.946).
+
+**Fresh external (316), the cost:** erased claims 20.2% vs 11.3% for v4.2 (+0.089 [+0.037, +0.143], p < 0.001) and
+8.3% for MedScope-4B; ESG 0.381 vs 0.417 (n.s.); net utility 0.127 vs 0.048 (n.s.) and vs -0.053 for MedScope-4B
+(+0.180 [+0.065, +0.302], p 0.004). By source, the rise is in SIIM pneumothorax: erased claims 46% (v4.2 10%, v4 0%),
+lesion images correct 51% (22%, 0%). v4.3 finds more pneumothoraces and also says "present" on more films whose
+pneumothorax was erased.
