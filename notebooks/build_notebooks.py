@@ -5941,28 +5941,34 @@ assert os.path.exists(f'{RESULTS}/np_v5f0_colon/summary.json'), 'the fold-0 run 
 REPLAY = f'{DRIVE}/external/vqa_train/views_vqa_train.jsonl'
 S3 = f'@S3@'
 L1 = f'{ADAPTERS}/r21_lookfirst_f0'
+cmds = []
 if not os.path.exists(f'{L1}/final/adapter_config.json'):
-    sh(f'python scripts/train_sft.py --model {BASE} --init {S2} {S3} --look-first 0.8 --extra-views {SIIM_TRAIN} {CT}/views_train_fold0.jsonl --out {L1}')
+    cmds.append(f'python scripts/train_sft.py --model {BASE} --init {S2} {S3} --look-first 0.8 --extra-views {SIIM_TRAIN} {CT}/views_train_fold0.jsonl --out {L1}')
 """.replace('@S3@', s3)),
-        md("## 3. L2 and L0: GRPO from the fold-0 v5 model, with and without the process reward (settings of pilot 39b)"),
+        md("## 3. L2 and L0: GRPO from the fold-0 v5 model, with and without the process reward (settings of pilot 39b); the three trainings of sections 2-3 run side by side (two at a time on 70 GB and up, four on 90 GB and up)"),
         code(r"""
 DRAW = 12 if GPU_GB >= 70 else 4
 for name, extra in (('r21_grpo_look_f0', '--look-bonus'), ('r21_grpo_plain_f0', '')):
     out = f'{ADAPTERS}/{name}'
     if not os.path.exists(f'{out}/final/adapter_config.json'):
-        sh(f'python scripts/train_grpo.py --model {BASE} --init {V5F0} --views {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl {CT}/views_train_fold0.jsonl '
-           f'--negatives {TRAIN_NEG_V4} --negative-share 0.2 --exclude-prefix lgg --steps 150 --views-per-step 4 --max-draws 12 '
-           f'--draw-batch {DRAW} --group-size 4 --lr 1e-5 --beta 0.05 --seed 0 --save-every 10 {extra} --out {out}')
+        cmds.append(f'python scripts/train_grpo.py --model {BASE} --init {V5F0} --views {TRAIN_V4_BASE} {V4}/train_tp/views.jsonl {CT}/views_train_fold0.jsonl '
+                    f'--negatives {TRAIN_NEG_V4} --negative-share 0.2 --exclude-prefix lgg --steps 150 --views-per-step 4 --max-draws 12 '
+                    f'--draw-batch {DRAW} --group-size 4 --lr 1e-5 --beta 0.05 --seed 0 --save-every 10 {extra} --out {out}')
+run_par(cmds)
+for name in ('r21_lookfirst_f0', 'r21_grpo_look_f0', 'r21_grpo_plain_f0'):
+    assert os.path.exists(f'{ADAPTERS}/{name}/final/adapter_config.json'), f'{name} did not finish: run all again'
 """),
         md("## 4. Fold 0's 38 natural pairs and the validation guard; the go signal of Amendment 7"),
         code(r"""
 ARMS = [('L1 look-first training', 'r21_lookfirst_f0', 'l1'), ('L2 GRPO + process reward', 'r21_grpo_look_f0', 'l2'),
         ('L0 GRPO, usual reward', 'r21_grpo_plain_f0', 'l0')]
-for _, adapter, tg in ARMS:
-    sh(f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/{adapter}/final --views {CT}/views_test_fold0.jsonl '
-       f'--out {RESULTS}/np_r21{tg}_f0_colon --name r21-{tg}-fold0 --split natural_colon_fold0 --batch-size {BATCH}')
-for tg, adapter in [('v5f0', V5F0)] + [(t, f'{ADAPTERS}/{a}/final') for _, a, t in ARMS]:
-    sh(f'python scripts/evaluate.py --model {BASE} --adapter {adapter} --views {VAL_V4} {VAL_NEG_V4} --out {RESULTS}/r21_{tg}_val --name r21-{tg} --split validation --batch-size {BATCH}')
+cmds = [f'python scripts/evaluate.py --model {BASE} --adapter {ADAPTERS}/{adapter}/final --views {CT}/views_test_fold0.jsonl '
+        f'--out {RESULTS}/np_r21{tg}_f0_colon --name r21-{tg}-fold0 --split natural_colon_fold0 --batch-size {BATCH}'
+        for _, adapter, tg in ARMS if not os.path.exists(f'{RESULTS}/np_r21{tg}_f0_colon/summary.json')]
+cmds += [f'python scripts/evaluate.py --model {BASE} --adapter {adapter} --views {VAL_V4} {VAL_NEG_V4} --out {RESULTS}/r21_{tg}_val --name r21-{tg} --split validation --batch-size {BATCH}'
+         for tg, adapter in [('v5f0', V5F0)] + [(t, f'{ADAPTERS}/{a}/final') for _, a, t in ARMS]
+         if not os.path.exists(f'{RESULTS}/r21_{tg}_val/summary.json')]
+run_par(cmds)
 import sys
 sys.path.insert(0, '/content/medscope/scripts')
 from pathlib import Path
