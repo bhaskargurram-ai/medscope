@@ -2024,3 +2024,21 @@ lesion-free claims 16.3% vs 9.4% for v4q_cf_s0 (+0.069 [+0.030, +0.111], p 0.001
 
 **Reading:** the pre-registered primary is not shown. Natural pairs drive natural ESG; counterfactual views drive
 main-test ESG; only the arm with both does well on both tests, at the cost of more lesion-free claims on the main test.
+
+## 2026-11-25 — R21 pilot complete: rewarding the look (notebook 56; Amendment 7 go signal): NO GO
+
+RESULTS/56_rewarding_the_look_(r21,_pilot)_report.md (01:24 UTC). One seed, fold 0, 38 natural pairs from videos no
+arm saw, against the fold-0 v5 model. Suggestion by Sonali Sharma.
+
+| Model | Natural ESG | Polyp not denied | Polyp-free absent or referred | Correct box | Polyp frames inspected | Val. net utility | Val. lesion-free claims |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| v5 fold-0 (reference) | 0.632 | 71.1% | 92.1% | 21 | 27 | 0.626 | 11.4% |
+| L1 look-first training | 0.500 | 78.9% | 71.1% | 21 | 38 | 0.560 | 25.5% |
+| L2 GRPO + process reward | 0.263 | 84.2% | 42.1% | 20 | 38 | 0.564 | 10.0% |
+| L0 GRPO, usual reward | 0.579 | 63.2% | 94.7% | 20 | 24 | 0.630 | 7.3% |
+
+L1: NO GO (natural ESG -0.132, correct boxes +0). L2: NO GO (natural ESG -0.368 vs v5, -0.316 vs L0; correct boxes -1).
+
+**Reading:** rewarding inspection made the models inspect every polyp frame (38/38) but not find or locate more
+polyps; both look arms said "present" more often on polyp-free frames (L2: 42.1% absent or referred, vs 92.1% for v5).
+The GRPO control is close to v5. One seed, 38 pairs: a pilot; not carried forward.
