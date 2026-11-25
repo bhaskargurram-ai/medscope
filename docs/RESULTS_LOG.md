@@ -2095,3 +2095,25 @@ runtime calls are replaced. The Colab folders are recreated on the pod's volume 
 checkpoints, results and a log (`runpod/notebook60.log`) are copied back every 15 minutes and at the end. Checked
 here only against stand-ins (the Drive cell against a stand-in rclone; the queue, readings and report cells on
 made-up decisions); not yet run on a pod.
+
+## 2026-11-25 — R24 result: MedScope-4B-v6 is the plain mix; guard PASSED (notebook 60; Amendment 9; validation only)
+
+`adapters/v6_choice.json` (22:48 UTC). Validation images only; no test result of v6 exists yet.
+
+**Choice.** Net utility over the main validation views (1,473 views, 540 cases) and the SIIM validation patients
+(242 views, 98 cases) together: plain 0.547, kept 0.452. Rule (kept, unless plain is higher by more than 0.005):
+**plain**. **Guard on the main validation views: PASSED** (net utility 0.642, v4 0.613, limit >= 0.593; lesion-free
+claims 9.1%, v4 7.7%, limit <= 9.7%).
+
+| Validation set | Mix | Net utility | ESG | Lesion images correct (CCR) | Erased claims | Control edit denied | Lesion-free claims |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Main (540 cases) | plain | 0.642 [0.556, 0.721] | 0.706 | 0.819 | 10.6% | 18.8% | 9.1% |
+| Main (540 cases) | kept | 0.621 [0.533, 0.704] | 0.716 | 0.792 | 7.5% | 20.9% | 10.0% |
+| SIIM patients (98 cases) | plain | -0.031 [-0.313, 0.272] | 0.292 | 0.604 | 31.3% | 39.6% | 8.0% |
+| SIIM patients (98 cases) | kept | -0.576 [-0.851, -0.267] | 0.167 | 0.302 | 14.6% | 68.8% | 8.0% |
+
+**Reading.** Keeping the erased-lesion views at their v4.2 share (28.3% of stage-3 views against 9.9%) lowers
+erased-lesion claims on both validation sets (10.6% to 7.5%; 31.3% to 14.6%), but on the SIIM validation patients it
+halves the pneumothoraces found (60.4% to 30.2%) and raises denials of control-edited films (39.6% to 68.8%): the
+model says "absent" more, not more selectively. The plain mix is MedScope-4B-v6; seeds 1 and 2 and the fold models are
+trained with it. The kept mix is run on the main test, the fresh external set and the new SIIM patients as planned.
