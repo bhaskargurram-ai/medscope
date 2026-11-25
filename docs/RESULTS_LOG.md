@@ -2042,3 +2042,22 @@ L1: NO GO (natural ESG -0.132, correct boxes +0). L2: NO GO (natural ESG -0.368 
 **Reading:** rewarding inspection made the models inspect every polyp frame (38/38) but not find or locate more
 polyps; both look arms said "present" more often on polyp-free frames (L2: 42.1% absent or referred, vs 92.1% for v5).
 The GRPO control is close to v5. One seed, 38 pairs: a pilot; not carried forward.
+
+## 2026-11-24 — Amendment 9 pre-registered (R24-R27), code and notebook 60 (no results yet)
+
+Committed at 21:35 ET (a3629e0), before any LDPolypVideo file was downloaded or any v6 model trained. One model,
+MedScope-4B-v6, takes the place of v4.2, v4.3-cxt and v5 in the follow-up results: v4.2's three stages with the
+REAL-Colon natural frames and the CheXthought films added to stage 3 together.
+
+- **R24** two stage-3 mixes (plain; erased-lesion views kept at their v4.2 share), one chosen on validation images
+  only; the R8 guard.
+- **R25** the whole recipe with seeds 1 and 2; the rule of Amendment 5; a three-seed vote from stored decisions.
+- **R26** natural pairs from LDPolypVideo (160 clips, a hospital no model here has seen; takes the place of R18b):
+  v6 against the three flagships by the rule of Amendments 4 and 6; at least 40 pairs for a confirmatory reading.
+- **R27** v6 on every earlier test: cross-validated REAL-Colon pairs, new SIIM patients (rule of Amendment 8),
+  CheXthought test patients, main test (trade rule), fresh external (erased-lesion claims against v4.2), R13 and R20.
+
+Code: `scripts/train_sft.py` (`--min-erased-share`, `--mix-only`), `scripts/natural_pairs.py ldpolyp-build`,
+`scripts/seed_vote.py`, `scripts/release_v5.py` (v6 runs and reports added to the release patterns); 10 new tests
+(255 pass). Notebook: 60 (`60_final_model_v6.ipynb`). Its selection, vote, reading and report cells were run once on
+made-up decisions to check that they execute; no real result exists. MedScope-4B (v4) stays the pre-registered model.
