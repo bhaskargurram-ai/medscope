@@ -6480,8 +6480,8 @@ One model in place of the three follow-up versions (v4.2, v4.3-cxt, v5), with it
 MedScope-4B (v4) stays the pre-registered model of the main comparison. Every result is reported, whatever it shows.
 
 **Needs:** notebooks 51, 54a, 54b and 59 done. An A100 40 GB (about 45-50 hours, one job at a time), an A100 80 GB
-(about 25 hours) or a G4 96 GB (about 15 hours, four jobs at a time). Every step resumes: after a disconnect, Run all
-again. Secrets: `HF_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (about $15 of API calls, on the new
+(about 25 hours), an H100 (three jobs at a time; not timed yet, expected to be the fastest) or a G4 96 GB (about 15
+hours, four jobs at a time). Every step resumes: after a disconnect, Run all again. Secrets: `HF_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (about $15 of API calls, on the new
 colonoscopy frames only), Kaggle as for notebook 51; the SIIM-ACR `archive.zip` in `MyDrive/medscope/siim/`.
 
 **LDPolypVideo:** the notebook downloads `TrainValid.rar` and `Test.rar` itself. If Google Drive refuses (it limits
@@ -6492,6 +6492,9 @@ popular files), it stops in step 1 and tells you which two files to put in `MyDr
         code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
         code(r7_config(35, 'A100 (or G4)').replace("'Amendment 7' in doc, 'Amendment 7 missing", "'Amendment 9' in doc, 'Amendment 9 missing") + r"""
 import glob, re, sys
+if GPU_GB and 'H100' in torch.cuda.get_device_name(0) and PAR < 3:
+    PAR = 3                              # an 80 GB H100 is fast enough to keep three jobs busy (about 12-18 GB each)
+    print('H100: three jobs at a time')
 sys.path.insert(0, '/content/medscope/scripts')
 from natural_pairs import cluster_boot, natural_esg_rows, pooled_rows
 from medscope.eval.runner import scored_rows
