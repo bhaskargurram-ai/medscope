@@ -20,6 +20,9 @@ the pair id in meta["pair"], the video or patient as patient_id), so scripts/eva
     # Amendment 6 (v5): training frames from every REAL-Colon video, three folds, context frames for the R9 pairs
     python scripts/natural_pairs.py colon-train --r9 DIR --out TRAIN_DIR
     python scripts/natural_pairs.py score --views V.jsonl --runs v5cv=FOLD0+FOLD1+FOLD2 ... --ref v5cv --boxes --out R.md
+    # Amendment 9 (R26): natural pairs from LDPolypVideo, a hospital no model here has seen (TrainValid/ and Test/
+    # unpacked under SRC, each with Images/<video>/<frame>.jpg and Annotations/<video>/<frame>.txt)
+    python scripts/natural_pairs.py ldpolyp-build --src SRC --out DIR
 """
 
 from __future__ import annotations
@@ -846,6 +849,196 @@ def dedup(views_file: Path, against: list[str], max_distance: int = 4, min_corre
     print(f"{views_file.name}: {len(bad)} pairs dropped as near-copies of earlier images, {len(keep) // 2} kept")
 
 
+# ---------------------------------------------------------------------------------------------- LDPolypVideo (R26)
+# Amendment 9, fixed before any LDPolypVideo file was downloaded. The clips are short and come without a frame rate,
+# so the rules of Amendment 4 are written in frames, and every frame's own label (polyp / no polyp) is used.
+
+LD_GAP = 5                 # polyp runs separated by at most this many frames are one track
+LD_MIN_TRACK = 10          # shorter tracks are skipped (frames)
+LD_CLEAR = 5               # the lesion-free frame is at least this many frames from any frame not marked polyp-free
+LD_MIN_PAIRS = 40          # fewer pairs than this: the test is reported as descriptive only
+
+
+def parse_ld(text: str) -> tuple[Optional[bool], list[tuple[float, float, float, float]]]:
+    """One LDPolypVideo annotation file: the first line is the number of polyps (0 = none), then four numbers per
+    polyp. Returns (polyp present?, raw boxes); (None, []) when the file cannot be read as that."""
+    rows = [[float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", line)] for line in text.splitlines()]
+    rows = [r for r in rows if r]
+    if not rows:
+        return None, []
+    if len(rows[0]) == 1:
+        n = int(rows[0][0])
+        nums = [x for r in rows[1:] for x in r]
+        if n == 0:
+            return False, []
+    elif len(rows[0]) >= 4:      # no count line: every line is a box
+        n, nums = len(rows), [x for r in rows for x in r[-4:]]
+    else:
+        return None, []
+    boxes = [tuple(nums[i:i + 4]) for i in range(0, len(nums) - 3, 4)][:max(n, 0)]
+    return True, boxes
+
+
+def ld_box_format(boxes: list[tuple], sizes: list[tuple[int, int]]) -> str:
+    """How the four numbers are to be read: 'corners' (x1 y1 x2 y2), 'xywh' (x y width height), 'yolo' (centre and
+    size as shares of the image) or 'unknown'. Decided on all boxes at once (pure)."""
+    if not boxes:
+        return "unknown"
+    b = np.array(boxes, float)
+    wh = np.array(sizes, float)
+    if b.max() <= 1.0 and b.min() >= 0:
+        return "yolo"
+    corners = (b[:, 2] > b[:, 0]) & (b[:, 3] > b[:, 1]) & (b[:, 2] <= wh[:, 0] + 1) & (b[:, 3] <= wh[:, 1] + 1)
+    if corners.mean() >= 0.995:      # a width is not larger than x for every one of thousands of boxes by chance
+        return "corners"
+    xywh = (b[:, 2] > 0) & (b[:, 3] > 0) & (b[:, 0] + b[:, 2] <= wh[:, 0] + 1) & (b[:, 1] + b[:, 3] <= wh[:, 1] + 1)
+    return "xywh" if xywh.mean() >= 0.99 else "unknown"
+
+
+def ld_corners(box: tuple, size: tuple[int, int], fmt: str) -> Optional[tuple[float, float, float, float]]:
+    x, y, a, b = box
+    w, h = size
+    if fmt == "corners":
+        out = (x, y, a, b)
+    elif fmt == "xywh":
+        out = (x, y, x + a, y + b)
+    elif fmt == "yolo":
+        out = ((x - a / 2) * w, (y - b / 2) * h, (x + a / 2) * w, (y + b / 2) * h)
+    else:
+        return None
+    x1, y1, x2, y2 = max(0.0, out[0]), max(0.0, out[1]), min(float(w), out[2]), min(float(h), out[3])
+    return (x1, y1, x2, y2) if x2 > x1 and y2 > y1 else None
+
+
+def select_ld_video(polyp: dict[int, Optional[bool]], boxes: Optional[dict[int, list]], size: tuple[int, int]):
+    """Candidate lesion and lesion-free frames of one clip, or the reason there is no pair (pure, testable).
+    polyp: frame -> True / False / None (label unreadable); boxes: frame -> corner boxes, or None when the box format
+    of the dataset could not be established (the size rule is then not applied)."""
+    frames = sorted(polyp)
+    pos = [f for f in frames if polyp[f]]
+    if not pos:
+        return "no polyp frame"
+    runs, start, prev = [], pos[0], pos[0]
+    for f in pos[1:]:
+        if f - prev > LD_GAP:
+            runs.append((start, prev))
+            start = f
+        prev = f
+    runs.append((start, prev))
+    runs = [(a, b) for a, b in runs if b - a + 1 >= LD_MIN_TRACK]
+    if not runs:
+        return "no track long enough"
+    a, b = sorted(runs, key=lambda t: (-(t[1] - t[0]), t[0]))[0]
+    q1, q3 = a + (b - a) // 4, b - (b - a) // 4
+    w, h = size
+
+    def big_enough(f: int) -> bool:
+        if boxes is None:
+            return True
+        area = max(((x2 - x1) * (y2 - y1) for x1, y1, x2, y2 in boxes.get(f, [])), default=0)
+        return bool(w and h) and area / (w * h) >= MIN_BOX_FRAC
+    lesion = [f for f in frames if q1 <= f <= q3 and polyp[f] and big_enough(f)]
+    if not lesion:
+        return "no polyp frame with a large enough box"
+    busy = np.array([f for f in frames if polyp[f] is not False])       # polyp, or label unreadable
+
+    def clear(f: int) -> bool:
+        i = int(np.searchsorted(busy, f))
+        return all(abs(f - busy[j]) >= LD_CLEAR for j in (i - 1, i) if 0 <= j < len(busy))
+    free = [f for f in frames if polyp[f] is False and clear(f)]
+    if not free:
+        return "no polyp-free frame far enough from a polyp frame"
+    return {"track": [int(a), int(b)], "pos": even(lesion, N_CANDIDATES), "neg": even(free, N_CANDIDATES)}
+
+
+def ld_videos(src: Path) -> Iterator[tuple[str, str, dict[int, Path], dict[int, Path]]]:
+    """(split, video, frame -> image file, frame -> annotation file) for every clip under src."""
+    for ann_root in sorted(p for p in src.rglob("*") if p.is_dir() and p.name.lower() == "annotations"):
+        img_root = next((p for p in ann_root.parent.iterdir() if p.is_dir() and p.name.lower() == "images"), None)
+        if img_root is None:
+            continue
+        split = ann_root.parent.name
+        for vdir in sorted((d for d in ann_root.iterdir() if d.is_dir()), key=lambda d: (len(d.name), d.name)):
+            def numbered(folder: Path, exts: tuple) -> dict[int, Path]:
+                files = sorted(f for f in folder.iterdir() if f.suffix.lower() in exts) if folder.is_dir() else []
+                out = {}
+                for i, f in enumerate(files):
+                    m = re.findall(r"\d+", f.stem)
+                    out[int(m[-1]) if m else i] = f
+                return out
+            anns = numbered(vdir, (".txt",))
+            imgs = numbered(img_root / vdir.name, (".jpg", ".jpeg", ".png", ".bmp"))
+            if anns and imgs:
+                yield split, vdir.name, imgs, anns
+
+
+def ldpolyp_build(src: Path, out: Path) -> None:
+    clips, raw, sizes = [], [], []
+    stats = Counter()
+    for split, video, imgs, anns in ld_videos(src):
+        with Image.open(next(iter(imgs.values()))) as im:
+            size = im.size
+        polyp, rawb = {}, {}
+        for f, path in anns.items():
+            if f not in imgs:
+                continue
+            flag, bx = parse_ld(path.read_text(errors="ignore"))
+            polyp[f], rawb[f] = flag, bx
+            stats["frames"] += 1
+            stats["polyp frames" if flag else "polyp-free frames" if flag is False else "unreadable labels"] += 1
+            raw += bx
+            sizes += [size] * len(bx)
+        clips.append((split, video, imgs, polyp, rawb, size))
+    if not clips:
+        raise SystemExit(f"no clip found under {src}: expected <split>/Images/<video>/<frame>.jpg and "
+                         f"<split>/Annotations/<video>/<frame>.txt; found {[p.name for p in list(src.iterdir())[:10]]}")
+    if not stats["polyp frames"] or not stats["polyp-free frames"]:
+        sample = next(iter(next(iter(ld_videos(src)))[3].values()))
+        raise SystemExit(f"the labels could not be read ({dict(stats)}); one annotation file, {sample}:\n"
+                         f"{sample.read_text(errors='ignore')[:300]}")
+    fmt = ld_box_format(raw, sizes)
+    views, why = [], Counter()
+    for split, video, imgs, polyp, rawb, size in clips:
+        boxes = None if fmt == "unknown" else {
+            f: [c for c in (ld_corners(b, size, fmt) for b in bx) if c] for f, bx in rawb.items()}
+        sel = select_ld_video(polyp, boxes, size)
+        if isinstance(sel, str):
+            why[sel] += 1
+            continue
+
+        def best(cands):
+            scored = []
+            for f in cands:
+                img = np.asarray(Image.open(imgs[f]).convert("RGB"))
+                if usable(img):
+                    scored.append((sharpness(img), int(f), img))
+            return max(scored, key=lambda t: t[0]) if scored else None
+        pos, neg = best(sel["pos"]), best(sel["neg"])
+        if pos is None or neg is None:
+            why["no usable candidate frame"] += 1
+            continue
+        pid = "ldpolyp" + re.sub(r"[^0-9a-z]", "", f"{split}{video}".lower())
+        box = None
+        if boxes is not None and boxes.get(pos[1]):
+            big = max(boxes[pos[1]], key=lambda b: (b[2] - b[0]) * (b[3] - b[1]))
+            box = norm_box(big, *size)
+        pp = save(pos[2], out / "images" / f"{pid}.png")
+        npth = save(neg[2], out / "images" / f"{pid}neg.png")
+        views += pair_views(pid, f"ldpolyp_{split}_{video}", "natural_ldpolyp", "endoscopy", COLON_Q, pp, npth, box,
+                            False, {"video": video, "split": split, "frames": [pos[1], neg[1]],
+                                    "frames_apart": abs(pos[1] - neg[1]), "track": sel["track"]})
+        why["pairs"] += 1
+    write_views(views, out / "views_natural_ldpolyp.jsonl")
+    report = (f"LDPolypVideo natural pairs: {why['pairs']} pairs from {len(clips)} clips; {dict(stats)}; box format: "
+              f"{fmt}; clips without a pair: { {k: v for k, v in why.items() if k != 'pairs'} }; confirmatory reading "
+              f"needs at least {LD_MIN_PAIRS} pairs: {'yes' if why['pairs'] >= LD_MIN_PAIRS else 'NO (descriptive only)'}")
+    (out / "report_ldpolyp.txt").write_text(report + "\n")
+    (out / "report_ldpolyp.json").write_text(json.dumps({"pairs": why["pairs"], "clips": len(clips), "box_format": fmt,
+                                                         "stats": dict(stats), "no_pair": dict(why),
+                                                         "confirmatory": why["pairs"] >= LD_MIN_PAIRS}, indent=1))
+    print(report)
+
+
 # ---------------------------------------------------------------------------------------------- scoring
 
 def natural_esg_rows(scored: list[dict], views: dict[str, dict]) -> dict[str, tuple[float, float, float]]:
@@ -1003,6 +1196,9 @@ def main() -> None:
     a = sub.add_parser("colon-loco", help="leave-one-centre-out files from the frames colon-train drew (R18)")
     a.add_argument("--r9", required=True, help="views_natural_colon.jsonl")
     a.add_argument("--dir", required=True, help="the colon_train folder (videos.jsonl)")
+    a = sub.add_parser("ldpolyp-build", help="natural pairs from LDPolypVideo (R26, Amendment 9)")
+    a.add_argument("--src", required=True, help="folder holding TrainValid/ and Test/ (Images/, Annotations/)")
+    a.add_argument("--out", required=True)
     args = ap.parse_args()
     if args.cmd == "colon-fetch":
         colon_fetch(Path(args.out), args.max_videos, args.inspect)
@@ -1016,6 +1212,8 @@ def main() -> None:
         colon_train(Path(args.r9), Path(args.out), args.max_videos, args.workers)
     elif args.cmd == "colon-loco":
         colon_loco(Path(args.r9), Path(args.dir))
+    elif args.cmd == "ldpolyp-build":
+        ldpolyp_build(Path(args.src), Path(args.out))
     else:
         score(args.views, args.runs, args.ref, Path(args.out), args.by, args.boxes)
 

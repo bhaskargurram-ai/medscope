@@ -6453,6 +6453,428 @@ print(open(f'{DRIVE}/release_v5/release_v5_urls.json').read())
     ]
 
 
+def nb60_final_model() -> list[dict]:
+    """Notebook 60: R24-R27 (Amendment 9), the consolidated model MedScope-4B-v6: one recipe, three training seeds,
+    a colonoscopy source no model here has seen, and every earlier test."""
+    c51 = nb51_v42()
+    siim_data = next(c for c in c51 if "MANUAL =" in "".join(c["source"]))
+    siim_build = next(c for c in c51 if "prepare_siim_train.py" in "".join(c["source"]))
+    s3 = ("--views {TRAIN_V4} {REPLAY} --negatives {TRAIN_NEG_V4} --subsample 5000 --lr 5e-5 --mode agentic "
+          "--min-absent-share 0.35 --balance-health --window-prob 0.3 --small-zoom --paraphrase-prob 0.5")
+    return [md("""
+# MedScope 60: the consolidated model, MedScope-4B-v6 (review checks R24-R27, Amendment 9)
+
+One model in place of the three follow-up versions (v4.2, v4.3-cxt, v5), with its tests fixed in
+`docs/REVIEW_EXPERIMENTS.md`, Amendment 9, before any of this ran:
+
+1. **A colonoscopy hospital no model here has seen (R26).** Natural pairs from LDPolypVideo: a frame with a polyp and
+   a polyp-free frame of the same clip. Built first, so a download problem shows in the first minutes.
+2. **One recipe (R24).** v4.2's three stages, with the real colonoscopy frames (v5) and the CheXthought films
+   (v4.3-cxt) added to stage 3 together. Two mixes are trained: the plain one, and one that keeps the erased-lesion
+   views at the share they had in v4.2 (the added lesion-free frames otherwise crowd them out). The better one on
+   validation images is MedScope-4B-v6.
+3. **Three training seeds of the whole recipe and their vote (R25).**
+4. **Cross-validated models for the 103 REAL-Colon pairs (R27).**
+5. **Every test**, with the reading rules of Amendment 9, and one report.
+
+MedScope-4B (v4) stays the pre-registered model of the main comparison. Every result is reported, whatever it shows.
+
+**Needs:** notebooks 51, 54a, 54b and 59 done. An A100 40 GB (about 45-50 hours, one job at a time), an A100 80 GB
+(about 25 hours) or a G4 96 GB (about 15 hours, four jobs at a time). Every step resumes: after a disconnect, Run all
+again. Secrets: `HF_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (about $15 of API calls, on the new
+colonoscopy frames only), Kaggle as for notebook 51; the SIIM-ACR `archive.zip` in `MyDrive/medscope/siim/`.
+
+**LDPolypVideo:** the notebook downloads `TrainValid.rar` and `Test.rar` itself. If Google Drive refuses (it limits
+popular files), it stops in step 1 and tells you which two files to put in `MyDrive/medscope/ldpolyp/`. Run all.
+""" + SECRETS_NOTE),
+        code(SETUP), code(AUTO_RELEASE), code(GPU_STACK),
+        code("!pip install -q -U kaggle pydicom openai anthropic google-genai gdown"), code(LAMA_CELL),
+        code(RESTORE_ALL), code(RESTORE_V4), code(RESTORE_EVAL),
+        code(r7_config(35, 'A100 (or G4)').replace("'Amendment 7' in doc, 'Amendment 7 missing", "'Amendment 9' in doc, 'Amendment 9 missing") + r"""
+import glob, re, sys
+sys.path.insert(0, '/content/medscope/scripts')
+from natural_pairs import cluster_boot, natural_esg_rows, pooled_rows
+from medscope.eval.runner import scored_rows
+from medscope.eval.compare import load_outcomes, paired_bootstrap, significance_table
+from medscope.colab import read_text
+V6 = f'{DRIVE}/v6'
+os.makedirs(V6, exist_ok=True)
+CXT = f'{DRIVE}/chexthought/r23'
+CXT_TRAIN, CXT_TEST = f'{CXT}/views_train.jsonl', f'{CXT}/views_test.jsonl'
+LD = f'{NP}/ldpolyp'
+LD_VIEWS = f'{LD}/views_natural_ldpolyp.jsonl'
+S1_0, S2_0 = f'{ADAPTERS}/v42_s1/final', f'{ADAPTERS}/v42_s2/final'
+V42, V5, V43 = f'{ADAPTERS}/v42_s3/final', f'{ADAPTERS}/v5_s3/final', f'{ADAPTERS}/v43cxt_s3/final'
+FLAG = [('gemini', 'gemini', 'gemini-4-argon'), ('claudeopus', 'anthropic', 'claude-opus-5-5'), ('gpt6astra', 'openai', 'gpt-6-astra')]
+KEYS = {'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'gemini': 'GEMINI_API_KEY'}
+# everything this notebook builds on, checked before anything is trained
+need = {CXT_TRAIN: 'notebook 59', CXT_TEST: 'notebook 59', f'{CT}/views_train_all.jsonl': 'notebook 54a', COLON_VIEWS: 'notebook 52/53',
+        CTX_PAIRS: 'notebook 54a', f'{S1_0}/adapter_config.json': 'notebook 51', f'{S2_0}/adapter_config.json': 'notebook 51',
+        f'{V42}/adapter_config.json': 'notebook 51', f'{V5}/adapter_config.json': 'notebook 54b',
+        f'{V43}/adapter_config.json': 'notebook 59'}
+need.update({f'{CT}/views_{w}_fold{k}.jsonl': 'notebook 54a' for k in FOLDS for w in ('train', 'test')})
+need.update({f'{RESULTS}/{r}/summary.json': nb for r, nb in
+             [('v4_s3_val', 'notebook 23'), ('v4_final_test', 'notebook 25'), ('v42_test', 'notebook 51'), ('v42_ext2', 'notebook 51'),
+              ('v42_siimte', 'notebook 51'), ('v5_test', 'notebook 54b'), ('v5_ext2', 'notebook 54b'), ('r23_v43_ext2', 'notebook 59')]
+             + [(f'v2_{t}_test', 'notebook 12/25') for t, _, _ in FLAG] + [(f'np_{t}_colon', 'notebook 52/53') for t, _ in OTHERS]
+             + [(f'np_v5f{k}_colon', 'notebook 54b') for k in FOLDS] + [(f'r23_{t}_cxt', 'notebook 59') for t, _, _ in FLAG]})
+missing = [f'{p} ({nb})' for p, nb in need.items() if not os.path.exists(p)]
+if missing:
+    raise SystemExit('Missing, from earlier notebooks:\n  ' + '\n  '.join(missing))
+nokey = [mid for _, p, mid in FLAG if not os.environ.get(KEYS[p])]
+if nokey:
+    raise SystemExit(f'API key missing for {nokey}: add the secret (notebook access on) and Run all again.')
+
+def run_jobs(jobs):                      # like run_par, for steps that are several commands in a row
+    if PAR == 1 or len(jobs) <= 1:
+        for job in jobs:
+            job()
+    else:
+        with ThreadPoolExecutor(PAR) as ex:
+            for f in [ex.submit(job) for job in jobs]:
+                f.result()
+
+def train(out, args):                    # one training; skipped when it is finished
+    if not os.path.exists(f'{ADAPTERS}/{out}/final/adapter_config.json'):
+        sh(f'python scripts/train_sft.py --model {BASE} {args} --out {ADAPTERS}/{out}')
+
+def run_name(model, split):              # natural-pair runs are named np_*, like the earlier ones
+    return f"np_{model.replace('_', '')}_{split}" if split == 'ld' else f'{model}_{split}'
+
+def evals(jobs):                         # jobs: (adapter, views, run folder, name, split); finished runs are skipped
+    cmds = []
+    for adapter, views, run, name, split in jobs:
+        if not os.path.exists(f'{RESULTS}/{run}/summary.json'):
+            a = f'--adapter {adapter}' if adapter else ''
+            cmds.append(f'python scripts/evaluate.py --model {BASE} {a} --views {views} --out {RESULTS}/{run} --name {name} '
+                        f'--split {split} --batch-size {BATCH}')
+    run_par(cmds)
+"""),
+        md("""## 1. R26: natural pairs from LDPolypVideo (about 10-20 minutes; nothing is trained yet)
+
+160 annotated colonoscopy clips from a hospital in China that no model here has trained or been tested on. One pair
+per clip by the rules of Amendment 9; the confirmatory reading needs at least 40 pairs."""),
+        code(r"""
+LDSRC = f'{DRIVE}/ldpolyp'                # TrainValid.rar and Test.rar are kept here
+LD_FOLDER = 'https://drive.google.com/drive/folders/13KwU_uZcxsl6dL-mqcs39Yb0gjU9vn3G'
+LD_FILE = '1pxFYO-nRd5uqdYsjs7NRkwXQMMurbWsZ'
+MANUAL_LD = ('LDPolypVideo could not be downloaded automatically (Google Drive limits popular files).\n'
+             '1. Open https://github.com/dashishi/LDPolypVideo-Benchmark and follow its Google Drive links\n'
+             f'   ({LD_FOLDER} and https://drive.google.com/file/d/{LD_FILE}/view).\n'
+             '2. Download TrainValid.rar and Test.rar (not the two "videos ..." zip files).\n'
+             '3. Put both in MyDrive/medscope/ldpolyp/ and Run all again. Nothing else is lost.')
+def ld_archives():
+    found = {}
+    for f in sorted(glob.glob(f'{LDSRC}/**/*', recursive=True)):
+        low = os.path.basename(f).lower()
+        if os.path.isfile(f) and low.endswith(('.rar', '.zip', '.7z')):
+            for w in ('trainvalid', 'test'):
+                if low.startswith(w):
+                    found.setdefault(w, f)
+    return found
+if not os.path.exists(f'{LD}/report_ldpolyp.json'):
+    os.makedirs(LDSRC, exist_ok=True)
+    if len(ld_archives()) < 2:
+        try:
+            import gdown
+            for f in gdown.download_folder(url=LD_FOLDER, skip_download=True, quiet=True, use_cookies=False, remaining_ok=True) or []:
+                name = os.path.basename(f.path)
+                if name.lower().startswith(('trainvalid', 'test')) and not os.path.exists(f'{LDSRC}/{name}'):
+                    print('downloading', name)
+                    gdown.download(id=f.id, output=f'{LDSRC}/{name}', quiet=True)
+        except Exception as e:
+            print('the folder link did not work:', type(e).__name__, str(e)[:300])
+    if len(ld_archives()) < 2:
+        try:                              # the second link is a single file: look at its name before taking it
+            import requests, gdown
+            page = requests.get(f'https://drive.google.com/uc?id={LD_FILE}&export=download', timeout=60).text
+            name = (re.search(r'([\w .()-]+\.(?:rar|zip|7z))', page) or [None, ''])[1].strip()
+            print('the second link holds:', name or 'a file whose name could not be read')
+            if name.lower().startswith(('trainvalid', 'test')) and not os.path.exists(f'{LDSRC}/{name}'):
+                gdown.download(id=LD_FILE, output=f'{LDSRC}/{name}', quiet=True)
+        except Exception as e:
+            print('the file link did not work:', type(e).__name__, str(e)[:300])
+    arch = ld_archives()
+    if len(arch) < 2:
+        raise SystemExit(MANUAL_LD)
+    LDX = f'{WORK}/ldpolyp_src'
+    for w, path in arch.items():
+        dest = f'{LDX}/{w}'
+        if os.path.exists(f'{dest}/_done'):
+            continue
+        os.makedirs(dest, exist_ok=True)
+        if path.lower().endswith('.zip'):
+            cmd = ['unzip', '-q', '-o', path, '-d', dest]
+        else:
+            if not shutil.which('unrar'):
+                subprocess.run('apt-get -qq install -y unrar > /dev/null 2>&1', shell=True)
+            cmd = ['unrar', 'x', '-o+', '-inul', path, dest + '/'] if shutil.which('unrar') else ['7z', 'x', '-y', f'-o{dest}', path]
+        print('unpacking', os.path.basename(path))
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit(f'could not unpack {path}:\n{(r.stderr or r.stdout)[-600:]}')
+        open(f'{dest}/_done', 'w').write('1')
+    sh(f'python scripts/natural_pairs.py ldpolyp-build --src {LDX} --out {LD}')
+LDREP = json.load(open(f'{LD}/report_ldpolyp.json'))
+print(open(f'{LD}/report_ldpolyp.txt').read())
+assert LDREP['pairs'] > 0, 'no pair could be built: copy the line above into the chat'
+"""),
+        md("## 2. The SIIM patients of v4.2 (same cells as notebook 51; about 20-30 minutes in a new session)"),
+        siim_data, siim_build,
+        md("""## 3. R24: the two mixes of stage 3 (about 3 hours each; resumes)
+
+The share of erased-lesion views in v4.2's stage 3 is read from the training code itself (no model is loaded), and
+the "kept" mix repeats erased views until they are back at that share. The seeds' stage 1 starts here too when the
+GPU has room."""),
+        code(r"""
+REPLAY = f'{DRIVE}/external/vqa_train/views_vqa_train.jsonl'
+S1 = f'@S1@'
+S2 = lambda rft: (f'--views {TRAIN_V4} --negatives {TRAIN_NEG_V4} --subsample 3000 --replays {rft} --hard-repeat 3 '
+                  f'--lr 5e-5 --mode agentic --window-prob 0.3 --small-zoom --paraphrase-prob 0.5')
+S3 = f'@S3@'
+RFT = '--per-kind 200 --per-kind-override natural_negative=500 target_removal=300 --k 4 --temperature 1.2'
+ALL_COLON = f'{CT}/views_train_all.jsonl'
+
+def mix(tag, args):                      # the views a stage-3 command would train on, by kind (nothing is trained)
+    out = f'{V6}/mix_{tag}.json'
+    if not os.path.exists(out):
+        sh(f'python scripts/train_sft.py --model {BASE} {args} --out {WORK}/mix_unused --mix-only {out}')
+    return json.load(open(out))
+MIX42 = mix('v42_s3', f'{S3} --extra-views {SIIM_TRAIN}')
+KEEP = round(MIX42['erased_share'], 4)
+
+def s3_args(init, colon, seed, recipe):
+    keep = f'--min-erased-share {KEEP}' if recipe == 'keep' else ''
+    return f'--init {init} {S3} {keep} --seed {seed} --extra-views {SIIM_TRAIN} {colon} {CXT_TRAIN}'
+MIXES = {r: mix(f'v6_{r}', s3_args(S2_0, ALL_COLON, 0, r)) for r in ('plain', 'keep')}
+MIX_TEXT = ('Stage-3 training views, share of erased-lesion views: v4.2 '
+            f"{MIX42['erased_share']:.1%} of {MIX42['views']}; v6 plain {MIXES['plain']['erased_share']:.1%} of "
+            f"{MIXES['plain']['views']}; v6 kept {MIXES['keep']['erased_share']:.1%} of {MIXES['keep']['views']}.")
+print(MIX_TEXT)
+SEEDS = (1, 2)
+run_jobs([lambda r=r: train(f'v6_{r}_s3', s3_args(S2_0, ALL_COLON, 0, r)) for r in ('plain', 'keep')]
+         + [lambda s=s: train(f'v6_seed{s}_s1', f'{S1} --seed {s} --extra-views {SIIM_TRAIN}') for s in SEEDS])
+""".replace('@S1@', S1_ARGS).replace('@S3@', s3)),
+        md("## 4. R24: the choice between the two mixes, on validation images only, and the guard"),
+        code(r"""
+evals([(f'{ADAPTERS}/v6_{r}_s3/final', views, f'v6_{r}_{tag}', f'v6-{r}-{tag}', tag) for r in ('plain', 'keep')
+       for tag, views in (('val', f'{VAL_V4} {VAL_NEG_V4}'), ('siimval', SIIM_VAL))])
+def pooled_utility(r):
+    rows = scored_rows(f'{RESULTS}/v6_{r}_val') + scored_rows(f'{RESULTS}/v6_{r}_siimval')
+    return float(np.mean([x['reward'] for x in rows]))
+CHOICE_FILE = f'{ADAPTERS}/v6_choice.json'
+if not os.path.exists(CHOICE_FILE):
+    up, uk = pooled_utility('plain'), pooled_utility('keep')
+    recipe = 'plain' if up > uk + 0.005 else 'keep'
+    u6, u4 = m(f'v6_{recipe}_val', 'net_utility'), m('v4_s3_val', 'net_utility')
+    h6, h4 = m(f'v6_{recipe}_val', 'natural_hallucination_rate'), m('v4_s3_val', 'natural_hallucination_rate')
+    passed = bool(u6 >= u4 - 0.02 and h6 <= h4 + 0.02)
+    text = (f'Validation net utility over the main validation images and the SIIM validation patients: plain {up:.3f}, '
+            f'kept {uk:.3f}. Rule (Amendment 9: kept, unless plain is higher by more than 0.005): MedScope-4B-v6 is the '
+            f'"{recipe}" mix. Guard on the main validation images: net utility {u6:.3f} (v4 {u4:.3f}; limit >= {u4 - 0.02:.3f}), '
+            f'lesion-free claims {h6:.1%} (v4 {h4:.1%}; limit <= {h4 + 0.02:.1%}): ' + ('PASSED' if passed else 'NOT PASSED'))
+    json.dump({'recipe': recipe, 'adapter': f'{ADAPTERS}/v6_{recipe}_s3/final', 'passed': passed, 'rule': text,
+               'kept_share': KEEP}, open(CHOICE_FILE, 'w'), indent=1)
+CHOICE = json.load(open(CHOICE_FILE))
+RECIPE, V6A, GUARD = CHOICE['recipe'], CHOICE['adapter'], CHOICE['rule']
+OTHER = 'plain' if RECIPE == 'keep' else 'keep'
+print(GUARD)
+"""),
+        md("""## 5. R25 and R27: the two other seeds of the whole recipe, and the three fold models (resumes)
+
+Per seed: stage 1 (about 4 hours), rejection sampling (about 1.5 hours), stage 2 (about 2 hours), stage 3 (about 3
+hours). Per fold model: stage 3 only."""),
+        code(r"""
+def seed_chain(s):
+    A = f'v6_seed{s}'
+    train(f'{A}_s1', f'{S1} --seed {s} --extra-views {SIIM_TRAIN}')
+    rft = f'{ADAPTERS}/{A}_rft/samples.jsonl'
+    if not os.path.exists(rft):
+        sh(f'python scripts/sample_rft.py --model {BASE} --adapter {ADAPTERS}/{A}_s1/final --views {TRAIN_V4} '
+           f'{ST}/train/views/views_clean.jsonl --negatives {TRAIN_NEG_V4} {ST}/train/negatives.jsonl {RFT} --out {rft}')
+    train(f'{A}_s2', f'--init {ADAPTERS}/{A}_s1/final {S2(rft)} --seed {s} --extra-views {SIIM_TRAIN}')
+    train(f'{A}_s3', s3_args(f'{ADAPTERS}/{A}_s2/final', ALL_COLON, s, RECIPE))
+run_jobs([lambda s=s: seed_chain(s) for s in SEEDS]
+         + [lambda k=k: train(f'v6_f{k}_s3', s3_args(S2_0, f'{CT}/views_train_fold{k}.jsonl', 0, RECIPE)) for k in FOLDS])
+ADAPTER = {'v6': V6A, 'v6_other': f'{ADAPTERS}/v6_{OTHER}_s3/final', **{f'v6_seed{s}': f'{ADAPTERS}/v6_seed{s}_s3/final' for s in SEEDS}}
+for name, path in list(ADAPTER.items()) + [(f'fold {k}', f'{ADAPTERS}/v6_f{k}_s3/final') for k in FOLDS]:
+    assert os.path.exists(f'{path}/adapter_config.json'), f'{name} did not finish: Run all again'
+"""),
+        md("""## 6. Every test (about 10 hours one at a time; resumes)
+
+MedScope-4B-v6 on every set; seeds 1 and 2 on every set but standard VQA; the mix that was not chosen on three sets;
+the fold models on the REAL-Colon pairs they never saw; v4, v5, the base model and the three flagships (API) on the
+LDPolypVideo pairs."""),
+        code(r"""
+SIIMTE = f'{V6}/views_siimte.jsonl'
+open(SIIMTE, 'w').write(''.join(open(f).read() for f in SIIM_TEST.split()))
+SETS = {'test': f'{TEST_VIEWS} {TEST_NEG}', 'ext': EXT_VIEWS, 'fresh': FRESH, 'ext2': EXT2, 'siimte': SIIMTE,
+        'cxt': CXT_TEST, 'ld': LD_VIEWS, 'vqa': VQA_VIEWS}
+SEED_SETS = [s for s in SETS if s != 'vqa']
+procs = [subprocess.Popen(f'python scripts/evaluate.py --api {p} --model {mid} --views {LD_VIEWS} --out {RESULTS}/np_{t}_ld '
+                          f'--name {mid}-ldpolyp --split natural_ldpolyp --batch-size 8 > {LD}/log_{t}.txt 2>&1',
+                          shell=True, cwd='/content/medscope')
+         for t, p, mid in FLAG if not os.path.exists(f'{RESULTS}/np_{t}_ld/summary.json')]
+jobs = [(V6A, SETS[s], run_name('v6', s), 'medscope-4b-v6', s) for s in SETS]
+jobs += [(f'{ADAPTERS}/v6_f{k}_s3/final', f'{CT}/views_test_fold{k}.jsonl', f'np_v6f{k}_colon', f'v6-fold{k}-natural', f'natural_colon_fold{k}') for k in FOLDS]
+jobs += [(a, LD_VIEWS, f'np_{t}_ld', f'{t}-ldpolyp', 'natural_ldpolyp') for t, a in (('v4', FINAL), ('v5', V5), ('base', ''))]
+jobs += [(ADAPTER[f'v6_seed{s}'], SETS[x], run_name(f'v6_seed{s}', x), f'medscope-4b-v6-seed{s}', x) for s in SEEDS for x in SEED_SETS]
+jobs += [(ADAPTER['v6_other'], SETS[x], run_name('v6_other', x), f'v6-{OTHER}-mix', x) for x in ('test', 'ext2', 'siimte')]
+evals(jobs)
+for p in procs:
+    p.wait()
+for t, _, mid in FLAG:
+    if not os.path.exists(f'{RESULTS}/np_{t}_ld/summary.json'):
+        print(open(f'{LD}/log_{t}.txt').read()[-600:])
+        raise SystemExit(f'{mid}: the API run on the LDPolypVideo pairs did not finish (its log is above). Run all again.')
+for x in SEED_SETS:                      # the three-seed vote, from the stored decisions
+    seeds = ' '.join(f'{RESULTS}/{run_name(mdl, x)}' for mdl in ('v6', 'v6_seed1', 'v6_seed2'))
+    sh(f'python scripts/seed_vote.py --runs {seeds} --out {RESULTS}/{run_name("v6_vote", x)} --name medscope-4b-v6-vote --split {x}')
+"""),
+        md("## 7. The readings of Amendment 9"),
+        code(r"""
+def nat_diff(views_files, ref, other):   # natural ESG, ref minus other, resampling whole clips or videos
+    views = {}
+    for f in views_files:
+        for line in open(f):
+            v = json.loads(line)
+            views[v['view_id']] = v
+    cluster = {v['meta']['pair']: v['patient_id'] for v in views.values()}
+    a, b = natural_esg_rows(pooled_rows(ref), views), natural_esg_rows(pooled_rows(other), views)
+    return cluster_boot({k: a[k][2] - b[k][2] for k in a.keys() & b.keys()}, cluster)
+def flagship_reading(diffs):             # the rule of Amendments 4 and 6
+    above = [lo > 0 for _, lo, _, _ in diffs.values()]
+    return 'ABOVE EVERY FLAGSHIP' if all(above) else 'ABOVE NONE (not shown)' if not any(above) else 'MIXED'
+fmt = lambda d: f'{d[0]:+.3f} [{d[1]:+.3f}, {d[2]:+.3f}], p = {d[3]:.3f}'
+R = lambda run: f'{RESULTS}/{run}'
+
+# R26: LDPolypVideo pairs
+ld_runs = [('MedScope-4B-v6', 'np_v6_ld'), ('v6-seed1', 'np_v6seed1_ld'), ('v6-seed2', 'np_v6seed2_ld'), ('v6-vote', 'np_v6vote_ld'),
+           ('MedScope-4B', 'np_v4_ld'), ('MedScope-v5', 'np_v5_ld'), ('Qwen3.5-4B', 'np_base_ld')] + [(mid, f'np_{t}_ld') for t, _, mid in FLAG]
+boxes = '--boxes' if LDREP['box_format'] != 'unknown' else ''
+sh(f"python scripts/natural_pairs.py score --views {LD_VIEWS} --runs {' '.join(f'{n}={R(r)}' for n, r in ld_runs)} "
+   f'--ref MedScope-4B-v6 --by split {boxes} --out {RESULTS}/r26_natural_ldpolyp.md')
+ld_d = {mid: nat_diff([LD_VIEWS], R('np_v6_ld'), R(f'np_{t}_ld')) for t, _, mid in FLAG}
+ld_v4 = nat_diff([LD_VIEWS], R('np_v6_ld'), R('np_v4_ld'))
+LD_RULE = (f"{LDREP['pairs']} pairs from {LDREP['clips']} clips"
+           + ('' if LDREP['confirmatory'] else ' (fewer than 40: DESCRIPTIVE ONLY, no confirmatory reading)') + '. '
+           + 'MedScope-4B-v6 minus each flagship, natural ESG: ' + '; '.join(f'{k} {fmt(d)}' for k, d in ld_d.items())
+           + f'. Reading (Amendment 9): {flagship_reading(ld_d)}. v6 minus MedScope-4B (v4): {fmt(ld_v4)}: natural-pair training '
+           + ('carries over to the new hospital' if ld_v4[1] > 0 else 'is not shown to carry over to the new hospital') + '.')
+
+# R27a: the 103 REAL-Colon pairs, each answered by the v6 fold model that never saw its video
+CV6 = '+'.join(R(f'np_v6f{k}_colon') for k in FOLDS)
+CV5 = '+'.join(R(f'np_v5f{k}_colon') for k in FOLDS)
+r9 = f'MedScope-4B-v6-CV={CV6} MedScope-v5-CV={CV5} ' + ' '.join(f'{n}={R(f"np_{t}_colon")}' for t, n in OTHERS)
+sh(f'python scripts/natural_pairs.py score --views {COLON_VIEWS} --runs {r9} --ref MedScope-4B-v6-CV --by fold --boxes --out {RESULTS}/r27_natural_colon_v6.md')
+r9ctx = f'MedScope-4B-v6-CV={CV6} MedScope-v5-CV={CV5} ' + ' '.join(f'{n}={R(f"np_{t}_colon")}+{R(f"np_{t}_colonctx")}' for t, n in OTHERS)
+sh(f'python scripts/natural_pairs.py score --views {CTX_PAIRS} --runs {r9ctx} --ref MedScope-4B-v6-CV --by cohort --out {RESULTS}/r27_natural_colon_v6_context.md')
+r9_d = {mid: nat_diff([COLON_VIEWS], CV6, R(f'np_{t}_colon')) for t, _, mid in FLAG}
+R9_RULE = ('Cross-validated v6 minus each flagship, natural ESG on the 103 pairs: ' + '; '.join(f'{k} {fmt(d)}' for k, d in r9_d.items())
+           + f'. Reading (rule of Amendment 6): {flagship_reading(r9_d)}. v6-CV minus v5-CV: {fmt(nat_diff([COLON_VIEWS], CV6, CV5))}.')
+
+# R27b: pneumothorax
+def cxt_score(views, runs, out):
+    have = ' '.join(f'{n}={R(r)}' for n, r in runs if os.path.exists(f'{R(r)}/summary.json'))
+    sh(f'python scripts/chexthought.py score-test --views {views} --runs {have} --ref MedScope-4B-v6 --out {out}')
+    return read_text(out)
+SIIM_TAB = cxt_score(SIIMTE, [('MedScope-4B-v6', 'v6_siimte'), ('v6-seed1', 'v6_seed1_siimte'), ('v6-seed2', 'v6_seed2_siimte'),
+                              ('v6-vote', 'v6_vote_siimte'), ('v4.3-cxt', 'r23_v43_siimte'), ('v5', 'v5_siimte'), ('v4.2', 'v42_siimte'),
+                              ('MedScope-4B', 'v4_final_siimte_r8')], f'{RESULTS}/r27_siimte.md')
+CXT_TAB = cxt_score(CXT_TEST, [('MedScope-4B-v6', 'v6_cxt'), ('v6-seed1', 'v6_seed1_cxt'), ('v6-seed2', 'v6_seed2_cxt'), ('v6-vote', 'v6_vote_cxt'),
+                               ('v4.3-cxt', 'r23_v43_cxt'), ('v4.2', 'r23_v42_cxt'), ('MedScope-4B', 'r23_v4_cxt'), ('Qwen3.5-4B', 'r23_base_cxt')]
+                    + [(mid, f'r23_{t}_cxt') for t, _, mid in FLAG], f'{RESULTS}/r27_cxt.md')
+def films(run, kind):
+    rows = [r for r in scored_rows(R(run)) if r['kind'] == kind]
+    return sum(r['action'] == 'answer' and not r.get('claims_absent') for r in rows), len(rows)
+pres = lambda r: float(r['action'] == 'answer' and not r.get('claims_absent'))
+a = {r['case_id']: r for r in scored_rows(R('v6_siimte')) if r['kind'] == 'original'}
+b = {r['case_id']: r for r in scored_rows(R('v42_siimte')) if r['kind'] == 'original'}
+ptx = cluster_boot({c: pres(a[c]) - pres(b[c]) for c in a.keys() & b.keys()}, {c: c for c in a})
+(p6, n6), (p2, n2) = films('v6_siimte', 'original'), films('v42_siimte', 'original')
+(h6, k6), (h2, k2) = films('v6_siimte', 'natural_negative'), films('v42_siimte', 'natural_negative')
+raised = ptx[1] > 0 and h6 / max(k6, 1) - h2 / max(k2, 1) <= 0.05
+PTX_RULE = (f'New SIIM patients: pneumothorax films called present v6 {p6}/{n6}, v4.2 {p2}/{n2} (difference {fmt(ptx)}); '
+            f'healthy films called positive {h6}/{k6} vs {h2}/{k2}. Rule (Amendment 8, as fixed in Amendment 9): '
+            + ('RAISED' if raised else 'NOT RAISED'))
+
+# R27c: counterfactual discipline
+e6, e4 = m('v6_test', 'esg'), m('v4_final_test', 'esg')
+TRADE = (f'Main-test ESG: v6 {e6:.3f}, v4 {e4:.3f} ({e6 - e4:+.3f}; more than 0.05 below v4 is a trade of counterfactual '
+         f'discipline for sensitivity): ' + ('TRADE' if e6 < e4 - 0.05 else 'no trade'))
+def erased_cost(ref, other, label):
+    d = paired_bootstrap(load_outcomes(R(ref)), load_outcomes(R(other)), 'target_hallucination_rate')
+    return (f"{label}: {d['a']:.1%} vs {d['b']:.1%} ({d['diff']:+.3f} [{d['ci_low']:+.3f}, {d['ci_high']:+.3f}], p = {d['p']:.3f})", d['ci_low'] > 0)
+c42, costs = erased_cost('v6_ext2', 'v42_ext2', 'v6 vs v4.2')
+COST = ('Erased-lesion claims on the fresh external set. ' + c42 + '. Rule (Amendment 9): '
+        + ('THE COST REMAINS (interval above zero)' if costs else 'NO COST SHOWN against v4.2') + '. '
+        + erased_cost('v6_ext2', 'v5_ext2', 'v6 vs v5')[0] + '; ' + erased_cost('v6_ext2', 'r23_v43_ext2', 'v6 vs v4.3-cxt')[0]
+        + '; ' + erased_cost('v6_ext2', 'v6_other_ext2', f'v6 ({RECIPE} mix) vs the {OTHER} mix')[0] + '.')
+
+# R25: seeds and vote
+f3 = lambda x: 'n/a' if x is None or x != x else f'{x:.3f}'
+KEYS5 = [('ccr', 'CCR'), ('esg', 'ESG'), ('target_hallucination_rate', 'Erased claims'), ('natural_hallucination_rate', 'Lesion-free claims'), ('net_utility', 'Net utility')]
+lines = []
+for split, label in (('test', 'Main test'), ('ext', 'External centres'), ('fresh', 'Fresh internal'), ('ext2', 'Fresh external'), ('siimte', 'New SIIM patients')):
+    lines += [f'**{label}**', '', '| Metric | Seed 0 (MedScope-4B-v6) | Seed 1 | Seed 2 | Mean (sd) | Three-seed vote |', '| --- | --- | --- | --- | --- | --- |']
+    for k, name in KEYS5:
+        xs = [m(f'{mdl}_{split}', k) for mdl in ('v6', 'v6_seed1', 'v6_seed2')]
+        ok = [x for x in xs if x is not None and x == x]
+        spread = f'{np.mean(ok):.3f} ({np.std(ok, ddof=1):.3f})' if len(ok) > 1 else 'n/a'
+        lines.append(f'| {name} | ' + ' | '.join(f3(x) for x in xs) + f' | {spread} | {f3(m(f"v6_vote_{split}", k))} |')
+    lines.append('')
+SEEDS_TABLE = '\n'.join(lines)
+flag_runs = [f'v2_{t}_test' for t, _, _ in FLAG]
+seed_low = {mdl: [paired_bootstrap(load_outcomes(R(f'{mdl}_test')), load_outcomes(R(f)), 'esg')['ci_low'] for f in flag_runs]
+            for mdl in ('v6', 'v6_seed1', 'v6_seed2')}
+holds = all(lo > 0 for lows in seed_low.values() for lo in lows)
+hs = [m(f'{mdl}_test', 'natural_hallucination_rate') for mdl in ('v6', 'v6_seed1', 'v6_seed2')]
+es = [m(f'{mdl}_test', 'esg') for mdl in ('v6', 'v6_seed1', 'v6_seed2')]
+hv, ev = m('v6_vote_test', 'natural_hallucination_rate'), m('v6_vote_test', 'esg')
+vote_ok = hv <= np.mean(hs) and ev >= np.mean(es) - 0.02
+SEEDS_RULE = ('Every seed above each of the three flagships on main-test ESG with the paired interval above zero (rule of Amendment 5): '
+              + ('HOLDS' if holds else 'DOES NOT HOLD') + f'. Lesion-free claims over seeds: {np.mean(hs):.1%} (sd {np.std(hs, ddof=1):.1%}); '
+              f'three-seed vote {hv:.1%}, ESG {ev:.3f} (seeds {np.mean(es):.3f}). Rule (Amendment 9): the vote '
+              + ('IS the reported operating point' if vote_ok else 'DOES NOT HELP and is reported as such') + '.')
+SEEDS_VS = '\n\n'.join(f'{label} vs flagships (main test)\n\n' + significance_table(RESULTS, f'{mdl}_test', flag_runs)
+                       for mdl, label in (('v6', 'Seed 0'), ('v6_seed1', 'Seed 1'), ('v6_seed2', 'Seed 2'), ('v6_vote', 'Three-seed vote')))
+open(f'{RESULTS}/r25_seeds_v6.md', 'w').write(SEEDS_RULE + '\n\n' + SEEDS_TABLE + '\n\n' + SEEDS_VS + '\n')
+READINGS = '\n\n'.join(['R24: ' + GUARD, 'R26: ' + LD_RULE, 'R27 (REAL-Colon pairs): ' + R9_RULE, 'R27 (pneumothorax): ' + PTX_RULE,
+                        'R27 (main test): ' + TRADE, 'R27 (fresh external): ' + COST, 'R25: ' + SEEDS_RULE])
+open(f'{RESULTS}/r24_readings_v6.md', 'w').write(READINGS + '\n')
+print(READINGS)
+"""),
+        md("## 8. The earlier checks again for v6: edit visibility (R13) and question type (R20) (about 20 minutes)"),
+        code(r"""
+runs = 'MedScope-4B-v6=v6_test MedScope-4B=v4_final_test ' + ' '.join(f'{mid}=v2_{t}_test' for t, _, mid in FLAG)
+if not os.path.exists(f'{RESULTS}/r27_edit_visibility.md'):
+    sh(f'python scripts/edit_visibility.py --train {TRAIN_VIEWS} --test {TEST_VIEWS} --results {RESULTS} --runs {runs} --ref MedScope-4B-v6 --out {RESULTS}/r27_edit_visibility')
+    shutil.copy(f'{RESULTS}/r27_edit_visibility/edit_visibility.md', f'{RESULTS}/r27_edit_visibility.md')
+sh(f'python scripts/question_type.py --views {TEST_VIEWS} {TEST_NEG} --results {RESULTS} --runs {runs} --ref MedScope-4B-v6 --out {RESULTS}/r27_question_type.md')
+"""),
+        publish("MedScope report - 60 consolidated model v6 (R24-R27)", """
+    ('What MedScope-4B-v6 is', 'One model in place of v4.2, v4.3-cxt and v5: the three stages of v4.2, with the REAL-Colon natural frames and the CheXthought films added to stage 3 together. Designed after R16, R17 and R23 were seen; its tests and reading rules were fixed in Amendment 9 before any of it ran, and R26 uses a hospital no model here had seen. MedScope-4B (v4) stays the pre-registered model of the main comparison.'),
+    ('Every reading of Amendment 9', READINGS),
+    ('R24: the two mixes', MIX_TEXT + '\\n\\nMain test, chosen mix vs the other\\n\\n' + significance_table(RESULTS, 'v6_test', ['v6_other_test']) + '\\n\\nFresh external\\n\\n' + significance_table(RESULTS, 'v6_ext2', ['v6_other_ext2']) + '\\n\\nNew SIIM patients\\n\\n' + significance_table(RESULTS, 'v6_siimte', ['v6_other_siimte'])),
+    ('R26: LDPolypVideo natural pairs (a hospital no model here has seen)', read_text(f'{LD}/report_ldpolyp.txt') + '\\n\\n' + read_text(f'{RESULTS}/r26_natural_ldpolyp.md')),
+    ('R27: REAL-Colon pairs, cross-validated', read_text(f'{RESULTS}/r27_natural_colon_v6.md')),
+    ('R27: context-matched lesion-free frames', read_text(f'{RESULTS}/r27_natural_colon_v6_context.md')),
+    ('R27: new SIIM patients', SIIM_TAB),
+    ('R27: CheXthought test patients', CXT_TAB),
+    ('R27: main test, v6 vs v4, the earlier follow-up models and the flagships (paired)', significance_table(RESULTS, 'v6_test', ['v4_final_test', 'v42_test', 'v5_test', 'r23_v43_test'] + flag_runs)),
+    ('R27: fresh external', significance_table(RESULTS, 'v6_ext2', ['v4_final_ext2', 'v42_ext2', 'v5_ext2', 'r23_v43_ext2'])),
+    ('R27: external centres', significance_table(RESULTS, 'v6_ext', ['v4_final_ext', 'v42_ext', 'v5_ext'])),
+    ('R27: fresh internal', significance_table(RESULTS, 'v6_fresh', ['v4_final_fresh', 'v42_fresh', 'v5_fresh'])),
+    ('By source', by_dataset(RESULTS, ['v6_test', 'v4_final_test', 'v6_ext2', 'v42_ext2', 'v5_ext2', 'r23_v43_ext2', 'v4_final_ext2'])),
+    ('R25: training seeds and the three-seed vote', read_text(f'{RESULTS}/r25_seeds_v6.md')),
+    ('R13 again: edit visibility', read_text(f'{RESULTS}/r27_edit_visibility.md')),
+    ('R20 again: question type', read_text(f'{RESULTS}/r27_question_type.md')),
+    ('Standard VQA', vqa_table(RESULTS, ['v6_vqa', 'v5_vqa', 'v42_vqa', 'v4_final_vqa'])),
+"""),
+        code(DONE_CELL),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -6548,6 +6970,7 @@ NOTEBOOKS = {
     "57b_chexthought_stats.ipynb": nb57b_chexthought_stats,
     "58_release_v5.ipynb": nb58_release_v5,
     "59_chexthought_pneumothorax.ipynb": nb59_chexthought_pneumothorax,
+    "60_final_model_v6.ipynb": nb60_final_model,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

@@ -519,3 +519,105 @@ films (256-px copies), the corrected chest X-ray natural pairs (pneumothorax pai
 reader of this study; click boxes are coarse. CheXpert Plus images may be used under its research-use agreement and
 are not redistributed; only adapters, view lists (image ids) and per-view outputs are released.
 Code: scripts/chexthought.py (`build-views`, `score-test`); notebook 59.
+
+# Amendment 9 (24 Nov 2026, 21:35 ET): R24-R27, one consolidated model, three training seeds and a hospital no model here has seen (committed before any LDPolypVideo file was downloaded or any v6 model trained)
+
+**Status of what exists.** Unchanged. MedScope-4B (v4) stays the pre-registered model of the main comparison. v4.2
+(R8), v4.3-cxt (R23) and v5 (R16) stay post hoc and as reported. This amendment defines one model that takes their
+place in the manuscript's follow-up results, "MedScope-4B-v6", and fixes its tests before any of it is trained.
+
+**What was looked at before this plan was written.** The results of R12 and R16-R23 (all in `docs/RESULTS_LOG.md`).
+The training code: `scripts/train_sft.py` repeats "absent" views (erased-lesion views and lesion-free images
+together) until they are 35% of the stage-3 views, so the lesion-free frames added for v5 and v4.3-cxt fill that
+share and the erased-lesion views are repeated less than in v4.2. This is offered as a possible reason for the higher
+erased-lesion claims of v5 and v4.3-cxt on the fresh external set (19.6% and 20.2% against 11.3% for v4.2); it has
+not been tested. For LDPolypVideo: its repository page and a third-party description of its folders and annotation
+files. No LDPolypVideo image or annotation file had been downloaded.
+
+## R24. The recipe (MedScope-4B-v6)
+
+**Stages 1 and 2:** v4.2's (notebook 51; for seed 0 the existing adapters `v42_s1`, `v42_s2`).
+**Stage 3:** v4.2's stage-3 command, with these added in full: the SIIM training patients (as in v4.2), the
+REAL-Colon natural training frames of Amendment 6 (all 60 videos) and the CheXthought training films of Amendment 8.
+
+**Two mixes, seed 0.**
+- **plain:** the command as it is (the mix rule of v5 and v4.3-cxt).
+- **kept:** after the 35% rule, erased-lesion views are repeated until their share of all stage-3 training views is
+  the share they have in v4.2's stage 3 (`--min-erased-share`). That share is computed by the training code from
+  v4.2's own command (`--mix-only`); it is not chosen.
+
+**Choice, on validation images only.** Net utility over the main validation views and the SIIM validation patients
+together. MedScope-4B-v6 is the kept mix, unless the plain mix is higher by more than 0.005. **Guard (the R8 rule):**
+on the main validation views, net utility not more than 0.02 below v4's and lesion-free claims not more than 2
+points above v4's; a failed guard is reported. The mix that is not chosen is run on the main test, the fresh external
+set and the new SIIM patients only, to describe what the kept share does (no reading rule).
+
+## R25. Training seeds of v6 and the three-seed vote
+
+The whole recipe again with seeds 1 and 2: stage 1, rejection sampling and stage 2 as in v4.2 with the seed, then
+stage 3 with the chosen mix and the seed. Every seed is run on the main test, the external centres, fresh internal,
+fresh external, the new SIIM patients, the CheXthought test patients and the LDPolypVideo pairs.
+
+**Reading (the rule of Amendment 5).** The result holds over seeds if every seed's main-test ESG is above each of the
+three flagships' with the paired interval above zero. Lesion-free claims are reported as mean (sd) over the seeds.
+
+**Three-seed vote (`scripts/seed_vote.py`; stored decisions only).** Each seed's decision on a view is "present",
+"absent", "refer" or "other" (asks for a better image, or malformed). The vote is the class two or three seeds chose,
+with the stored decision of the first such seed; with three different classes, the first seed's that refers, else
+the first that asks for a better image. **Reading.** The vote is the reported operating point if its main-test
+lesion-free claims are not above the seeds' mean and its main-test ESG is not more than 0.02 below the seeds' mean;
+otherwise it is reported as not helping. It costs three model runs per image, which the manuscript states.
+
+## R26. Natural pairs from a hospital no model here has seen (this takes the place of R18b)
+
+**Source.** LDPolypVideo (Ma et al., MICCAI 2021): 160 annotated colonoscopy clips from the First Affiliated
+Hospital of Anhui Medical University, every frame marked as showing a polyp (with boxes) or not. No model here was
+trained, tuned or tested on it. Both of its parts (TrainValid, Test) are used; nothing is trained on them.
+
+**Pairs (`scripts/natural_pairs.py ldpolyp-build`).** The clips are short and have no stated frame rate, so the
+rules of Amendment 4 are written in frames. One pair per clip:
+- Track: polyp frames with gaps of at most 5 frames; at least 10 frames long; the longest of the clip.
+- Lesion frame: in the middle half of the track, largest box at least 1% of the frame; of 12 evenly spaced
+  candidates, the sharpest with mean brightness 40-215.
+- Lesion-free frame: marked polyp-free and at least 5 frames from any frame that is not marked polyp-free; of 12
+  evenly spaced candidates, the sharpest usable one.
+- A clip without both gives no pair. If the box format of the files cannot be established from the boxes
+  themselves, the size rule is dropped and correct boxes are not reported.
+- Question and answers as in R9 ("Is there a polyp in this image?").
+
+**Models.** MedScope-4B-v6 (seed 0; seeds 1 and 2; the vote), MedScope-4B (v4), v5 (all videos), the base model,
+and the three flagships over the API on these frames only.
+
+**Primary measure and reading (the rule of Amendments 4 and 6).** Natural ESG of v6 (seed 0) minus each flagship,
+2,000 resamples of whole clips. Above every flagship with the interval above zero: with natural pairs in training,
+the advantage holds on unedited images from an unseen hospital. Above none: it does not, and the manuscript says
+so. Otherwise: mixed, comparison by comparison. Also fixed: v6 minus v4, interval above zero = natural-pair training
+carries over to the new hospital. **Fewer than 40 pairs:** the test is reported as descriptive only.
+
+**Secondary, descriptive.** By part (TrainValid, Test); polyps called present with a correct box (IoU >= 0.3).
+
+## R27. v6 on the earlier tests
+
+- **REAL-Colon pairs (R9), cross-validated.** Three fold models of the chosen mix (seed 0; the folds and frames of
+  Amendment 6). Reading by the rule of Amendment 6 against the stored flagship answers. The 103 pairs are used a
+  further time; this is secondary to R26. Context-matched frames as in R16.
+- **Pneumothorax.** New SIIM patients: v6 minus v4.2 by the rule of Amendment 8 (raised = interval above zero and
+  healthy films called positive not higher by more than 5 points). CheXthought test patients: Youden against the
+  stored answers of the three flagships (descriptive).
+- **Counterfactual discipline.** Main-test ESG more than 0.05 below v4's is reported as a trade (Amendment 6).
+  Fresh external set, erased-lesion claims, v6 minus v4.2 (paired over cases): interval above zero = the cost
+  remains; otherwise no cost is shown against v4.2. The same difference against v5, v4.3-cxt and the mix not chosen
+  is reported.
+- **Descriptive.** External centres, fresh internal, standard VQA; the edit-visibility subset (R13) and the split
+  by question type (R20) with v6 added.
+
+**Known limits, stated in advance.** v6 is designed after R16, R17 and R23 were seen; what is prospective is its
+tests: R26 uses images nobody here had seen, and every reading rule above is fixed now. The seeds share their
+training data. LDPolypVideo is one hospital; its polyp-free frames are marked by its own annotators, and some may be
+close in time to a polyp frame. Its repository states no licence; images are not redistributed (view lists hold
+frame ids only), and the frames are sent to the three providers' APIs as the R9 frames were. The fold models stand
+in for one model on R9, as before.
+
+**Fixed.** One attempt. Nothing is tuned beyond the one choice on validation images above. Every result is
+reported, whatever it shows. Code: `scripts/train_sft.py` (`--min-erased-share`, `--mix-only`),
+`scripts/natural_pairs.py` (`ldpolyp-build`), `scripts/seed_vote.py`; notebook 60.

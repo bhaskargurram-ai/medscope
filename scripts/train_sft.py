@@ -52,8 +52,30 @@ def v4_mix(views, args):
                     for i in range(need)]
             views = views + reps
             print(f"'absent' views: {share:.0%} -> {len(absent) + need} of {len(views)}")
+    keep = getattr(args, "min_erased_share", 0) or 0
+    if keep > 0:
+        # Amendment 9 (v6): natural lesion-free frames count as 'absent' above, so when they are added the erased
+        # views are repeated less; this keeps the erased views at a fixed share of everything that is trained on
+        erased = [v for v in views if v.kind is ViewKind.TARGET_REMOVAL and "#rft" not in v.view_id]
+        share = sum(v.kind is ViewKind.TARGET_REMOVAL for v in views) / max(1, len(views))
+        if erased and share < keep:
+            have = sum(v.kind is ViewKind.TARGET_REMOVAL for v in views)
+            need = int((keep * len(views) - have) / (1 - keep)) + 1
+            reps = [replace(erased[i % len(erased)], view_id=f"{erased[i % len(erased)].view_id}#e{i // len(erased) + 1}")
+                    for i in range(need)]
+            views = views + reps
+            print(f"erased views: {share:.1%} -> {have + need} of {len(views)}")
     print("view kinds:", dict(Counter(v.kind.value for v in views)))
     return views
+
+
+def mix_summary(views) -> dict:
+    """Counts by view kind and the share of erased views, for a planned run (no model is loaded)."""
+    from collections import Counter
+    kinds = Counter(v.kind.value for v in views)
+    n = max(1, len(views))
+    return {"views": len(views), "kinds": dict(kinds), "erased_share": kinds.get("target_removal", 0) / n,
+            "lesion_free_share": kinds.get("natural_negative", 0) / n}
 
 
 def parser() -> argparse.ArgumentParser:
@@ -107,6 +129,12 @@ def parser() -> argparse.ArgumentParser:
                          "lesion-free image (a zoom on a random region) with this probability before answering")
     ap.add_argument("--hard-repeat", type=int, default=1,
                     help="rejection sampling: repeat episodes kept from views the model mostly failed this many times")
+    ap.add_argument("--min-erased-share", type=float, default=0.0,
+                    help="Amendment 9: repeat erased-lesion views until they are at least this share of all training "
+                         "views (applied after --min-absent-share)")
+    ap.add_argument("--mix-only", default=None, metavar="FILE.json",
+                    help="write the training mix (views by kind, share of erased views) to this file and stop; "
+                         "nothing is trained and no model is loaded")
     return ap
 
 
@@ -160,6 +188,12 @@ def main() -> None:
 
     views, negs, replays = training_views(args)
     print(f"training on {len(views)} views ({len(negs)} natural negatives)")
+    if args.mix_only:
+        import json
+        Path(args.mix_only).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.mix_only).write_text(json.dumps(mix_summary(views), indent=1))
+        print("mix written to", args.mix_only, mix_summary(views))
+        return
 
     import random
     import numpy as np

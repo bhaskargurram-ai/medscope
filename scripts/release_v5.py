@@ -24,8 +24,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from release_hf import build_model, set_public  # noqa: E402
 
-RUN_PATTERNS = ("np_*", "v5_*", "blind_*", "r17_*", "r21_*", "r23_*", "seed1_*", "seed2_*")
-REPORT_PATTERNS = ("r16_*.md", "r17_*.md", "r18_*.md", "r19_*.md", "r20_*.md", "r21_*.md", "r23_*.md", "59_*.md", "natural_*.md")
+RUN_PATTERNS = ("np_*", "v5_*", "v6_*", "blind_*", "r17_*", "r21_*", "r23_*", "seed1_*", "seed2_*")
+REPORT_PATTERNS = ("r16_*.md", "r17_*.md", "r18_*.md", "r19_*.md", "r20_*.md", "r21_*.md", "r23_*.md", "r24_*.md",
+                   "r25_*.md", "r26_*.md", "r27_*.md", "59_*.md", "60_*.md", "natural_*.md")
 BLURB = ("MedScope-v5 (post hoc): the stage 3 of MedScope-4B-v4.2 again, with real same-patient colonoscopy frames "
          "(REAL-Colon, polyp and polyp-free frames of the same video) added to training.")
 POST_HOC = """
