@@ -2061,3 +2061,16 @@ Code: `scripts/train_sft.py` (`--min-erased-share`, `--mix-only`), `scripts/natu
 `scripts/seed_vote.py`, `scripts/release_v5.py` (v6 runs and reports added to the release patterns); 10 new tests
 (255 pass). Notebook: 60 (`60_final_model_v6.ipynb`). Its selection, vote, reading and report cells were run once on
 made-up decisions to check that they execute; no real result exists. MedScope-4B (v4) stays the pre-registered model.
+
+## 2026-11-24 — Notebook 60 started: LDPolypVideo pairs and the stage-3 mixes (Amendment 9; no model result yet)
+
+**R26 data (`natural_pairs/ldpolyp/report_ldpolyp.txt`, 22:53 ET).** 160 clips, 40,186 labelled frames (33,875 with
+a polyp, 6,311 polyp-free); box format read as corners. **116 pairs**; 44 clips without a pair (39: no polyp-free
+frame at least 5 frames from a polyp frame; 5: no polyp frame with a box of at least 1%). At least 40 pairs: the
+confirmatory reading applies.
+
+**R24 mixes (`v6/mix_*.json`, 23:02 ET; counted by `train_sft.py --mix-only`, nothing trained).** Stage-3 training
+views and the share that are erased-lesion views: v4.2 1,756 of 6,217 (28.2%); v6 plain 1,223 of 12,292 (9.9%); v6
+kept 4,359 of 15,428 (28.3%). Lesion-free images: 420 (6.8%), 3,801 (30.9%), 3,801 (24.6%). So adding the natural
+frames and films without the kept rule cuts the erased-lesion share to about a third of v4.2's; whether that
+explains the higher erased-lesion claims of v5 and v4.3-cxt is what R24 and R27 test.
