@@ -2074,3 +2074,14 @@ views and the share that are erased-lesion views: v4.2 1,756 of 6,217 (28.2%); v
 kept 4,359 of 15,428 (28.3%). Lesion-free images: 420 (6.8%), 3,801 (30.9%), 3,801 (24.6%). So adding the natural
 frames and films without the kept rule cuts the erased-lesion share to about a third of v4.2's; whether that
 explains the higher erased-lesion claims of v5 and v4.3-cxt is what R24 and R27 test.
+
+## 2026-11-25 — Notebook 60: scheduling only (no command, name, rule or number changed)
+
+At the pace seen on an A100 80 GB (two jobs at a time, GPU at 98%), the two stage-3 mixes took 5 h and 6.5 h; they
+hold 12,292 and 15,428 training views against 6,217 in v4.2's stage 3. Notebook 60's training and test steps were
+therefore rewritten as one queue of GPU slots: each step starts when what it needs is ready (the choice of mix no
+longer waits for the seeds' stage 1; the tests of v6 no longer wait for the seeds and folds), with six slots on an
+H200, four on a G4, three on an H100, two on an A100 80 GB. Every training and test command, every output name and
+every reading rule of Amendment 9 is as committed in a3629e0; finished pieces are skipped on resume. The queue was
+run on made-up decisions with one, three and six slots (never more jobs at once than slots; stage 3 of seeds and
+folds only after the choice; a second pass runs nothing).

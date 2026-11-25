@@ -6477,11 +6477,13 @@ One model in place of the three follow-up versions (v4.2, v4.3-cxt, v5), with it
 4. **Cross-validated models for the 103 REAL-Colon pairs (R27).**
 5. **Every test**, with the reading rules of Amendment 9, and one report.
 
+Steps 2-5 run as one queue: each training and test starts as soon as what it needs is ready and a GPU slot is free.
+
 MedScope-4B (v4) stays the pre-registered model of the main comparison. Every result is reported, whatever it shows.
 
-**Needs:** notebooks 51, 54a, 54b and 59 done. An A100 40 GB (about 45-50 hours, one job at a time), an A100 80 GB
-(about 25 hours), an H100 (three jobs at a time; not timed yet, expected to be the fastest) or a G4 96 GB (about 15
-hours, four jobs at a time). Every step resumes: after a disconnect, Run all again. Secrets: `HF_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (about $15 of API calls, on the new
+**Needs:** notebooks 51, 54a, 54b and 59 done. The largest GPU on offer: an H200 141 GB runs six jobs at a time, a
+G4 96 GB four, an H100 three, an A100 80 GB two (about 40 hours in all at the pace seen so far), an A100 40 GB one. Every step
+resumes: after a disconnect or a change of GPU, Run all again and nothing finished is repeated. Secrets: `HF_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (about $15 of API calls, on the new
 colonoscopy frames only), Kaggle as for notebook 51; the SIIM-ACR `archive.zip` in `MyDrive/medscope/siim/`.
 
 **LDPolypVideo:** the notebook downloads `TrainValid.rar` and `Test.rar` itself. If Google Drive refuses (it limits
@@ -6528,18 +6530,30 @@ nokey = [mid for _, p, mid in FLAG if not os.environ.get(KEYS[p])]
 if nokey:
     raise SystemExit(f'API key missing for {nokey}: add the secret (notebook access on) and Run all again.')
 
-def run_jobs(jobs):                      # like run_par, for steps that are several commands in a row
-    if PAR == 1 or len(jobs) <= 1:
-        for job in jobs:
-            job()
-    else:
-        with ThreadPoolExecutor(PAR) as ex:
-            for f in [ex.submit(job) for job in jobs]:
-                f.result()
+if GPU_GB >= 130:
+    PAR = 6                              # an H200 (141 GB): six jobs of about 16 GB each, with room to spare
+print('GPU jobs at a time:', PAR, '| CPU cores:', os.cpu_count())
+import threading
+SLOTS = ThreadPoolExecutor(PAR)          # the GPU slots: at most PAR commands at a time, first asked first served
+STEPS = ThreadPoolExecutor(128)          # steps that wait for one another (they only wait; the work is in the slots)
+
+def gpu(cmd):                            # run one command in a GPU slot and wait for it
+    SLOTS.submit(sh, cmd).result()
+
+def together(steps):                     # run steps side by side and wait for all; the first error is raised at the end
+    futures = [STEPS.submit(step) for step in steps]
+    errors = []
+    for f in futures:
+        try:
+            f.result()
+        except BaseException as e:
+            errors.append(e)
+    if errors:
+        raise errors[0]
 
 def train(out, args):                    # one training; skipped when it is finished
     if not os.path.exists(f'{ADAPTERS}/{out}/final/adapter_config.json'):
-        sh(f'python scripts/train_sft.py --model {BASE} {args} --out {ADAPTERS}/{out}')
+        gpu(f'python scripts/train_sft.py --model {BASE} {args} --out {ADAPTERS}/{out}')
 
 def run_name(model, split):              # natural-pair runs are named np_*, like the earlier ones
     return f"np_{model.replace('_', '')}_{split}" if split == 'ld' else f'{model}_{split}'
@@ -6551,7 +6565,7 @@ def evals(jobs):                         # jobs: (adapter, views, run folder, na
             a = f'--adapter {adapter}' if adapter else ''
             cmds.append(f'python scripts/evaluate.py --model {BASE} {a} --views {views} --out {RESULTS}/{run} --name {name} '
                         f'--split {split} --batch-size {BATCH}')
-    run_par(cmds)
+    together([lambda c=c: gpu(c) for c in cmds])
 """),
         md("""## 1. R26: natural pairs from LDPolypVideo (about 10-20 minutes; nothing is trained yet)
 
@@ -6624,11 +6638,10 @@ assert LDREP['pairs'] > 0, 'no pair could be built: copy the line above into the
 """),
         md("## 2. The SIIM patients of v4.2 (same cells as notebook 51; about 20-30 minutes in a new session)"),
         siim_data, siim_build,
-        md("""## 3. R24: the two mixes of stage 3 (about 3 hours each; resumes)
+        md("""## 3. R24: the two mixes of stage 3 (a minute; nothing is trained here)
 
 The share of erased-lesion views in v4.2's stage 3 is read from the training code itself (no model is loaded), and
-the "kept" mix repeats erased views until they are back at that share. The seeds' stage 1 starts here too when the
-GPU has room."""),
+the "kept" mix repeats erased views until they are back at that share."""),
         code(r"""
 REPLAY = f'{DRIVE}/external/vqa_train/views_vqa_train.jsonl'
 S1 = f'@S1@'
@@ -6655,86 +6668,111 @@ MIX_TEXT = ('Stage-3 training views, share of erased-lesion views: v4.2 '
             f"{MIXES['plain']['views']}; v6 kept {MIXES['keep']['erased_share']:.1%} of {MIXES['keep']['views']}.")
 print(MIX_TEXT)
 SEEDS = (1, 2)
-run_jobs([lambda r=r: train(f'v6_{r}_s3', s3_args(S2_0, ALL_COLON, 0, r)) for r in ('plain', 'keep')]
-         + [lambda s=s: train(f'v6_seed{s}_s1', f'{S1} --seed {s} --extra-views {SIIM_TRAIN}') for s in SEEDS])
 """.replace('@S1@', S1_ARGS).replace('@S3@', s3)),
-        md("## 4. R24: the choice between the two mixes, on validation images only, and the guard"),
-        code(r"""
-evals([(f'{ADAPTERS}/v6_{r}_s3/final', views, f'v6_{r}_{tag}', f'v6-{r}-{tag}', tag) for r in ('plain', 'keep')
-       for tag, views in (('val', f'{VAL_V4} {VAL_NEG_V4}'), ('siimval', SIIM_VAL))])
-def pooled_utility(r):
-    rows = scored_rows(f'{RESULTS}/v6_{r}_val') + scored_rows(f'{RESULTS}/v6_{r}_siimval')
-    return float(np.mean([x['reward'] for x in rows]))
-CHOICE_FILE = f'{ADAPTERS}/v6_choice.json'
-if not os.path.exists(CHOICE_FILE):
-    up, uk = pooled_utility('plain'), pooled_utility('keep')
-    recipe = 'plain' if up > uk + 0.005 else 'keep'
-    u6, u4 = m(f'v6_{recipe}_val', 'net_utility'), m('v4_s3_val', 'net_utility')
-    h6, h4 = m(f'v6_{recipe}_val', 'natural_hallucination_rate'), m('v4_s3_val', 'natural_hallucination_rate')
-    passed = bool(u6 >= u4 - 0.02 and h6 <= h4 + 0.02)
-    text = (f'Validation net utility over the main validation images and the SIIM validation patients: plain {up:.3f}, '
-            f'kept {uk:.3f}. Rule (Amendment 9: kept, unless plain is higher by more than 0.005): MedScope-4B-v6 is the '
-            f'"{recipe}" mix. Guard on the main validation images: net utility {u6:.3f} (v4 {u4:.3f}; limit >= {u4 - 0.02:.3f}), '
-            f'lesion-free claims {h6:.1%} (v4 {h4:.1%}; limit <= {h4 + 0.02:.1%}): ' + ('PASSED' if passed else 'NOT PASSED'))
-    json.dump({'recipe': recipe, 'adapter': f'{ADAPTERS}/v6_{recipe}_s3/final', 'passed': passed, 'rule': text,
-               'kept_share': KEEP}, open(CHOICE_FILE, 'w'), indent=1)
-CHOICE = json.load(open(CHOICE_FILE))
-RECIPE, V6A, GUARD = CHOICE['recipe'], CHOICE['adapter'], CHOICE['rule']
-OTHER = 'plain' if RECIPE == 'keep' else 'keep'
-print(GUARD)
-"""),
-        md("""## 5. R25 and R27: the two other seeds of the whole recipe, and the three fold models (resumes)
+        md("""## 4. Everything that needs the GPU, as one queue (R24, R25, R27; resumes)
 
-Per seed: stage 1 (about 4 hours), rejection sampling (about 1.5 hours), stage 2 (about 2 hours), stage 3 (about 3
-hours). Per fold model: stage 3 only."""),
-        code(r"""
-def seed_chain(s):
-    A = f'v6_seed{s}'
-    train(f'{A}_s1', f'{S1} --seed {s} --extra-views {SIIM_TRAIN}')
-    rft = f'{ADAPTERS}/{A}_rft/samples.jsonl'
-    if not os.path.exists(rft):
-        sh(f'python scripts/sample_rft.py --model {BASE} --adapter {ADAPTERS}/{A}_s1/final --views {TRAIN_V4} '
-           f'{ST}/train/views/views_clean.jsonl --negatives {TRAIN_NEG_V4} {ST}/train/negatives.jsonl {RFT} --out {rft}')
-    train(f'{A}_s2', f'--init {ADAPTERS}/{A}_s1/final {S2(rft)} --seed {s} --extra-views {SIIM_TRAIN}')
-    train(f'{A}_s3', s3_args(f'{ADAPTERS}/{A}_s2/final', ALL_COLON, s, RECIPE))
-run_jobs([lambda s=s: seed_chain(s) for s in SEEDS]
-         + [lambda k=k: train(f'v6_f{k}_s3', s3_args(S2_0, f'{CT}/views_train_fold{k}.jsonl', 0, RECIPE)) for k in FOLDS])
-ADAPTER = {'v6': V6A, 'v6_other': f'{ADAPTERS}/v6_{OTHER}_s3/final', **{f'v6_seed{s}': f'{ADAPTERS}/v6_seed{s}_s3/final' for s in SEEDS}}
-for name, path in list(ADAPTER.items()) + [(f'fold {k}', f'{ADAPTERS}/v6_f{k}_s3/final') for k in FOLDS]:
-    assert os.path.exists(f'{path}/adapter_config.json'), f'{name} did not finish: Run all again'
-"""),
-        md("""## 6. Every test (about 10 hours one at a time; resumes)
+Every training and test run waits only for what it needs, and the GPU slots are never left idle:
 
-MedScope-4B-v6 on every set; seeds 1 and 2 on every set but standard VQA; the mix that was not chosen on three sets;
-the fold models on the REAL-Colon pairs they never saw; v4, v5, the base model and the three flagships (API) on the
-LDPolypVideo pairs."""),
+- the two mixes are trained, then tested on validation images, and the rule of Amendment 9 picks MedScope-4B-v6;
+- seeds 1 and 2 run stage 1, rejection sampling and stage 2 meanwhile, then stage 3 with the chosen mix, then
+  their tests;
+- as soon as the mix is chosen: the three fold models (then the REAL-Colon pairs they never saw), v6 on every
+  set, and the mix that was not chosen on three sets;
+- v4, v5 and the base model on the LDPolypVideo pairs, and the three flagships over the API, from the start.
+
+Finished pieces are skipped, so after a disconnect Run all again picks up where it stopped."""),
         code(r"""
 SIIMTE = f'{V6}/views_siimte.jsonl'
 open(SIIMTE, 'w').write(''.join(open(f).read() for f in SIIM_TEST.split()))
 SETS = {'test': f'{TEST_VIEWS} {TEST_NEG}', 'ext': EXT_VIEWS, 'fresh': FRESH, 'ext2': EXT2, 'siimte': SIIMTE,
         'cxt': CXT_TEST, 'ld': LD_VIEWS, 'vqa': VQA_VIEWS}
 SEED_SETS = [s for s in SETS if s != 'vqa']
-procs = [subprocess.Popen(f'python scripts/evaluate.py --api {p} --model {mid} --views {LD_VIEWS} --out {RESULTS}/np_{t}_ld '
-                          f'--name {mid}-ldpolyp --split natural_ldpolyp --batch-size 8 > {LD}/log_{t}.txt 2>&1',
-                          shell=True, cwd='/content/medscope')
-         for t, p, mid in FLAG if not os.path.exists(f'{RESULTS}/np_{t}_ld/summary.json')]
-jobs = [(V6A, SETS[s], run_name('v6', s), 'medscope-4b-v6', s) for s in SETS]
-jobs += [(f'{ADAPTERS}/v6_f{k}_s3/final', f'{CT}/views_test_fold{k}.jsonl', f'np_v6f{k}_colon', f'v6-fold{k}-natural', f'natural_colon_fold{k}') for k in FOLDS]
-jobs += [(a, LD_VIEWS, f'np_{t}_ld', f'{t}-ldpolyp', 'natural_ldpolyp') for t, a in (('v4', FINAL), ('v5', V5), ('base', ''))]
-jobs += [(ADAPTER[f'v6_seed{s}'], SETS[x], run_name(f'v6_seed{s}', x), f'medscope-4b-v6-seed{s}', x) for s in SEEDS for x in SEED_SETS]
-jobs += [(ADAPTER['v6_other'], SETS[x], run_name('v6_other', x), f'v6-{OTHER}-mix', x) for x in ('test', 'ext2', 'siimte')]
-evals(jobs)
-for p in procs:
-    p.wait()
-for t, _, mid in FLAG:
-    if not os.path.exists(f'{RESULTS}/np_{t}_ld/summary.json'):
-        print(open(f'{LD}/log_{t}.txt').read()[-600:])
-        raise SystemExit(f'{mid}: the API run on the LDPolypVideo pairs did not finish (its log is above). Run all again.')
-for x in SEED_SETS:                      # the three-seed vote, from the stored decisions
+CHOICE_FILE = f'{ADAPTERS}/v6_choice.json'
+chosen, choice_failed = threading.Event(), threading.Event()
+
+def pooled_utility(r):
+    rows = scored_rows(f'{RESULTS}/v6_{r}_val') + scored_rows(f'{RESULTS}/v6_{r}_siimval')
+    return float(np.mean([x['reward'] for x in rows]))
+
+def choice():                            # R24: both mixes, their validation runs, then the rule
+    try:
+        together([lambda r=r: train(f'v6_{r}_s3', s3_args(S2_0, ALL_COLON, 0, r)) for r in ('plain', 'keep')])
+        evals([(f'{ADAPTERS}/v6_{r}_s3/final', views, f'v6_{r}_{tag}', f'v6-{r}-{tag}', tag) for r in ('plain', 'keep')
+               for tag, views in (('val', f'{VAL_V4} {VAL_NEG_V4}'), ('siimval', SIIM_VAL))])
+        if not os.path.exists(CHOICE_FILE):
+            up, uk = pooled_utility('plain'), pooled_utility('keep')
+            recipe = 'plain' if up > uk + 0.005 else 'keep'
+            u6, u4 = m(f'v6_{recipe}_val', 'net_utility'), m('v4_s3_val', 'net_utility')
+            h6, h4 = m(f'v6_{recipe}_val', 'natural_hallucination_rate'), m('v4_s3_val', 'natural_hallucination_rate')
+            passed = bool(u6 >= u4 - 0.02 and h6 <= h4 + 0.02)
+            text = (f'Validation net utility over the main validation images and the SIIM validation patients: plain {up:.3f}, '
+                    f'kept {uk:.3f}. Rule (Amendment 9: kept, unless plain is higher by more than 0.005): MedScope-4B-v6 is the '
+                    f'"{recipe}" mix. Guard on the main validation images: net utility {u6:.3f} (v4 {u4:.3f}; limit >= {u4 - 0.02:.3f}), '
+                    f'lesion-free claims {h6:.1%} (v4 {h4:.1%}; limit <= {h4 + 0.02:.1%}): ' + ('PASSED' if passed else 'NOT PASSED'))
+            json.dump({'recipe': recipe, 'adapter': f'{ADAPTERS}/v6_{recipe}_s3/final', 'passed': passed, 'rule': text,
+                       'kept_share': KEEP}, open(CHOICE_FILE, 'w'), indent=1)
+        print(json.load(open(CHOICE_FILE))['rule'])
+        chosen.set()
+    except BaseException:
+        choice_failed.set()
+        raise
+
+def the_choice():                        # wait until the mix is chosen
+    while not chosen.wait(10):
+        if choice_failed.is_set():
+            raise SystemExit('Stopped: the choice between the two mixes did not finish (its error is above).')
+    return json.load(open(CHOICE_FILE))
+
+def seed(s):                             # R25: the whole recipe with another seed, then its tests
+    A = f'v6_seed{s}'
+    train(f'{A}_s1', f'{S1} --seed {s} --extra-views {SIIM_TRAIN}')
+    rft = f'{ADAPTERS}/{A}_rft/samples.jsonl'
+    if not os.path.exists(rft):
+        gpu(f'python scripts/sample_rft.py --model {BASE} --adapter {ADAPTERS}/{A}_s1/final --views {TRAIN_V4} '
+            f'{ST}/train/views/views_clean.jsonl --negatives {TRAIN_NEG_V4} {ST}/train/negatives.jsonl {RFT} --out {rft}')
+    train(f'{A}_s2', f'--init {ADAPTERS}/{A}_s1/final {S2(rft)} --seed {s} --extra-views {SIIM_TRAIN}')
+    train(f'{A}_s3', s3_args(f'{ADAPTERS}/{A}_s2/final', ALL_COLON, s, the_choice()['recipe']))
+    evals([(f'{ADAPTERS}/{A}_s3/final', SETS[x], run_name(A, x), f'medscope-4b-v6-seed{s}', x) for x in SEED_SETS])
+
+def fold(k):                             # R27: a fold model, then the REAL-Colon pairs of the videos it never saw
+    train(f'v6_f{k}_s3', s3_args(S2_0, f'{CT}/views_train_fold{k}.jsonl', 0, the_choice()['recipe']))
+    evals([(f'{ADAPTERS}/v6_f{k}_s3/final', f'{CT}/views_test_fold{k}.jsonl', f'np_v6f{k}_colon', f'v6-fold{k}-natural', f'natural_colon_fold{k}')])
+
+def final():                             # MedScope-4B-v6 on every set; the mix not chosen on three
+    c = the_choice()
+    other = 'plain' if c['recipe'] == 'keep' else 'keep'
+    evals([(c['adapter'], SETS[x], run_name('v6', x), 'medscope-4b-v6', x) for x in SETS]
+          + [(f'{ADAPTERS}/v6_{other}_s3/final', SETS[x], run_name('v6_other', x), f'v6-{other}-mix', x) for x in ('test', 'ext2', 'siimte')])
+
+def ld_others():                         # v4, v5 and the base model on the LDPolypVideo pairs
+    evals([(a, LD_VIEWS, f'np_{t}_ld', f'{t}-ldpolyp', 'natural_ldpolyp') for t, a in (('v4', FINAL), ('v5', V5), ('base', ''))])
+
+def flagships():                         # the three flagships on the LDPolypVideo pairs (API; no GPU slot)
+    procs = [subprocess.Popen(f'python scripts/evaluate.py --api {p} --model {mid} --views {LD_VIEWS} --out {RESULTS}/np_{t}_ld '
+                              f'--name {mid}-ldpolyp --split natural_ldpolyp --batch-size 8 > {LD}/log_{t}.txt 2>&1',
+                              shell=True, cwd='/content/medscope')
+             for t, p, mid in FLAG if not os.path.exists(f'{RESULTS}/np_{t}_ld/summary.json')]
+    for proc in procs:
+        proc.wait()
+    for t, _, mid in FLAG:
+        if not os.path.exists(f'{RESULTS}/np_{t}_ld/summary.json'):
+            print(open(f'{LD}/log_{t}.txt').read()[-600:])
+            raise SystemExit(f'{mid}: the API run on the LDPolypVideo pairs did not finish (its log is above). Run all again.')
+
+def the_rest():                          # a moment later, so that the two mixes are first in the queue
+    import time
+    time.sleep(3)
+    together([flagships, ld_others, final] + [lambda s=s: seed(s) for s in SEEDS] + [lambda k=k: fold(k) for k in FOLDS])
+together([choice, the_rest])
+CHOICE = json.load(open(CHOICE_FILE))
+RECIPE, V6A, GUARD = CHOICE['recipe'], CHOICE['adapter'], CHOICE['rule']
+OTHER = 'plain' if RECIPE == 'keep' else 'keep'
+for x in SEED_SETS:                      # R25: the three-seed vote, from the stored decisions
     seeds = ' '.join(f'{RESULTS}/{run_name(mdl, x)}' for mdl in ('v6', 'v6_seed1', 'v6_seed2'))
     sh(f'python scripts/seed_vote.py --runs {seeds} --out {RESULTS}/{run_name("v6_vote", x)} --name medscope-4b-v6-vote --split {x}')
+print(GUARD)
 """),
-        md("## 7. The readings of Amendment 9"),
+        md("## 5. The readings of Amendment 9"),
         code(r"""
 def nat_diff(views_files, ref, other):   # natural ESG, ref minus other, resampling whole clips or videos
     views = {}
@@ -6847,7 +6885,7 @@ READINGS = '\n\n'.join(['R24: ' + GUARD, 'R26: ' + LD_RULE, 'R27 (REAL-Colon pai
 open(f'{RESULTS}/r24_readings_v6.md', 'w').write(READINGS + '\n')
 print(READINGS)
 """),
-        md("## 8. The earlier checks again for v6: edit visibility (R13) and question type (R20) (about 20 minutes)"),
+        md("## 6. The earlier checks again for v6: edit visibility (R13) and question type (R20) (about 20 minutes)"),
         code(r"""
 runs = 'MedScope-4B-v6=v6_test MedScope-4B=v4_final_test ' + ' '.join(f'{mid}=v2_{t}_test' for t, _, mid in FLAG)
 if not os.path.exists(f'{RESULTS}/r27_edit_visibility.md'):
