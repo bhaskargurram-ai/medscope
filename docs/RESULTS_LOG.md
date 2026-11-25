@@ -2085,3 +2085,13 @@ H200, four on a G4, three on an H100, two on an A100 80 GB. Every training and t
 every reading rule of Amendment 9 is as committed in a3629e0; finished pieces are skipped on resume. The queue was
 run on made-up decisions with one, three and six slots (never more jobs at once than slots; stage 3 of seeds and
 folds only after the choice; a second pass runs nothing).
+
+## 2026-11-25 — Notebook 60r: the same notebook 60 for a RunPod pod (no command, name, rule or number changed)
+
+`60r_final_model_v6_runpod.ipynb` is built from notebook 60's own cells; only Colab's Drive mount, secrets and
+runtime calls are replaced. The Colab folders are recreated on the pod's volume (every stored view keeps its
+`/content/...` image path), the data, earlier adapters and stored answers are copied from Google Drive with rclone
+(about 20 GB; old runs without their transcripts), whatever of v6 is already on Drive is resumed, and new adapters,
+checkpoints, results and a log (`runpod/notebook60.log`) are copied back every 15 minutes and at the end. Checked
+here only against stand-ins (the Drive cell against a stand-in rclone; the queue, readings and report cells on
+made-up decisions); not yet run on a pod.

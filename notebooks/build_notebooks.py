@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -6916,6 +6917,329 @@ sh(f'python scripts/question_type.py --views {TEST_VIEWS} {TEST_NEG} --results {
     ]
 
 
+# ---------------------------------------------------------------------------------------------- RunPod (JupyterLab)
+# The same notebook 60 outside Colab: the Colab folders are recreated on the pod's volume, the data comes from Google
+# Drive with rclone (nothing is uploaded by hand), new results go back to Drive while it runs, keys are set in a cell.
+
+RUNPOD_KEYS = r"""
+# ---- 1. Fill these in. The notebook then holds your keys: do not share it or commit it. ----
+KEYS = {
+    'GITHUB_TOKEN': '',          # read access to the medscope repository
+    'HF_TOKEN': '',              # Hugging Face
+    'OPENAI_API_KEY': '',
+    'ANTHROPIC_API_KEY': '',
+    'GEMINI_API_KEY': '',
+}
+RCLONE_TOKEN = ''                # leave empty: the next cell signs in to Google Drive with you, once
+STOP_POD_WHEN_DONE = True        # stop the pod (and its billing) when everything has finished, or when a step fails
+"""
+
+RUNPOD_SETUP = r"""
+# --- setup for RunPod: the same folders as on Colab, on the pod's volume; data from Google Drive ---
+import io, json, os, re, shutil, subprocess, sys, threading, time, urllib.request, zipfile
+STORE = '/workspace/medscope_colab'       # on the volume, so it survives a pod restart
+os.makedirs(STORE, exist_ok=True)
+if os.path.isdir('/content') and not os.path.islink('/content') and not os.listdir('/content'):
+    os.rmdir('/content')                  # an empty folder from the template
+if not os.path.exists('/content'):
+    os.symlink(STORE, '/content')         # every stored path starts with /content, as on Colab
+elif os.path.realpath('/content') != STORE:
+    print('NOTE: /content already exists on this pod and is not on the volume: its files are lost if the pod is deleted')
+DRIVE = '/content/drive/MyDrive/medscope'
+WORK = '/content/work'
+RESULTS = f'{DRIVE}/results'
+ADAPTERS = f'{DRIVE}/adapters'
+VIEWS = f'{WORK}/views'
+for d in (DRIVE, RESULTS, ADAPTERS, WORK, f'{DRIVE}/runpod'):
+    os.makedirs(d, exist_ok=True)
+os.environ['HF_HOME'] = '/workspace/hf'
+os.environ['PATH'] = os.path.dirname(sys.executable) + os.pathsep + os.environ['PATH']
+LOG = f'{DRIVE}/runpod/notebook60.log'    # everything the steps print; copied to Drive with the results
+_log_lock = threading.Lock()
+
+def say(text):
+    print(text, flush=True)
+    with _log_lock:
+        open(LOG, 'a').write(time.strftime('%Y-%m-%d %H:%M:%S ') + str(text) + '\n')
+
+for k, v in KEYS.items():
+    if v.strip():
+        os.environ[k] = v.strip()
+def secret(name):
+    return (KEYS.get(name) or os.environ.get(name) or '').strip() or None
+empty = [k for k in KEYS if not secret(k)]
+if empty:
+    raise SystemExit(f'Fill in {empty} in the first cell, then Run all again.')
+
+tools = [t for t in ('git', 'unzip', 'curl') if not shutil.which(t)]
+if tools:
+    subprocess.run('apt-get update -qq && apt-get install -y -qq ' + ' '.join(tools), shell=True)
+if not shutil.which('rclone'):
+    data = urllib.request.urlopen('https://downloads.rclone.org/rclone-current-linux-amd64.zip').read()
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        open('/usr/local/bin/rclone', 'wb').write(z.read(next(n for n in z.namelist() if n.endswith('/rclone'))))
+    os.chmod('/usr/local/bin/rclone', 0o755)
+print(subprocess.run(['rclone', 'version'], capture_output=True, text=True).stdout.splitlines()[0])
+
+REPO = 'bhaskargurram-ai/medscope'
+gh = secret('GITHUB_TOKEN')
+url = f'https://git:{gh}@github.com/{REPO}'
+def git(*args, cwd=None):
+    return subprocess.run(['git', *args], cwd=cwd, capture_output=True, text=True)
+if os.path.exists('/content/medscope/.git'):
+    git('remote', 'set-url', 'origin', url, cwd='/content/medscope')
+    r = git('fetch', '-q', 'origin', 'main', cwd='/content/medscope')
+    if r.returncode == 0:
+        r = git('reset', '-q', '--hard', 'origin/main', cwd='/content/medscope')
+else:
+    r = git('clone', '-q', url, '/content/medscope')
+if r.returncode != 0:
+    raise SystemExit('Could not download the code from GitHub (check GITHUB_TOKEN):\n' + r.stderr.replace(gh, '***'))
+
+def sh(cmd):
+    # run a project script, show and log its output live, and stop the notebook if it fails
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+                         env={**os.environ, 'PYTHONUNBUFFERED': '1'})
+    with _log_lock:
+        open(LOG, 'a').write(time.strftime('%Y-%m-%d %H:%M:%S ') + '$ ' + cmd[:300] + '\n')
+    for out_line in p.stdout:
+        print(out_line, end='')
+        with _log_lock:
+            open(LOG, 'a').write(out_line)
+    if p.wait() != 0:
+        say(f'FAILED (exit code {p.returncode}): {cmd[:300]}')
+        raise SystemExit(f'This step failed (exit code {p.returncode}):\n  {cmd[:200]}\n'
+                         'Nothing after it was run. Copy the error above into the chat.')
+
+for name in [m for m in sys.modules if m == 'medscope' or m.startswith('medscope.')]:
+    del sys.modules[name]
+os.chdir('/content/medscope')
+print('code version:', git('log', '--oneline', '-1', cwd='/content/medscope').stdout.strip())
+subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'opencv-python-headless', 'pyyaml', 'pillow', 'pandas', 'requests'], check=True)
+subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', '-e', '.', '--no-deps'], check=True)
+import cv2, yaml, numpy, PIL
+print('medscope installed; opencv', cv2.__version__)
+"""
+
+RUNPOD_DRIVE = r"""
+# --- Google Drive: sign in once, then copy what this notebook needs (nothing is uploaded by hand) ---
+import requests
+TOKEN_FILE = f'{STORE}/.rclone_drive_token.json'
+
+def drive_sign_in():
+    # rclone waits on the pod for Google's answer; you sign in from your own browser and paste the address back
+    proc = subprocess.Popen(['rclone', 'authorize', 'drive', '--auth-no-open-browser'], stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True)
+    lines = []
+    threading.Thread(target=lambda: [lines.append(x) for x in proc.stdout], daemon=True).start()
+    local = None
+    for _ in range(60):
+        local = re.search(r'http://(?:127\.0\.0\.1|localhost):53682/auth\?state=\S+', ''.join(lines))
+        if local:
+            break
+        time.sleep(0.5)
+    if not local:
+        proc.kill()
+        raise SystemExit('rclone did not start the sign-in:\n' + ''.join(lines)[-800:])
+    link = requests.get(local.group(0), allow_redirects=False).headers['Location']
+    print('1. Open this link and sign in with the Google account that owns MyDrive/medscope:\n\n' + link + '\n\n'
+          '2. After you allow access, the browser shows a page that cannot be reached (an address starting with\n'
+          '   http://127.0.0.1:53682/). That is expected. Copy that whole address from the address bar.\n', flush=True)
+    back = input('3. Paste the address here and press Enter: ').strip()
+    if '53682' not in back or 'code=' not in back:
+        proc.kill()
+        raise SystemExit('That is not the address of the page that failed to load. Run this cell again.')
+    requests.get(back.replace('localhost', '127.0.0.1'), timeout=120)
+    proc.wait(timeout=120)
+    blob = re.search(r'--->\s*(.*?)\s*<---', ''.join(lines), re.S)
+    if not blob:
+        raise SystemExit('The sign-in did not finish:\n' + re.sub(r'ya29\.\S+|1//\S+', '***', ''.join(lines))[-800:])
+    text = blob.group(1).strip()
+    if not text.startswith('{'):               # newer rclone versions wrap the token
+        import base64
+        text = json.loads(base64.b64decode(text + '=' * (-len(text) % 4)))['token']
+    return text
+
+token = RCLONE_TOKEN.strip() or (open(TOKEN_FILE).read().strip() if os.path.exists(TOKEN_FILE) else '') or drive_sign_in()
+json.loads(token)                              # must be the token rclone printed
+open(TOKEN_FILE, 'w').write(token)
+os.chmod(TOKEN_FILE, 0o600)
+os.environ.update({'RCLONE_CONFIG_GDRIVE_TYPE': 'drive', 'RCLONE_CONFIG_GDRIVE_SCOPE': 'drive', 'RCLONE_CONFIG_GDRIVE_TOKEN': token})
+REMOTE = 'gdrive:medscope'
+top = subprocess.run(['rclone', 'lsf', REMOTE, '--max-depth', '1'], capture_output=True, text=True)
+if top.returncode != 0 or 'adapters/' not in top.stdout:
+    if os.path.exists(TOKEN_FILE):
+        os.remove(TOKEN_FILE)
+    raise SystemExit('Google Drive is connected, but MyDrive/medscope/adapters is not there. Was it the right Google account?\n'
+                     + (top.stderr or top.stdout)[-600:] + '\nRun this cell again to sign in with the other account.')
+print('Google Drive connected:', ' '.join(sorted(top.stdout.split()))[:300])
+
+PULL = '''
+- **/candidates/**
+- *.rar
+- /natural_pairs/**.zip
+- /natural_pairs/**.tar
++ /slake/views.tar
++ /slake/negatives/**
++ /extra/extra.tar
++ /v4/v4.tar
++ /external/external.tar
++ /external/vqa.tar
++ /external/vqa_train/**
++ /models/big-lama.pt
++ /siim/*.zip
++ /natural_pairs/colon/**
++ /natural_pairs/colon_train/**
++ /natural_pairs/ldpolyp/**
++ /chexthought/r23/**
++ /v6/**
++ /adapters/final_choice_v4.json
++ /adapters/v6_choice.json
++ /adapters/v4_s3/final/**
++ /adapters/v42_s1/final/**
++ /adapters/v42_s2/final/**
++ /adapters/v42_s3/final/**
++ /adapters/v5_s3/final/**
++ /adapters/v43cxt_s3/final/**
++ /adapters/v6_*/**
++ /results/v6_*/**
++ /results/np_v6*/**
+- transcripts.jsonl
+- stale_outcomes.jsonl
++ /results/v4_s3_val/**
++ /results/v4_final_*/**
++ /results/v42_*/**
++ /results/v5_*/**
++ /results/r23_*/**
++ /results/v2_gemini_test/**
++ /results/v2_claudeopus_test/**
++ /results/v2_gpt6astra_test/**
++ /results/np_*/**
+- *
+'''
+PUSH = '''
++ /adapters/v6_*/**
++ /adapters/v6_choice.json
++ /results/v6_*/**
++ /results/np_v6*/**
++ /results/np_*_ld/**
++ /results/r2[4-7]_**
++ /results/60_**
++ /v6/**
++ /natural_pairs/ldpolyp/log_*
++ /runpod/**
+- *
+'''
+open(f'{STORE}/pull.txt', 'w').write(PULL.strip() + '\n')
+open(f'{STORE}/push.txt', 'w').write(PUSH.strip() + '\n')
+COMMON = '--update --fast-list --transfers 16 --checkers 32 --drive-chunk-size 64M --retries 5 --low-level-retries 20'
+
+# from Drive: the benchmark data, the adapters and stored answers this notebook builds on, and whatever of v6 exists.
+# --update never replaces a newer file on the pod, so this is safe to run again.
+t0 = time.time()
+sh(f'rclone copy {REMOTE} {DRIVE} --filter-from {STORE}/pull.txt {COMMON} --stats 30s --stats-one-line --stats-log-level NOTICE')
+print(f'copied from Drive in {(time.time() - t0) / 60:.0f} minutes')
+print(subprocess.run(f'du -sh {DRIVE}', shell=True, capture_output=True, text=True).stdout.strip())
+
+_push_lock = threading.Lock()
+def push(why=''):
+    # new adapters, checkpoints, results and the log go back to Drive; nothing on Drive is deleted
+    with _push_lock:
+        r = subprocess.run(f'rclone copy {DRIVE} {REMOTE} --filter-from {STORE}/push.txt {COMMON}', shell=True, capture_output=True, text=True)
+        say(f'saved to Drive {why}' if r.returncode == 0 else f'save to Drive {why}: some files will be retried ({r.stderr.strip()[-200:]})')
+        return r.returncode == 0
+def _push_loop():
+    while True:
+        time.sleep(15 * 60)
+        try:
+            push('(every 15 minutes)')
+        except Exception as e:
+            say(f'save to Drive failed: {e}')
+if not any(t.name == 'medscope-push' for t in threading.enumerate()):
+    threading.Thread(target=_push_loop, name='medscope-push', daemon=True).start()
+
+def stop_pod():
+    pod = os.environ.get('RUNPOD_POD_ID')
+    if STOP_POD_WHEN_DONE and pod and shutil.which('runpodctl'):
+        say('stopping the pod in one minute (its volume, with everything on it, is kept)')
+        time.sleep(60)
+        subprocess.run(['runpodctl', 'stop', 'pod', pod])
+    else:
+        say('the pod is still running: stop it yourself when you are done')
+
+# from here on: when a cell fails, save what exists to Drive and stop the pod, so it does not bill while idle
+# (a cell you interrupt yourself does not stop the pod)
+def _after_cell(result):
+    err = result.error_in_exec or result.error_before_exec
+    if err is None or isinstance(err, KeyboardInterrupt):
+        return
+    say(f'*** This step failed: {type(err).__name__}: {str(err)[:500]}')
+    push('(after the failure)')
+    stop_pod()
+_ip = get_ipython()
+for _cb in list(_ip.events.callbacks['post_run_cell']):
+    if getattr(_cb, '__name__', '') == '_after_cell':
+        _ip.events.unregister('post_run_cell', _cb)
+_ip.events.register('post_run_cell', _after_cell)
+print('results are copied to Drive every 15 minutes; on a failure or at the end, once more, and the pod stops')
+"""
+
+RUNPOD_DONE = r"""
+ok = push('(final)')
+say('all done' + ('' if ok else '; the last copy to Drive reported errors: run this cell again before the pod is deleted'))
+if ok:
+    stop_pod()
+"""
+
+
+def nb60_runpod() -> list[dict]:
+    """Notebook 60 for a RunPod pod (JupyterLab): same steps, commands, names and rules; Colab's Drive, secrets and
+    runtime calls are replaced, and the data comes from Google Drive with rclone."""
+    cells = nb60_final_model()
+    text = lambda c: "".join(c["source"])       # noqa: E731
+    out = [md("""
+# MedScope 60 on RunPod: the consolidated model, MedScope-4B-v6 (R24-R27, Amendment 9)
+
+The same notebook 60 as on Colab (same steps, commands, file names and reading rules), for a RunPod pod with
+JupyterLab. Nothing is uploaded by hand:
+
+- the data, the earlier adapters and the stored answers are copied from your Google Drive (`MyDrive/medscope`),
+  about 20 GB, in the second cell;
+- whatever of v6 already exists on Drive (the two mixes, the seeds' checkpoints) is picked up and not repeated;
+- new adapters, checkpoints, results and a log go back to Drive every 15 minutes, so progress can be followed there;
+- when everything has finished, or a step fails, the last results are saved and the pod stops.
+
+**Before you start**
+
+1. Stop the Colab run of notebook 60 first: two runs writing the same Drive folders would overwrite each other.
+2. Pod: an H200 (six jobs at a time) or any GPU of 40 GB or more; a PyTorch template; a **volume of at least 150 GB**
+   mounted at `/workspace` (everything is kept there, so a stopped pod can be started again and resumed).
+3. Fill in the keys in the first cell, then Run all.
+4. The second cell asks you once to sign in to Google Drive: it prints a link, you allow access, and you paste back
+   the address of the page that then fails to load. The sign-in is kept on the volume for later runs.
+
+If the browser tab is closed the run continues; its output is then in `MyDrive/medscope/runpod/notebook60.log`.
+After a pod restart: Run all again; nothing finished is repeated.
+"""), code(RUNPOD_KEYS), code(RUNPOD_SETUP), code(RUNPOD_DRIVE)]
+    for c in cells[1:]:
+        t = text(c)
+        if c["cell_type"] == "code":
+            if "from google.colab import drive, userdata" in t or "auto-release armed" in t:
+                continue                              # Colab's setup and auto-release: replaced above
+            if "runtime.unassign()" in t:
+                out.append(code(RUNPOD_DONE))
+                continue
+            if "publish_doc(" in t:
+                t = re.sub(r"(?m)^publish_doc\(.*\)$", "push('(the report)')", t)
+                assert "publish_doc(" not in t.replace("publish_doc,", "")
+                out.append(code(t))
+                continue
+        out.append(c)
+    leftovers = [text(c)[:80] for c in out if c["cell_type"] == "code" and "google.colab" in text(c)]
+    assert not leftovers, leftovers
+    return out
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -7012,6 +7336,7 @@ NOTEBOOKS = {
     "58_release_v5.ipynb": nb58_release_v5,
     "59_chexthought_pneumothorax.ipynb": nb59_chexthought_pneumothorax,
     "60_final_model_v6.ipynb": nb60_final_model,
+    "60r_final_model_v6_runpod.ipynb": nb60_runpod,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 
