@@ -1,0 +1,63 @@
+\documentclass[5p,times,twocolumn,authoryear]{elsarticle}
+% Two-column Elsevier layout (elsarticle 5p; the Medical Image Analysis format). Bibliography: plainnat (author-year).
+% Manuscript v6. Each part lives in sections/*.tex. Build: ./build.sh
+
+\usepackage[OT1]{fontenc} % elsarticle loads T1; OT1 keeps every font Type 1 without cm-super
+\usepackage{amsmath,amssymb,amsfonts,bm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{adjustbox}
+\usepackage{array}
+\usepackage{microtype}
+\usepackage{xcolor}
+\definecolor{linkblue}{HTML}{335A8A}
+\usepackage[colorlinks=true,linkcolor=linkblue,citecolor=linkblue,urlcolor=linkblue]{hyperref}
+\usepackage{url}
+\usepackage[font=small,labelfont=bf,labelsep=period,skip=4pt]{caption}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\setlist{nosep,leftmargin=*}
+\setlength{\emergencystretch}{2.5em}
+\renewcommand{\topfraction}{0.9}\renewcommand{\dbltopfraction}{0.9}\renewcommand{\bottomfraction}{0.6}
+\renewcommand{\textfraction}{0.07}\renewcommand{\floatpagefraction}{0.75}\renewcommand{\dblfloatpagefraction}{0.75}
+\setcounter{topnumber}{4}\setcounter{dbltopnumber}{3}\setcounter{totalnumber}{6}
+\makeatletter\g@addto@macro{\UrlBreaks}{\do\-}\makeatother
+\biboptions{authoryear,round}
+\journal{Medical Image Analysis}
+
+% --- names, fixed once (never typed by hand in the sections) ---
+\newcommand{\ms}{\texttt{MedScope-4B}}          % counterfactual training only; the primary model
+\newcommand{\msp}{\texttt{MedScope-4B-P}}       % plus pneumothorax films in every stage (post hoc remedy)
+\newcommand{\msn}{\texttt{MedScope-4B-N}}       % plus unedited (natural) training images
+\newcommand{\base}{\texttt{Qwen3.5-4B}}         % the base model, not fine-tuned
+\newcommand{\gem}{\texttt{gemini-4-argon}}
+\newcommand{\opus}{\texttt{claude-opus-5-5}}
+\newcommand{\gpt}{\texttt{gpt-6-astra}}
+\newcommand{\toconfirm}[1]{\textcolor{red}{\textbf{[To confirm: #1]}}}
+\newcommand{\ci}[2]{[#1,\,#2]}                  % 95% interval
+
+\begin{document}
+
+\input{sections/00_frontmatter}
+\input{sections/01_introduction}
+\input{sections/02_related}
+\input{sections/03_methods}
+\input{sections/04_results_a}
+\input{sections/05_results_b}
+\input{sections/06_discussion}
+\input{sections/07_backmatter}
+
+\bibliography{refs}
+\bibliographystyle{plainnat}
+
+\newpage
+\onecolumn
+\appendix
+\setcounter{table}{0}\renewcommand{\thetable}{S\arabic{table}}
+\setcounter{figure}{0}\renewcommand{\thefigure}{S\arabic{figure}}
+\input{sections/supp_a_plan_methods}
+\input{sections/supp_b_results_a}
+\input{sections/supp_c_results_b}
+\input{sections/supp_d_checklist}
+
+\end{document}
