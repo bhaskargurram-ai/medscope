@@ -14,7 +14,7 @@ Confirmatory analyses are those in which no model of this study had been run on 
 % src: review_numbers I2, M6; RE264, RE442, RE122-123; READER_VERIFIED.md L1, L20; L818-824 (first use of the new SIIM-ACR patients); L775-803 (pneumothorax analysis, post hoc); L826-873 (factorial arms, patient-level resampling, hash comparison, prompting conditions, dated 5 Nov after the main-test results of 3 Nov); L1280-1295 (interaction analysis); L1824-1832 (rebuild); supp_c_results_b.tex (continued-training observation)
 
 \begin{table}[!p]
-\caption{Every analysis of the study, in the order of the Results: the question, the design element that answers it, the test data, the status, the part of Supplementary Table~\ref{tab:s_plan} that gives its decision rule (--: no decision rule), and where it is reported. Part 1 of 2. Status: pre-specified, descriptive or post hoc as defined in the text; ``existing answers'': a re-analysis of main-test answers that existed when the rule was fixed; ``confirmatory'': no model of this study had been run on the test data when the rule was dated. Sections are those of the main text. ESG: evidence sensitivity gap.}
+\caption{Every analysis of the study, in the order of the Results: the question, the design element that answers it, the test data, the status, the part of Supplementary Table~\ref{tab:s_plan} that gives its decision rule (--: no decision rule), and where it is reported. Part 1 of 3. Status: pre-specified, descriptive or post hoc as defined in the text; ``existing answers'': a re-analysis of main-test answers that existed when the rule was fixed; ``confirmatory'': no model of this study had been run on the test data when the rule was dated. Sections are those of the main text. ESG: evidence sensitivity gap.}
 \label{tab:s_overview}
 \centering
 \footnotesize
@@ -53,7 +53,7 @@ Can a decision rule applied to model outputs do better? & 270 decision rules, ch
 
 \begin{table}[!p]
 \ContinuedFloat
-\caption{(continued) Part 2 of 2.}
+\caption{(continued) Part 2 of 3.}
 \centering
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -83,6 +83,21 @@ Against polyp-free frames from the same stretch of the video? & Context-matched 
 What does each kind of training data contribute? & Two-by-two: with or without counterfactual views, with or without unedited pairs & REAL-Colon: 103 pairs; main test & Pre-specified & 3 & Section~\ref{subsec:res_pairs}; Table~\ref{tab:s_twobytwo} \\
 Does \msn{} hold at a hospital not used in training, and on REAL-Colon? & \msn; cross-validated answers on REAL-Colon & LDPolypVideo: 116 pairs; REAL-Colon: 103 pairs & Model post hoc; tests pre-specified; LDPolypVideo confirmatory & 3 & Table~\ref{tab:natural}; Tables~\ref{tab:s_ldpolyp}, \ref{tab:s_realcolon} \\
 Do same-patient chest X-ray pairs show the same? & Follow-up pairs from NIH ChestX-ray14 & 44 pairs (first build); 183 of 200 (rebuild) & Descriptive; rebuild post hoc & -- & Table~\ref{tab:s_cxrpairs} \\
+\bottomrule
+\multicolumn{6}{@{}p{0.97\textwidth}@{}}{$^{b}$\,No model of this study had been run on the two fresh sets before \ms{} was fixed; the external datasets had been used with development versions of the trained model.} \\
+\end{tabular}
+\end{table}
+
+\begin{table}[!p]
+\ContinuedFloat
+\caption{(continued) Part 3 of 3.}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}L{0.22\textwidth}L{0.21\textwidth}L{0.16\textwidth}L{0.14\textwidth}L{0.05\textwidth}L{0.15\textwidth}@{}}
+\toprule
+\textbf{Question} & \textbf{Design element} & \textbf{Test data} & \textbf{Status} & \textbf{Rule} & \textbf{Reported in} \\
 \midrule
 \multicolumn{6}{@{}l}{\textit{\msn{} on the earlier tests and on chest films (Section~\ref{subsec:res_nmodel})}} \\
 Which training mix, and does it pass the validation guard? & Two candidate mixes chosen on validation data & Validation set; SIIM-ACR validation patients & Model post hoc; rule pre-specified & 1 & Table~\ref{tab:s_mix} \\
@@ -91,7 +106,6 @@ Does \msn{} keep the main-test result, across seeds, and does the vote help? & \
 Does it raise pneumothorax detection, and what does it cost on the fresh external set? & \msn{} against \msp & 200 new SIIM-ACR patients; fresh external set & Model post hoc; tests pre-specified & 4 & Table~\ref{tab:nmodel}; Table~\ref{tab:s_nmodel} \\
 How does it do elsewhere? & \msn{} on CheXthought test films, external datasets, fresh internal set, standard question answering, low-visibility erasures and question types & 600 CheXthought films; the other sets as above & Model post hoc; descriptive & -- & Table~\ref{tab:s_nmodel}; Tables~\ref{tab:s_chest}, \ref{tab:s_vqa} \\
 \bottomrule
-\multicolumn{6}{@{}p{0.97\textwidth}@{}}{$^{b}$\,No model of this study had been run on the two fresh sets before \ms{} was fixed; the external datasets had been used with development versions of the trained model.} \\
 \end{tabular}
 \end{table}
 % src: v5 P739-741, P778, P1234-1237; L1087-1088 (219 TELEA, 191 Stable Diffusion); L1242-1300 (edit-site control, half and restored erasures, probes); v5 P778 (179 validation lesion cases; 143 found); L1417 (111); L775-803 (pneumothorax analysis); L818-824, L1366-1383 (variant, MedScope-4B-P); L441 (1,051 items); PREREGISTRATION_v4 amendment 2 and L742-746 (requests for a better image by kind of degradation planned; no result in the log); L1430, L1564 (103, 96); L1443-1450, L1826 (44; 183 of 200); RE539-569, RE599-612 (MedScope-4B-N tests); L1964 (600 films)
@@ -240,6 +254,7 @@ Does rewarding inspection before the answer help on unedited pairs?$^{\ddagger}$
 \clearpage
 
 \subsection{Evaluation sets}
+\label{sec:s_data}
 
 Table~\ref{tab:s_datasets} gives every evaluation set with its cases per source. The SIIM-ACR films of the fresh external set come from a 256-pixel copy of the dataset; for a post hoc check, 42 of its 48 pneumothorax films were found at original resolution. The plan named ChestX-Det and TCGA-LGG for the fresh internal set; no unused TCGA-LGG test-split patient remained, so the set holds ChestX-Det cases only. The hash comparison across sets covered the training and validation sets, the main test, the external datasets and the two fresh sets (6,849 unedited images); the sets added later are kept apart by source or by patient as stated in the table.
 % src: PREREGISTRATION_v4.md post-hoc note 1, L772, L780-781 (256-pixel copy; 42 of 48); PREREGISTRATION_v4.md L27 and L693-694 (TCGA-LGG); L844-858 (hash comparison, six sets)
