@@ -2117,3 +2117,91 @@ erased-lesion claims on both validation sets (10.6% to 7.5%; 31.3% to 14.6%), bu
 halves the pneumothoraces found (60.4% to 30.2%) and raises denials of control-edited films (39.6% to 68.8%): the
 model says "absent" more, not more selectively. The plain mix is MedScope-4B-v6; seeds 1 and 2 and the fold models are
 trained with it. The kept mix is run on the main test, the fresh external set and the new SIIM patients as planned.
+
+## 2026-11-26 — R25, R26, R27 results: MedScope-4B-v6 on the main test, three seeds, a new hospital and every earlier test (notebook 60; Amendment 9)
+
+Report `results/60_consolidated_model_v6_(r24-r27)_report.md`, written 09:32 UTC on an RTX PRO 6000 Blackwell (Colab
+"G4"); readings in `r24_readings_v6.md`, `r25_seeds_v6.md`, `r26_natural_ldpolyp.md`, `r27_*.md`. Every rule was
+fixed in Amendment 9 (a3629e0) before any of this ran. One attempt.
+
+**R25, three training seeds: HOLDS.** Every seed is above each of the three flagships on main-test ESG with the paired
+interval above zero. The three-seed vote is the reported operating point.
+
+| Main test (507 cases) | Seed 0 (v6) | Seed 1 | Seed 2 | Mean (sd) | Three-seed vote |
+| --- | --- | --- | --- | --- | --- |
+| ESG | 0.744 | 0.740 | 0.726 | 0.737 (0.010) | 0.753 |
+| Lesion images correct (CCR) | 0.847 | 0.872 | 0.874 | 0.865 (0.015) | 0.863 |
+| Erased claims | 9.1% | 13.7% | 14.6% | 12.5% (2.9%) | 10.5% |
+| Lesion-free claims | 8.7% | 15.3% | 10.8% | 11.6% (3.4%) | 9.0% |
+| Net utility | 0.709 | 0.675 | 0.721 | 0.702 (0.024) | 0.726 |
+
+Vote minus each flagship, main-test ESG: gemini-4-argon +0.283 [+0.203, +0.364]; claude-opus-5-5 +0.425
+[+0.350, +0.500]; gpt-6-astra +0.447 [+0.368, +0.528]; all p < 0.001.
+
+**R27, main test: no trade.** v6 ESG 0.744 against 0.758 for v4 (-0.014 [-0.068, +0.040], p = 0.680); net utility
+0.709 against 0.732 (-0.023 [-0.089, +0.040], p = 0.487). v6 against v4.2, v5 and v4.3-cxt: no interval excludes zero
+on any of the five measures.
+
+**R26, LDPolypVideo natural pairs (116 pairs from 160 clips; a hospital no model here had seen): MIXED.**
+
+| Model | Lesion found | Lesion-free frame: absent or referred | Natural ESG [95% CI] | v6 minus model [95% CI], p |
+| --- | --- | --- | --- | --- |
+| MedScope-4B-v6 | 62.1% | 99.1% | 0.612 [0.526, 0.698] | -- |
+| v6 three-seed vote | 61.2% | 97.4% | 0.586 [0.491, 0.673] | +0.026 [-0.009, +0.069], p = 0.238 |
+| MedScope-4B (v4) | 45.7% | 96.6% | 0.422 [0.328, 0.517] | +0.190 [+0.112, +0.267], p < 0.001 |
+| MedScope-v5 | 59.5% | 99.1% | 0.586 [0.491, 0.672] | +0.026 [-0.017, +0.069], p = 0.351 |
+| Qwen3.5-4B (base) | 40.5% | 95.7% | 0.362 [0.276, 0.448] | +0.250 [+0.155, +0.353], p < 0.001 |
+| gemini-4-argon | 71.6% | 81.0% | 0.526 [0.422, 0.621] | +0.086 [-0.017, +0.190], p = 0.117 |
+| claude-opus-5-5 | 62.9% | 83.6% | 0.466 [0.362, 0.569] | +0.147 [+0.043, +0.250], p = 0.010 |
+| gpt-6-astra | 55.2% | 75.0% | 0.302 [0.198, 0.405] | +0.310 [+0.181, +0.431], p < 0.001 |
+
+Natural-pair training carries over to the new hospital (v6 minus v4 +0.190). v6 is above two of the three flagships;
+the interval against gemini-4-argon includes zero. Present with a correct box (IoU >= 0.3): v6 66/116, gemini-4-argon
+76/116, claude-opus-5-5 66/116, gpt-6-astra 55/116, v4 50/116.
+
+**R27, REAL-Colon natural pairs, cross-validated (103 pairs): MIXED.** v6-CV natural ESG 0.534 [0.394, 0.661]. Minus
+gemini-4-argon +0.068 [-0.069, +0.202], p = 0.347; claude-opus-5-5 +0.087 [-0.049, +0.230], p = 0.259; gpt-6-astra
++0.214 [+0.071, +0.343], p = 0.003. v6-CV minus v5-CV -0.019 [-0.086, +0.048], p = 0.604: adding the chest films to
+stage 3 costs nothing here. v6-CV minus v4 +0.291 [+0.176, +0.402]; minus v4.2 +0.272 [+0.162, +0.378]. On the 96
+context-matched pairs: v6-CV 0.479 [0.322, 0.615]; minus gemini-4-argon +0.146 [+0.000, +0.284], p = 0.067;
+claude-opus-5-5 +0.156 [+0.032, +0.277], p = 0.019; gpt-6-astra +0.292 [+0.137, +0.429], p < 0.001.
+
+**R27, pneumothorax, new SIIM patients (100 pneumothorax and 100 healthy films): NOT RAISED.** v6 calls 54/100
+pneumothorax films present, v4.2 53/100 (+0.010 [-0.080, +0.100], p = 0.920); healthy films called positive 4/100
+against 5/100. Seeds 1 and 2 call 75/100 and 70/100, the vote 68/100 (Youden 0.620 [0.510, 0.730] against 0.500
+[0.380, 0.610] for seed 0 and 0.480 for v4.2); the rule was fixed on seed 0, so this is descriptive.
+
+**R27, CheXthought test patients (300 and 300 films).** Youden: v6 0.660 [0.591, 0.726], vote 0.700 [0.633, 0.763],
+v4.3-cxt 0.650, v4.2 0.287, gemini-4-argon 0.460, claude-opus-5-5 0.207, gpt-6-astra 0.377. v6 minus each flagship:
++0.200 [+0.122, +0.284], +0.453 [+0.344, +0.560], +0.283 [+0.196, +0.375]; all p < 0.001.
+
+**R27, fresh external (316 cases): THE COST REMAINS.** Erased-lesion claims v6 22.0%, v4.2 11.3% (+0.107
+[+0.054, +0.162], p < 0.001); v5 19.6%, v4.3-cxt 20.2% (neither interval excludes zero). By source, v6 against v4.2:
+SIIM pneumothorax chest films 33% against 10%, ETIS-Larib 26% against 15%, BUS-UCLM 14% against 8%, BraTS meningioma
+12% against 12%. On the same set v6 is above v4 on net utility (0.114 against -0.053, +0.168 [+0.056, +0.279],
+p = 0.002) and on lesion images correct (0.607 against 0.476, +0.131 [+0.069, +0.197]); ESG 0.381 against 0.393.
+Vote: erased claims 22.6%, net utility 0.147.
+
+**R27, external centres (169 cases).** v6 minus v4: net utility +0.096 [+0.011, +0.182], p = 0.020; ESG +0.076
+[+0.009, +0.143], p = 0.033. v6 minus v4.2: ESG -0.067 [-0.126, -0.009], p = 0.025. **Fresh internal (76 cases):**
+v6 against v4 and v4.2, no interval excludes zero; v6 minus v5 on lesion images correct -0.139 [-0.250, -0.038].
+
+**R24, the kept mix on the tests (run as planned; not the model).** Main test: net utility 0.765 against 0.709 for the
+plain mix (plain minus kept -0.056 [-0.115, +0.003], p = 0.062). Fresh external: erased claims 17.3% against 22.0%
+(+0.048 [+0.006, +0.092], p = 0.035). New SIIM patients: lesion images correct 0.320 against 0.530 (+0.210
+[+0.111, +0.307]), net utility -0.512 against -0.134 (+0.378 [+0.195, +0.567]).
+
+**R13 again (edit visibility).** Low-visibility erasures (117 cases): ESG v6 0.624 [0.538, 0.709], v4 0.650; v6 minus
+gemini-4-argon +0.231 [+0.103, +0.359], claude-opus-5-5 +0.402 [+0.291, +0.513], gpt-6-astra +0.359 [+0.231, +0.479].
+Erased claims on low-visibility erasures: v6 13.7%, flagships 42.7% to 57.3%.
+
+**R20 again (question type).** v6 ESG 0.711 [0.632, 0.789] on finding-specific questions (114 lesion cases) and 0.781
+[0.695, 0.857] on generic ones (105); minus the flagships +0.272 to +0.368 and +0.276 to +0.524, all p < 0.001.
+
+**Standard VQA (all questions).** v6: PathVQA 0.507, SLAKE 0.743, VQA-RAD 0.532 (v4: 0.477, 0.730, 0.514).
+
+**Reading.** One model now does what v4.2, v4.3-cxt and v5 did separately, with no loss on the main test, and its
+lead over the flagships on the main test holds for every seed. On real colonoscopy frames it is far above v4 at two
+hospitals, one of them unseen, and above two of three flagships at the unseen one; against gemini-4-argon the
+difference is not shown on either set. Two limits stay: erased-lesion claims on the fresh external set remain about
+twice v4.2's, and pneumothorax sensitivity on new SIIM patients depends on the seed (54% to 75%).
