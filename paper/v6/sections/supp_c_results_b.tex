@@ -276,14 +276,14 @@ Model & Pneumothorax films called present & $p$ & Films without pneumothorax cal
 % src: report60 L186-218; L2169-2176; L1973-1985 (CheXthought rows of the comparison models); docs/REVIEW_EXPERIMENTS.md L490-515 (film selection and rule)
 
 \begin{table}[!htbp]
-\caption{Chest X-ray follow-up pairs (secondary; descriptive): a film whose only label is pneumothorax, effusion, nodule or mass, and the nearest film of the same patient and view labelled as showing no finding (NIH ChestX-ray14; labels mined from reports). Two builds are shown. In the first build, 200 pairs were built (50 per finding) and a near-copy check that compared coarse image hashes removed 156, leaving 44; the result is reported as run. In the rebuild (post hoc) the check was corrected and 183 of the same 200 pairs were scored. Brackets: 95\% bootstrap intervals over patients where recorded. Differences are \ms{} minus the row model on the rebuild. By finding, natural ESG of \ms{} was $0.00$ for effusion ($n = 11$), $0.50$ for mass ($n = 10$), $-0.14$ for nodule ($n = 7$) and $-0.06$ for pneumothorax ($n = 16$) in the first build, and $0.31$, $0.24$, $0.13$ and $0.00$ in the rebuild ($n = 45$ to $46$ each). \msn{} was not run on these pairs.}
+\caption{Chest X-ray follow-up pairs (secondary; descriptive): a film whose only label is pneumothorax, effusion, nodule or mass, and the nearest film of the same patient and view labelled as showing no finding (NIH ChestX-ray14; labels mined from reports). Two versions are shown. In the planned version, 200 pairs were built (50 per finding) and a near-copy check that compared coarse image hashes removed 156, leaving 44; the result is reported as run. In the corrected version (post hoc) the check also required pixel correlation, and 183 of the same 200 pairs were scored. Brackets: 95\% bootstrap intervals over patients where recorded. Differences are \ms{} minus the row model on the corrected version. By finding, natural ESG of \ms{} was $0.00$ for effusion ($n = 11$), $0.50$ for mass ($n = 10$), $-0.14$ for nodule ($n = 7$) and $-0.06$ for pneumothorax ($n = 16$) in the planned version, and $0.31$, $0.24$, $0.13$ and $0.00$ in the corrected version ($n = 45$ to $46$ each). \msn{} was not run on these pairs.}
 \label{tab:s_cxrpairs}
 \centering
 \footnotesize
 \begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{l c c cc}
 \toprule
- & First build ($44$ pairs) & \multicolumn{3}{c}{Rebuild, post hoc ($183$ pairs)} \\
+ & Planned ($44$ pairs) & \multicolumn{3}{c}{Corrected, post hoc ($183$ pairs)} \\
 \cmidrule(lr){2-2}\cmidrule(lr){3-5}
 Model & Natural ESG [95\% CI] & Natural ESG [95\% CI] & \ms{} minus model [95\% CI] & $p$ \\
 \midrule
@@ -525,8 +525,8 @@ Fresh external ($316$ cases) & ESG & $0.381$ $\ci{0.298}{0.461}$ & $0.417$ & n.r
 % src: top: L1578-1602 (= v5 P1096-1124), L1517-1518 (limits); bottom: L1919-1927, L1962-1995 (L1965-1966 limits as re-scored)
 
 \begin{table}[!htbp]
-\caption{\msn{} (first seed) and its three-seed vote against \ms{} and \msp{} on every test set of the main text except the unedited colonoscopy pairs: the full version of Table~\ref{tab:nmodel}. Top: values. Lesion images correct: share of original and control-edited lesion images answered correctly. Youden index: share of pneumothorax films called present plus share of films without pneumothorax answered ``absent'' or referred, minus one. The vote needs three model runs per image. Bottom: \msn{} minus the other model on the four counterfactual test sets, paired over cases, with 95\% CI and two-sided $p$ values; differences in claims are differences in proportions. The pre-specified readings were: on the main test, an ESG more than 0.05 below that of \ms{} would count as a loss (not reached); on the fresh external set, an interval above zero for erased-lesion claims against \msp{} would mean that the added training images carry a cost (interval above zero). The other comparisons are descriptive. Differences on the chest films are in Supplementary Table~\ref{tab:s_chest}; the three seeds are in Supplementary Table~\ref{tab:s_nseeds}.}
-\label{tab:s_nmodel}\label{tab:s_next}
+\caption{\msn{} (first seed) and its three-seed vote against \ms{} and \msp{} on every test set of the main text except the unedited colonoscopy pairs: the full version of Table~\ref{tab:nmodel}. Lesion images correct: share of original and control-edited lesion images answered correctly. Youden index: share of pneumothorax films called present plus share of films without pneumothorax answered ``absent'' or referred, minus one. The vote needs three model runs per image. Paired differences are in Supplementary Table~\ref{tab:s_next} for the four counterfactual test sets and in Supplementary Table~\ref{tab:s_chest} for the chest films; the three seeds are in Supplementary Table~\ref{tab:s_nseeds}.}
+\label{tab:s_nmodel}
 \centering
 \footnotesize
 \begin{adjustbox}{max width=\linewidth}
@@ -579,8 +579,14 @@ Youden index & $0.000$ & $0.287$ & $0.660$ & $0.700$ \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
+\end{table}
+% src: main test, external datasets, fresh internal, fresh external: report60 L221-234, L261-274, L286-299, L306-319 (values; claims are the report's proportions times 100) and L365-403 (vote); new SIIM-ACR patients: report60 L190-197 (films, Youden), L407-413 (MedScope-4B-N and vote, five measures), L1596-1602 of the log (MedScope-4B-P and MedScope-4B, five measures) and facts C5; CheXthought: report60 L206-212
 
-\vspace{0.6em}
+\begin{table}[!htbp]
+\caption{Paired differences for Supplementary Table~\ref{tab:s_nmodel}: \msn{} (first seed) minus \ms{} and minus \msp{} on the four counterfactual test sets, paired over cases, with 95\% CI and two-sided $p$ values; differences in claims are differences in proportions. The pre-specified readings were: on the main test, an ESG more than 0.05 below that of \ms{} would count as a loss (not reached); on the fresh external set, an interval above zero for erased-lesion claims against \msp{} would mean that the added training images carry a cost (interval above zero). The other comparisons are descriptive.}
+\label{tab:s_next}
+\centering
+\footnotesize
 \begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{l cc cc}
 \toprule
@@ -617,7 +623,7 @@ Net utility & $+0.168$ $\ci{+0.056}{+0.279}$ & $0.002$ & $+0.067$ $\ci{-0.039}{+
 \end{tabular}
 \end{adjustbox}
 \end{table}
-% src: top, main test, external datasets, fresh internal, fresh external: report60 L221-234, L261-274, L286-299, L306-319 (values; claims are the report's proportions times 100) and L365-403 (vote); new SIIM-ACR patients: report60 L190-197 (films, Youden), L407-413 (MedScope-4B-N and vote, five measures), L1596-1602 (MedScope-4B-P and MedScope-4B, five measures) and facts C5; CheXthought: report60 L206-212. Bottom: report60 L221-234, L261-274, L286-299, L306-319 (identical to the former Supplementary Table of p values); rules: docs/REVIEW_EXPERIMENTS.md L606-610
+% src: report60 L221-234, L261-274, L286-299, L306-319; rules: docs/REVIEW_EXPERIMENTS.md L606-610
 
 \begin{table}[!htbp]
 \caption{\msn{} (first seed) against the two single-addition models on the four counterfactual test sets: values, paired differences (\msn{} minus the other model) with 95\% CI, and two-sided $p$ values. \msp{} with CheXthought films was not run on the external datasets or the fresh internal set (--). On the fresh external set no difference in erased-lesion claims between \msn{} and either single-addition model was shown; each single-addition model reported more erased lesions there than \msp{} (Supplementary Table~\ref{tab:s_additions}).}
@@ -807,8 +813,8 @@ Adapter rank 64 instead of 16 & First-stage model & Main-test ESG $0.731$ agains
 Adapter on the vision encoder, learning rate $2 \times 10^{-4}$ & First-stage model & ESG $0.000$ on every set; the answer depends on the question only & Not met \\
 Adapter on the vision encoder, learning rate $2 \times 10^{-5}$ & First-stage model & Main-test ESG $0.776$, but fresh external lesion images correct $0.560 \to 0.488$ ($-0.071$, $p = 0.03$); erased-lesion claims $6.8\%$ & Not met \\
 Reinforcement learning on the cost-matrix reward (150 steps) & Continued training & Net utility with tools not used in training $+0.056$, erased-lesion claims $+0.022$ (the condition on erased-lesion claims was missed); fresh external net utility $+0.124$, ESG $+0.083$, lesion-free claims $+0.054$ & Not met \\
-Multi-agent reader, first design & Continued training$^{\ast}$ & Net utility with tools not used in training $+0.090$ $\ci{+0.004}{+0.180}$; lesion images correct $0.769 \to 0.513$ on the external datasets and $0.560 \to 0.378$ on the fresh external set & Not met \\
-Multi-agent reader, second design (deciding agent trained on validation views) & Continued training$^{\ast}$ & Main-test net utility $0.809$ (its verifier uses the editing tool of the main test), but ESG with tools not used in training $-0.002$ and erased-lesion claims $+0.061$ $\ci{+0.027}{+0.096}$ & Not met \\
+Multi-agent system, first design & Continued training$^{\ast}$ & Net utility with tools not used in training $+0.090$ $\ci{+0.004}{+0.180}$; lesion images correct $0.769 \to 0.513$ on the external datasets and $0.560 \to 0.378$ on the fresh external set & Not met \\
+Multi-agent system, second design (deciding agent trained on validation views) & Continued training$^{\ast}$ & Main-test net utility $0.809$ (its verifier uses the editing tool of the main test), but ESG with tools not used in training $-0.002$ and erased-lesion claims $+0.061$ $\ci{+0.027}{+0.096}$ & Not met \\
 \midrule
 \multicolumn{4}{l}{\emph{Mix of editing tools in first-stage training}} \\
 Four editing tools & Continued training & Validation TELEA ESG $0.665$ against $0.648$ ($+0.017$ $\ci{-0.034}{0.067}$); LaMa ESG $-0.022$; TELEA control edit denied $-0.021$ & Not met \\
