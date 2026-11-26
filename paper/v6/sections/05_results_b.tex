@@ -1,1 +1,148 @@
-% 05_results_b: to be written
+% 05_results_b.tex  (Writer D)  Results, part 2: Sections 4.5-4.7. Continues \section{Results} of 04_results_a.tex.
+% Every number is copied from docs/RESULTS_LOG.md (L = line), the fact sheet (facts), the stored report of the
+% final run (report60 = scratchpad/report60.md, line numbers) or paper/v5/paper.tex (v5 P = line).
+
+\subsection{Unedited image pairs: restraint carried over, and detection required unedited training images}
+\label{subsec:res_pairs}
+
+The unedited pairs contain no edit: a frame that shows a polyp and a polyp-free frame of the same video receive the same question (Section~\ref{subsec:pairs}). On the 103 REAL-Colon pairs (pre-specified), \ms{} reported a polyp on 2 polyp-free frames, against 15 for \base{} and 20 for \opus{}; it asked for a better image on 12 more, which natural ESG does not count as ``absent'' or referred. It called the polyp present on 36 polyp frames, against 40 and 73. Restraint on lesion-free frames thus carried over to unedited images; detection of real polyps did not improve.
+% src: L1484-1489 (2/103, 15/103, 20/103; 12 requests for a better image; 36/103, 40/103, 73/103); facts C7
+
+The natural ESG of \ms{} was $0.243$ $\ci{0.149}{0.340}$, equal to that of \base{} ($0.243$; difference $0.000$ $\ci{-0.103}{+0.095}$, $p = 1.000$) and lower than that of \gem{} ($0.466$; $-0.223$ $\ci{-0.346}{-0.102}$, $p = 0.001$) and \opus{} ($0.447$; $-0.204$ $\ci{-0.333}{-0.071}$, $p = 0.001$). Against \gpt{} ($0.320$) the difference was $-0.078$ $\ci{-0.184}{+0.028}$, $p = 0.172$ (Table~\ref{tab:natural}). The pre-specified reading required \ms{} to exceed each reference model with the interval above zero. It exceeded none: its advantage on erased lesions did not carry over to unedited images.
+% src: L1458-1468
+
+\begin{table*}[!t]
+\caption{Unedited colonoscopy frame pairs: a frame that shows a polyp and a polyp-free frame of the same video or clip, both asked ``Is there a polyp in this image?''. REAL-Colon: 103 pairs from 46 videos of four centres; the answers of \msn{} are cross-validated (each pair is answered by a copy trained without that pair's video). LDPolypVideo: 116 pairs from 160 clips of one hospital, none of whose images was used to train or select any of our models. Found: the polyp frame was not answered ``absent'' and was not referred. Absent or referred: the answer to the polyp-free frame. Natural ESG: the share of polyp-free frames answered ``absent'' or referred minus the same share for polyp frames. Brackets give 95\% intervals from $2{,}000$ bootstrap resamples of whole videos or clips. Differences are \msn{} (single model) minus the row model, paired over the same pairs, with two-sided $p$ values. The three-seed vote exists for the full model only, so it has no cross-validated answers on REAL-Colon. --: not applicable.}
+\label{tab:natural}
+\centering
+\footnotesize
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{l cccc cccc}
+\toprule
+ & \multicolumn{4}{c}{REAL-Colon ($103$ pairs)} & \multicolumn{4}{c}{LDPolypVideo ($116$ pairs)} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+Model & \shortstack{Polyp frames\\found} & \shortstack{Polyp-free frames\\absent or referred} & \shortstack{Natural ESG\\{}[95\% CI]} & \shortstack{\msn{} minus model\\{}[95\% CI], $p$} & \shortstack{Polyp frames\\found} & \shortstack{Polyp-free frames\\absent or referred} & \shortstack{Natural ESG\\{}[95\% CI]} & \shortstack{\msn{} minus model\\{}[95\% CI], $p$} \\
+\midrule
+\base{} & $38.8\%$ & $85.4\%$ & $0.243$ $\ci{0.143}{0.350}$ & $+0.291$ $\ci{+0.167}{+0.407}$, $<0.001$ & $40.5\%$ & $95.7\%$ & $0.362$ $\ci{0.276}{0.448}$ & $+0.250$ $\ci{+0.155}{+0.353}$, $<0.001$ \\
+\ms{} & $37.9\%$ & $86.4\%$ & $0.243$ $\ci{0.149}{0.340}$ & $+0.291$ $\ci{+0.176}{+0.402}$, $<0.001$ & $45.7\%$ & $96.6\%$ & $0.422$ $\ci{0.328}{0.517}$ & $+0.190$ $\ci{+0.112}{+0.267}$, $<0.001$ \\
+\msn{}, single model & $64.1\%$ & $89.3\%$ & $0.534$ $\ci{0.394}{0.661}$ & -- & $62.1\%$ & $99.1\%$ & $0.612$ $\ci{0.526}{0.698}$ & -- \\
+\msn{}, three-seed vote & -- & -- & -- & -- & $61.2\%$ & $97.4\%$ & $0.586$ $\ci{0.491}{0.673}$ & $+0.026$ $\ci{-0.009}{+0.069}$, $0.238$ \\
+\midrule
+\gem{} & $68.0\%$ & $78.6\%$ & $0.466$ $\ci{0.336}{0.581}$ & $+0.068$ $\ci{-0.069}{+0.202}$, $0.347$ & $71.6\%$ & $81.0\%$ & $0.526$ $\ci{0.422}{0.621}$ & $+0.086$ $\ci{-0.017}{+0.190}$, $0.117$ \\
+\opus{} & $70.9\%$ & $73.8\%$ & $0.447$ $\ci{0.317}{0.579}$ & $+0.087$ $\ci{-0.049}{+0.230}$, $0.259$ & $62.9\%$ & $83.6\%$ & $0.466$ $\ci{0.362}{0.569}$ & $+0.147$ $\ci{+0.043}{+0.250}$, $0.010$ \\
+\gpt{} & $64.1\%$ & $68.0\%$ & $0.320$ $\ci{0.212}{0.437}$ & $+0.214$ $\ci{+0.071}{+0.343}$, $0.003$ & $55.2\%$ & $75.0\%$ & $0.302$ $\ci{0.198}{0.405}$ & $+0.310$ $\ci{+0.181}{+0.431}$, $<0.001$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table*}
+% src: REAL-Colon columns report60 L117-126 (= L1458-1465, L2162-2165); LDPolypVideo columns report60 L69-80 (= L2145-2156); p = 0.000 in the report is printed as < 0.001
+
+\msn{} was trained with unedited images, among them frames of other REAL-Colon videos, so its answers on these pairs are cross-validated (Section~\ref{subsec:models}); the comparison was pre-specified, on pairs that had been used before. Its natural ESG was $0.534$ $\ci{0.394}{0.661}$, higher than that of \ms{} (difference $+0.291$ $\ci{+0.176}{+0.402}$, $p < 0.001$) and of \gpt{} ($+0.214$ $\ci{+0.071}{+0.343}$, $p = 0.003$). Differences from \gem{} ($+0.068$ $\ci{-0.069}{+0.202}$, $p = 0.347$) and from \opus{} ($+0.087$ $\ci{-0.049}{+0.230}$, $p = 0.259$) were not shown.
+% src: L2162-2165; report60 L119-126
+
+The confirmatory test (pre-specified) used 116 pairs from LDPolypVideo, recorded at a hospital none of whose images had been used to train or select our models. \msn{} had a natural ESG of $0.612$ $\ci{0.526}{0.698}$, against $0.422$ for \ms{} (difference $+0.190$ $\ci{+0.112}{+0.267}$, $p < 0.001$), $0.466$ for \opus{} ($+0.147$ $\ci{+0.043}{+0.250}$, $p = 0.010$), $0.302$ for \gpt{} ($+0.310$ $\ci{+0.181}{+0.431}$, $p < 0.001$) and $0.526$ for \gem{} ($+0.086$ $\ci{-0.017}{+0.190}$, $p = 0.117$). It thus exceeded \ms{} and two of the three reference models. A difference from \gem{} was not shown at either hospital.
+% src: L2145-2159; facts C9
+
+The models reached these scores in different ways (Fig.~\ref{fig:natural}). On LDPolypVideo, \msn{} answered $99.1\%$ of the polyp-free frames ``absent'' or referred them, against $75.0\%$ to $83.6\%$ for the reference models, and found $62.1\%$ of the polyps, against $55.2\%$ to $71.6\%$. \gem{} placed a correct box on 76 of 116 polyps and \msn{} on 66 (Supplementary Table~\ref{tab:s_ldpolyp}).
+% src: L2149-2160; report60 L71-80, L101-110
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig4_natural_pairs.pdf}
+\caption{Unedited colonoscopy frame pairs, by model. Left: REAL-Colon, 103 pairs from 46 videos; the answers of \msn{} are cross-validated. Right: LDPolypVideo, 116 pairs from 160 clips of a hospital not used to train or select any of our models. Each point places a model by the share of polyp frames it found (not answered ``absent'' and not referred) and the share of polyp-free frames it answered ``absent'' or referred; natural ESG is the sum of the two shares minus one and is given for each model with its 95\% interval ($2{,}000$ bootstrap resamples of whole videos or clips). Values are in Table~\ref{tab:natural}.}
+\label{fig:natural}
+\end{figure*}
+% src: same numbers as Table tab:natural
+
+Three secondary analyses are in the supplement. With every video of one REAL-Colon centre withheld from training in turn (pre-specified; run on a model that added only the colonoscopy pairs), natural ESG was $0.495$ $\ci{0.370}{0.612}$, against $0.553$ with centres shared (difference $-0.058$ $\ci{-0.132}{+0.010}$, $p = 0.119$), and again exceeded \gpt{} only (Supplementary Table~\ref{tab:s_loco}). With the polyp-free frame taken 3 to 10~s from the polyp (96 pairs; descriptive), cross-validated \msn{} scored $0.479$ $\ci{0.322}{0.615}$ and the reference models $0.188$ to $0.333$ (Supplementary Table~\ref{tab:s_context}). On 183 chest X-ray follow-up pairs (post hoc), natural ESG was $0.169$ $\ci{0.098}{0.240}$ for \ms{} and $0.109$ to $0.148$ for the reference models; no difference between them was shown (Supplementary Table~\ref{tab:s_cxrpairs}).
+% src: L1867-1876, L1884-1885 (leave-one-centre-out); L2165-2167 and report60 L161-168 (context-matched); L1826-1832 (chest X-ray)
+
+\subsection{\texorpdfstring{\msn}{MedScope-4B-N} on the earlier tests and on chest films}
+\label{subsec:res_nmodel}
+
+Adding unedited images to training did not lower performance on the main test (Table~\ref{tab:nmodel}). \msn{} had an ESG of $0.744$, against $0.758$ for \ms{} (difference $-0.014$ $\ci{-0.068}{+0.040}$, $p = 0.680$), and a net utility of $0.709$, against $0.732$ ($-0.023$ $\ci{-0.089}{+0.040}$, $p = 0.487$). The pre-specified criterion for a loss, an ESG more than $0.05$ below that of \ms{}, was not reached by the estimate; the interval does not exclude a fall of that size.
+% src: L2141-2143; report60 L24, L225-226
+
+The lead over the reference models held for each of three training seeds (pre-specified). Main-test ESG was $0.744$, $0.740$ and $0.726$, and every seed exceeded each reference model with the paired interval above zero (smallest difference $+0.256$ $\ci{+0.171}{+0.338}$; all $p < 0.001$). The spread between seeds reflects training runs on the same data; each interval reflects resampling of test cases. Lesion-free claims were $8.7\%$, $15.3\%$ and $10.8\%$. A majority vote of the three seeds had an ESG of $0.753$, lesion-free claims of $9.0\%$ and a net utility of $0.726$; it met the pre-specified condition for reporting it and costs three model runs per image (Supplementary Table~\ref{tab:s_nseeds}).
+% src: L2127-2139; report60 L28, L365-373, L461 (smallest difference: seed 2 minus gemini-4-argon)
+
+On chest films, \msn{} separated pneumothorax from lesion-free films better than the reference models. On 300 pneumothorax and 300 lesion-free CheXthought films of patients not used in training (descriptive), its Youden index was $0.660$ $\ci{0.591}{0.726}$. This was higher than $0.460$ for \gem{} (difference $+0.200$ $\ci{+0.122}{+0.284}$), $0.207$ for \opus{} ($+0.453$ $\ci{+0.344}{+0.560}$) and $0.377$ for \gpt{} ($+0.283$ $\ci{+0.196}{+0.375}$; all $p < 0.001$). The vote scored $0.700$ $\ci{0.633}{0.763}$, \msp{} $0.287$ and \ms{} $0.000$ (Supplementary Table~\ref{tab:s_chest}).
+% src: L2174-2176; facts C6; report60 L206-216
+
+Against \ms{}, \msn{} was higher at the external centres in ESG ($0.672$ against $0.597$; difference $+0.076$ $\ci{+0.009}{+0.143}$, $p = 0.033$) and in net utility ($0.625$ against $0.530$; $+0.096$ $\ci{+0.011}{+0.182}$, $p = 0.020$). On the fresh external set it was higher in net utility ($0.114$ against $-0.053$; $+0.168$ $\ci{+0.056}{+0.279}$, $p = 0.002$) and in lesion images correct ($0.607$ against $0.476$; $+0.131$ $\ci{+0.069}{+0.197}$, $p < 0.001$); ESG was $0.381$ against $0.393$. On the fresh internal set no difference from \ms{} or \msp{} was shown (Supplementary Table~\ref{tab:s_next}).
+% src: L2181-2187; report60 L265-267, L290-291, L310-319
+
+Three results went against \msn{}. First, on the fresh external set it reported $22.0\%$ of erased lesions, against $11.3\%$ for \msp{} (difference in proportion $+0.107$ $\ci{+0.054}{+0.162}$, $p < 0.001$) and $8.3\%$ for \ms{} ($+0.137$ $\ci{+0.077}{+0.202}$, $p < 0.001$); by the pre-specified reading, the added training images carry this cost. By source, the rates for \msn{} and \msp{} were $33\%$ and $10\%$ on SIIM chest films, $26\%$ and $15\%$ on ETIS-Larib colonoscopy images, $14\%$ and $8\%$ on BUS-UCLM breast ultrasound and $12\%$ and $12\%$ on BraTS meningioma MRI. The candidate training mix that the validation rule did not select reported $17.3\%$ on this set and answered fewer lesion images of new SIIM patients correctly ($0.320$ against $0.530$; Supplementary Table~\ref{tab:s_mix}).
+% src: L2178-2183, L2189-2192; report60 L26, L268, L273, L340-347
+
+Second, on 100 pneumothorax and 100 lesion-free films of new SIIM patients (pre-specified), \msn{} called 54 of 100 pneumothorax films present, against 53 of 100 for \msp{} (difference $+0.010$ $\ci{-0.080}{+0.100}$, $p = 0.920$): detection was not raised. The other two seeds called 75 and 70 films present and the vote 68. The criterion was fixed for the first seed, so this spread is descriptive; the seeds that found more pneumothoraces also reported more erased ones ($25.0\%$, $59.0\%$ and $43.0\%$ of erased views). Third, at the external centres the ESG of \msn{} was lower than that of \msp{} ($0.672$ against $0.739$; difference $-0.067$ $\ci{-0.126}{-0.009}$, $p = 0.025$).
+% src: L2169-2172, L2185-2186; report60 L22, L296, L405-411 (erased-lesion claims by seed on new SIIM patients: 0.250, 0.590, 0.430)
+
+Repeated with \msn{}, the analyses of low-visibility erasures and of finding-specific questions gave an ESG of $0.624$ $\ci{0.538}{0.709}$ and $0.711$ $\ci{0.632}{0.789}$ (Supplementary Tables~\ref{tab:s_visibility} and~\ref{tab:s_qtype}); standard VQA accuracy is in Supplementary Table~\ref{tab:s_vqa}.
+% src: L2194-2201
+
+\begin{table*}[!t]
+\caption{\msn{} (single model and three-seed majority vote) against \ms{} and \msp{} on the earlier test sets and on chest films. ESG: evidence sensitivity gap. Lesion images correct: share of original and control-edited lesion views answered correctly. Youden index: share of pneumothorax films called present plus share of lesion-free films answered ``absent'' or referred, minus one. The last two columns give \msn{} (single model) minus the other model, paired over the same cases or patients, with 95\% bootstrap intervals; differences in claims and in films called present are differences in proportions. The vote requires three model runs per image. On the two chest-film sets \ms{} called no pneumothorax film present. --: not computed. $P$ values and the same measures for each seed are in Supplementary Tables~\ref{tab:s_next}, \ref{tab:s_nseeds} and~\ref{tab:s_chest}.}
+\label{tab:nmodel}
+\centering
+\footnotesize
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{ll cccc cc}
+\toprule
+Test set & Measure & \ms{} & \msp{} & \shortstack{\msn{},\\single model} & \shortstack{\msn{},\\vote} & \shortstack{\msn{} minus \ms{}\\{}[95\% CI]} & \shortstack{\msn{} minus \msp{}\\{}[95\% CI]} \\
+\midrule
+Main test ($507$ cases) & ESG & $0.758$ & $0.740$ & $0.744$ & $0.753$ & $-0.014$ $\ci{-0.068}{+0.040}$ & $+0.005$ $\ci{-0.039}{+0.047}$ \\
+ & Erased-lesion claims & $9.6\%$ & $11.0\%$ & $9.1\%$ & $10.5\%$ & $-0.005$ $\ci{-0.044}{+0.034}$ & $-0.018$ $\ci{-0.054}{+0.018}$ \\
+ & Lesion-free claims & $7.6\%$ & $9.0\%$ & $8.7\%$ & $9.0\%$ & $+0.010$ $\ci{-0.022}{+0.042}$ & $-0.003$ $\ci{-0.030}{+0.025}$ \\
+ & Lesion images correct & $0.849$ & $0.856$ & $0.847$ & $0.863$ & $-0.002$ $\ci{-0.040}{+0.034}$ & $-0.009$ $\ci{-0.036}{+0.019}$ \\
+ & Net utility & $0.732$ & $0.714$ & $0.709$ & $0.726$ & $-0.023$ $\ci{-0.089}{+0.040}$ & $-0.005$ $\ci{-0.057}{+0.044}$ \\
+\midrule
+External centres ($169$ cases) & ESG & $0.597$ & $0.739$ & $0.672$ & $0.689$ & $+0.076$ $\ci{+0.009}{+0.143}$ & $-0.067$ $\ci{-0.126}{-0.009}$ \\
+ & Erased-lesion claims & $11.8\%$ & $6.7\%$ & $10.9\%$ & $11.8\%$ & $-0.008$ $\ci{-0.061}{+0.046}$ & $+0.042$ $\ci{+0.000}{+0.088}$ \\
+ & Lesion-free claims & $4.0\%$ & $6.0\%$ & $2.0\%$ & $2.0\%$ & $-0.020$ $\ci{-0.093}{+0.045}$ & $-0.040$ $\ci{-0.103}{+0.000}$ \\
+ & Lesion images correct & $0.727$ & $0.815$ & $0.777$ & $0.803$ & $+0.050$ $\ci{+0.000}{+0.103}$ & $-0.038$ $\ci{-0.089}{+0.017}$ \\
+ & Net utility & $0.530$ & $0.696$ & $0.625$ & $0.659$ & $+0.096$ $\ci{+0.011}{+0.182}$ & $-0.070$ $\ci{-0.149}{+0.014}$ \\
+\midrule
+Fresh internal ($76$ cases) & ESG & $0.472$ & $0.528$ & $0.417$ & $0.472$ & $-0.056$ $\ci{-0.270}{+0.162}$ & $-0.111$ $\ci{-0.276}{+0.056}$ \\
+ & Erased-lesion claims & $19.4\%$ & $25.0\%$ & $25.0\%$ & $25.0\%$ & $+0.056$ $\ci{-0.125}{+0.222}$ & $+0.000$ $\ci{-0.139}{+0.135}$ \\
+ & Lesion-free claims & $12.5\%$ & $17.5\%$ & $15.0\%$ & $12.5\%$ & $+0.025$ $\ci{-0.125}{+0.179}$ & $-0.025$ $\ci{-0.156}{+0.105}$ \\
+ & Lesion images correct & $0.681$ & $0.778$ & $0.681$ & $0.722$ & $+0.000$ $\ci{-0.163}{+0.171}$ & $-0.097$ $\ci{-0.221}{+0.027}$ \\
+ & Net utility & $0.402$ & $0.500$ & $0.372$ & $0.438$ & $-0.030$ $\ci{-0.277}{+0.218}$ & $-0.128$ $\ci{-0.314}{+0.042}$ \\
+\midrule
+Fresh external ($316$ cases) & ESG & $0.393$ & $0.417$ & $0.381$ & $0.399$ & $-0.012$ $\ci{-0.095}{+0.061}$ & $-0.036$ $\ci{-0.113}{+0.038}$ \\
+ & Erased-lesion claims & $8.3\%$ & $11.3\%$ & $22.0\%$ & $22.6\%$ & $+0.137$ $\ci{+0.077}{+0.202}$ & $+0.107$ $\ci{+0.054}{+0.162}$ \\
+ & Lesion-free claims & $4.7\%$ & $6.8\%$ & $5.4\%$ & $6.1\%$ & $+0.007$ $\ci{-0.033}{+0.045}$ & $-0.014$ $\ci{-0.058}{+0.032}$ \\
+ & Lesion images correct & $0.476$ & $0.536$ & $0.607$ & $0.619$ & $+0.131$ $\ci{+0.069}{+0.197}$ & $+0.071$ $\ci{+0.017}{+0.124}$ \\
+ & Net utility & $-0.053$ & $0.048$ & $0.114$ & $0.147$ & $+0.168$ $\ci{+0.056}{+0.279}$ & $+0.067$ $\ci{-0.039}{+0.162}$ \\
+\midrule
+New SIIM patients & Pneumothorax films called present & $0/100$ & $53/100$ & $54/100$ & $68/100$ & $+0.540$ $\ci{+0.440}{+0.630}$ & $+0.010$ $\ci{-0.080}{+0.100}$ \\
+($100 + 100$ films) & Lesion-free films absent or referred & $100.0\%$ & $95.0\%$ & $96.0\%$ & $94.0\%$ & -- & -- \\
+ & Youden index & $0.000$ & $0.480$ & $0.500$ & $0.620$ & $+0.500$ $\ci{+0.360}{+0.630}$ & $+0.020$ $\ci{-0.070}{+0.110}$ \\
+ & Erased-lesion claims & $0.0\%$ & $19.0\%$ & $25.0\%$ & $42.0\%$ & -- & -- \\
+\midrule
+CheXthought test patients & Pneumothorax films called present & $0.0\%$ & $35.7\%$ & $75.0\%$ & $78.7\%$ & $+0.750$ $\ci{+0.688}{+0.805}$ & $+0.393$ $\ci{+0.328}{+0.455}$ \\
+($300 + 300$ films) & Lesion-free films absent or referred & $100.0\%$ & $93.0\%$ & $91.0\%$ & $91.3\%$ & -- & -- \\
+ & Youden index & $0.000$ & $0.287$ & $0.660$ & $0.700$ & $+0.660$ $\ci{+0.518}{+0.804}$ & $+0.373$ $\ci{+0.280}{+0.461}$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table*}
+% src: main test, external centres, fresh internal, fresh external: report60 L225-234, L265-274, L290-299, L310-319 (values and differences; claims are the report's proportions times 100) and L365-403 (vote); new SIIM patients: report60 L190-197, L407-413, L2169-2172, L1370, L1921-1922 and facts C5 (erased-lesion claims of MedScope-4B and MedScope-4B-P: 0.000 and 19.0%); CheXthought: report60 L206-212
+
+\subsection{What did and did not improve evidence sensitivity}
+\label{subsec:res_designs}
+
+Evidence sensitivity improved when the training images changed, and not when the training objective, the adapter, the system design or the decision rule changed. A pre-specified two-by-two comparison separated the two kinds of training images: four models received the first training stage with or without counterfactual views and with or without natural pairs (one seed; models with natural pairs cross-validated over videos). On the 103 REAL-Colon pairs, natural ESG was $0.563$ with natural pairs only, $0.505$ with both kinds, $0.223$ with counterfactual views only and $0.214$ with neither (Supplementary Table~\ref{tab:s_twobytwo}). Natural pairs raised it by $+0.350$ $\ci{+0.227}{+0.474}$ without counterfactual views and by $+0.282$ $\ci{+0.156}{+0.405}$ with them (both $p < 0.001$). The primary comparison, both kinds against natural pairs only, was $-0.058$ $\ci{-0.168}{+0.042}$, $p = 0.311$: a contribution of counterfactual views on unedited frames was not shown. On the main test, the model with both kinds had an ESG of $0.744$ and the model with natural pairs only $0.260$ (difference $+0.484$ $\ci{+0.408}{+0.558}$). Each kind of training image improved the test built from that kind; only the model with both did well on both.
+% src: L1997-2026; facts C7 (two-by-two) and C1 (main test, fold-0 models)
+
+Twelve alternative designs were each tested against a criterion fixed in advance (Supplementary Table~\ref{tab:s_designs}; Supplementary Fig.~\ref{fig:s_designs}). They changed the training objective (preference optimisation, a consistency loss between an original view and its control edit, reinforcement learning on the cost-matrix reward), the control edit, the adapter (higher rank; adapters on the vision encoder), the system (two multi-agent designs with a verifier that erases the reported region and asks again) or the mix of editing tools in training. None met its criterion. Recorded changes in ESG lay between $-0.054$ and $+0.041$, and in most designs erased-lesion claims and lesion images correct rose or fell together. One of the twelve tested counterfactual training itself against preference optimisation applied after training without counterfactual views: on the fresh external set no difference in ESG was shown (means of three seeds $0.381$ and $0.355$; each per-seed interval included zero).
+% src: v5 P752 (range -0.054 to +0.041), P767-771, P1263-1288 (twelve designs); L916-922 (three seeds: 0.381 +- 0.018 vs 0.355 +- 0.015; per seed +0.012, +0.006, +0.060, all CIs include 0)
+
+Of 270 decision rules applied to the outputs of a trained model, 128 recombined stored outputs: 19 passed on one half of the validation set and none on the other half. None of the 142 that added test-time evidence passed on the first half. Three designs tested later (an image swap with a hard negative, a vision adapter with layer-wise learning-rate decay, and subtraction of the answer score obtained without the image) did not meet their criteria either (Supplementary Table~\ref{tab:s_designs_later}).
+% src: L1184-1205 (19 of 128, 0 confirmed; 0 of 142); v5 P772, P1041-1044; L1337-1353 (three later designs)
+
+Two further tests, with one seed each, rewarded inspection of the image before the answer: training examples in which the model zooms before it answers, and reinforcement learning with a reward for a zoom on the lesion site. On 38 REAL-Colon pairs from videos none of these models had used, natural ESG was $0.500$ and $0.263$, against $0.632$ for the comparison model without the change. The criterion fixed in advance, which required a natural ESG higher by at least $0.05$, was not met (Supplementary Table~\ref{tab:s_inspect}).
+% src: L2028-2044; rule: docs/REVIEW_EXPERIMENTS.md L466-470
+
+Linear probes on the hidden states of the language model separated erased from control-edited views no better than the model's answers did: on an editing tool unseen in training, the difference in area under the curve was at most $0.028$, below the pre-specified threshold of $0.05$ (Supplementary Table~\ref{tab:s_site}).
+% src: L1269 ("Read-out gap below the rule (0.028 image features, -0.008 last token)"); v5 P780

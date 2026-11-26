@@ -1,1 +1,219 @@
-% 03_methods: to be written
+% ===================== 3. Materials and methods (Writer B) =====================
+\section{Materials and methods}
+\label{sec:methods}
+
+\subsection{Study design and predictions}
+\label{subsec:design}
+
+The study varies the image and holds the question fixed (Fig.~\ref{fig:design}). Each test case is an image with an expert lesion mask and a closed question whose answer depends on that lesion, for example ``Is there a polyp in this image?''. Two edited views were built from each case. In the \emph{erased} image the lesion is removed by inpainting. In the \emph{control edit} the same inpainting tool fills a region of the same shape elsewhere in the image, and the lesion is left untouched. Unedited \emph{lesion-free} images of the same imaging type receive the same kind of question. We call the test images and their scoring MedScope-Bench.
+% src: brief sections 3 and 4; v5 P473-479
+
+The design makes predictions that can fail. A model that uses the image should report the finding on the original image, answer that it is absent (or refer the case) on the erased image, and still report it after the control edit. A model that does not use the image, because it answers from the wording of the question or from the surrounding anatomy, gives the same answer to all three views. A model that treats any trace of editing as a sign of absence denies the finding on both edited views. The primary measure, the evidence sensitivity gap (ESG; Section~\ref{subsec:measures}), is the difference between the erased image and the control edit in the share of ``absent or refer'' answers. It is zero for the second and the third kind of model and for any constant answer. A model can also avoid reporting erased lesions by reporting nothing, so the share of real lesions found and the share of lesion-free images with a reported finding are given next to every ESG.
+% src: brief section 4 (sentence 2); v5 P498; L229-238
+
+An erased image is still an edited image, and an erasure may leave part of the lesion or its secondary signs. Two further elements address this. Specialist readers assessed edited and unedited images without being told which were edited (Section~\ref{subsec:readers}). A second design uses no edit at all: an unedited image that shows a lesion is paired with an unedited image of the same patient that does not (Section~\ref{subsec:pairs}). A model that uses the image should report the finding on the first image of such a pair and not on the second.
+% src: brief section 4 (sentences 5-7); RE193-197
+
+Table~\ref{tab:overview} lists every question the study asks, the design element that answers it, the test data, whether the analysis was pre-specified or post hoc (Section~\ref{subsec:stats}), and where the result is reported.
+% src: none (pointer)
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig1_design.pdf}
+\caption{Study design. Views built from one test case with an expert lesion mask: the original image, the erased image (lesion removed by inpainting) and the control edit (a region of the same shape filled with the same tool elsewhere; lesion untouched), together with an unedited lesion-free image of the same imaging type. Every view is shown with the same closed question; the answer expected from a model that uses the image is given for each view. The second design pairs an unedited image that shows a lesion with an unedited image of the same patient that does not. Example images are from the public source datasets (Table~\ref{tab:datasets}).}
+\label{fig:design}
+\end{figure*}
+% src: v5 P466 (old Fig. 1 content); caption to be checked against the final figure file
+
+\begin{table*}[!t]
+\caption{Overview of the study: each question asked, the design element that answers it, the test data, the status of the analysis and where its result is reported. Pre-specified: test set, comparison and decision rule fixed and dated before the data were seen. Descriptive: test set and comparison fixed in advance, no decision rule. Post hoc: added after earlier results were known. Dates and rules are in Table~\ref{tab:s_plan}. Tables and figures numbered with S are in the supplement. ESG: evidence sensitivity gap.}
+\label{tab:overview}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{@{}L{0.265\textwidth}L{0.255\textwidth}L{0.185\textwidth}L{0.105\textwidth}L{0.125\textwidth}@{}}
+\toprule
+\textbf{Question} & \textbf{Design element} & \textbf{Test data} & \textbf{Status} & \textbf{Reported in} \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{Main comparison (Section~\ref{subsec:res_main})}} \\
+Do models report a lesion after it has been erased, and still report it after a control edit? & Erased image against matched control edit, same question; nine comparison models, six open-weight models and \ms & Main test: 507 cases (219 with a lesion, 288 lesion-free), 1,115 views & Pre-specified$^{a}$ & Table~\ref{tab:main}; Fig.~\ref{fig:main}; Table~\ref{tab:s_modality} \\
+Is the reported finding produced by the question alone? & Blank grey image and an image of another imaging type, same question & 183 main-test lesion cases & Pre-specified & Table~\ref{tab:s_blank} \\
+Does the result hold when the question names the finding? & Cases split by question type & 114 finding-specific and 105 generic lesion cases & Pre-specified & Table~\ref{tab:s_qtype} \\
+Does it hold for other training seeds, and from the public release? & Training of \ms{} repeated with two further seeds; released model run again & Main test and three further edited test sets & Pre-specified & Tables~\ref{tab:s_seeds}, \ref{tab:s_plan} \\
+Does it depend on the prompt, the model settings or the wording? & Five prompting conditions for the three reference models; question wordings unseen in training & 150 and 373 main-test cases & Descriptive & Table~\ref{tab:s_prompts} \\
+Does it hold for an open-ended request? & ``Describe any abnormal findings in this image'', scored by a text-only judge & 36 main-test cases & Pre-specified & Section~\ref{subsec:res_main} \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{Is the result explained by detection of the edit? (Section~\ref{subsec:res_alternatives})}} \\
+Would a model that answers ``absent'' to any edited image score well? & Matched control edit (ESG is zero for such a model); unedited lesion-free images & Main test & By design & Table~\ref{tab:alternatives} \\
+Does the result depend on the editing tool used in training? & Erasures and control edits remade with two tools unseen in training & 125 main-test cases common to all tools; all 219 lesion cases & Descriptive & Fig.~\ref{fig:tools}; Table~\ref{tab:s_tools} \\
+Which training views are needed? & Training without counterfactual views, with erasures only or with control edits only & Main test; tools unseen in training & Descriptive & Fig.~\ref{fig:tools}; Table~\ref{tab:s_ablations} \\
+Is the answer driven by an edit at the lesion's site? & Edit-site control: a ring edit around an intact lesion; probes of hidden states & 179 validation lesion cases & Pre-specified$^{b}$ & Table~\ref{tab:s_site} \\
+Does it hold on erasures that an edit detector scores as unedited? & Low-visibility erasures & 111 of 219 main-test erasures & Pre-specified & Table~\ref{tab:s_visibility} \\
+Could test images that resemble training images explain it? & Test cases most similar to a training image removed & 378 main-test cases kept & Pre-specified & Table~\ref{tab:alternatives} \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{Reader assessment of the erasures (Section~\ref{subsec:res_readers})}} \\
+Do specialists still report the finding on erased images, and can they tell edited from unedited images? & Specialist reader round & 212 main-test images & Pre-specified & Tables~\ref{tab:readers}, \ref{tab:s_expert} \\
+The same for trainee physicians; do models still report erasures that both trainees called clean? & Earlier trainee round; stored model answers scored again & 128 main-test images & Pre-specified & Table~\ref{tab:s_trainee} \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{Other centres and new test sets (Section~\ref{subsec:res_external})}} \\
+Does the result hold at centres and in datasets not used in training? & \ms{} run once on each set & External centres (169 cases); fresh internal (76); fresh external (316) & Pre-specified$^{c}$ & Table~\ref{tab:s_external} \\
+Does adding pneumothorax films to training remove a miss on pneumothorax? & \msp & 200 new SIIM-ACR patients & Model post hoc; rule pre-specified & Section~\ref{subsec:res_external} \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{Unedited images (Sections~\ref{subsec:res_pairs} and~\ref{subsec:res_nmodel})}} \\
+Does the advantage of \ms{} carry over to unedited same-patient pairs? & Polyp frame against polyp-free frame of the same examination & REAL-Colon: 103 pairs from 46 videos & Pre-specified & Table~\ref{tab:natural}; Fig.~\ref{fig:natural} \\
+With unedited images in training, does it hold for unseen patients and at an unseen hospital? & \msn; cross-validated answers on REAL-Colon; LDPolypVideo used for testing only & REAL-Colon: 103 pairs; LDPolypVideo: 116 pairs from 160 clips & Model post hoc; tests pre-specified & Table~\ref{tab:natural}; Fig.~\ref{fig:natural}; Tables~\ref{tab:s_realcolon}, \ref{tab:s_ldpolyp} \\
+Does it hold with no centre shared, and against polyp-free frames from the same stretch of the examination? & Leave-one-centre-out training; context-matched frames & REAL-Colon: 103 and 96 pairs & Pre-specified; descriptive & Tables~\ref{tab:s_loco}, \ref{tab:s_context} \\
+Is pneumothorax found on unedited chest films? & Films with against films without pneumothorax; follow-up pairs & CheXthought: 300 + 300 test films; SIIM-ACR: 100 + 100 new patients; 183 follow-up pairs & Pre-specified (SIIM-ACR); descriptive; post hoc (pairs) & Tables~\ref{tab:nmodel}, \ref{tab:s_chest}, \ref{tab:s_cxrpairs} \\
+Does \msn{} keep the result on edited images, across seeds and on standard question answering? & \msn{} on every earlier test set; three seeds and their vote & Main test, external centres, fresh sets; 1,051 question-answering items & Pre-specified; descriptive & Tables~\ref{tab:nmodel}, \ref{tab:s_nseeds}, \ref{tab:s_next}, \ref{tab:s_vqa} \\
+\midrule
+\multicolumn{5}{@{}l}{\textit{What improves evidence sensitivity (Section~\ref{subsec:res_designs})}} \\
+What does each kind of training data contribute? & Two-by-two: with or without counterfactual views, with or without unedited pairs & REAL-Colon: 103 pairs; main test & Pre-specified & Table~\ref{tab:s_twobytwo} \\
+Do other objectives, adapters, agent designs or editing-tool mixes do better? & Twelve alternative designs, each against a matched comparator & Tools unseen in training; fresh external set; validation set & Pre-specified & Table~\ref{tab:s_designs}; Fig.~\ref{fig:s_designs} \\
+Can a decision rule applied to model outputs do better? & 270 decision rules, chosen on one half of the validation cases and confirmed on the other & Validation set & Pre-specified & Table~\ref{tab:s_designs} \\
+\bottomrule
+\multicolumn{5}{@{}p{0.97\textwidth}@{}}{$^{a}$\,The training procedure and selection rule of \ms, the test set and the measures were fixed before the model's training data were built; earlier prototypes had been run on this test set (Section~\ref{subsec:data}), and the family of 27 comparisons used for the multiplicity correction was defined afterwards. $^{b}$\,The decision rule was pre-specified; the interaction analysis reported with it is post hoc. $^{c}$\,No model had been run on the two fresh sets before \ms{} was fixed; the external centres had been used with earlier prototypes.} \\
+\end{tabular}
+\end{table*}
+% src: brief section 6; facts B1, B2; v5 P620-622 (set sizes); L1766 (114/105); L1786 (183); L1417 (111); L1357 (378); v5 P719 (150, 373); v5 P823 (36); v5 P778 (179); facts E (212, 128); L2067-2068 (116/160); L1430 (103/46); L1564 (96); L1826 (183); L1964 (300 + 300); L1370 (100 + 100)
+
+\subsection{Data, splits and leakage controls}
+\label{subsec:data}
+
+Sources were chosen because they release expert lesion masks, which are needed to erase a lesion and to place a control edit of the same shape, together with lesion-free images of the same imaging type. Training, validation and the main test were drawn from five public sources: SLAKE (CT and MRI of several body regions) \citep{liu2021slake}, Kvasir-SEG with lesion-free frames from HyperKvasir (colonoscopy) \citep{jha2020kvasir,borgli2020hyperkvasir}, ChestX-Det (chest X-ray; drawn from NIH ChestX-ray14) \citep{liu2020chestxdet,wang2017chestx}, BUSI (breast ultrasound) \citep{al2020dataset} and TCGA-LGG (brain MRI) \citep{buda2019association}. Lesions smaller than 20 pixels or covering more than 20\% of the image were excluded, because they cannot be erased and checked reliably. Training used 1,508 SLAKE and colonoscopy cases and 1,792 chest X-ray, breast ultrasound and brain MRI cases, with 427 and 690 lesion-free images; the validation set holds 540 cases.
+% src: v5 P473, P620
+
+Three controls guard against leakage between training and test data. First, every image was assigned to its split before any view was built, so that all views of an image stay in one split. Second, splits were made by patient where the source releases patient identifiers (ChestX-Det, TCGA-LGG) and otherwise by group of near-identical images (SLAKE, Kvasir-SEG with HyperKvasir, BUSI). In those three sources two dissimilar images of one patient can fall in different splits; a pre-specified analysis therefore removes the test cases most similar to any training image (Section~\ref{subsec:res_alternatives}). Third, all 6,849 unedited images of all sets were hashed and compared across sets. No case, patient or group identifier was shared, and one image recurred (a lesion-free ChestX-Det validation image that is also a fresh external case). Every threshold, selection rule and fitted quantity used training or validation data only.
+% src: v5 P622, P624; RE117-125
+
+Table~\ref{tab:datasets} lists the evaluation sets. The main test holds 507 cases from 416 patients or image groups, 219 with a lesion mask and 288 lesion-free. It gives 1,115 views: 219 each of original, erased and control-edited images, 288 lesion-free images and 170 degraded copies (for example blurred or noisy), for which the expected answer is a request for a better image. ``External centres'' denotes four public datasets from which no image was used in training (169 cases). Earlier prototypes of the trained model had been run on the main test and on the external centres. Two further sets were therefore assembled on which no model had been run when \ms{} was fixed: the fresh internal set (76 cases from ChestX-Det patients not used before) and the fresh external set (316 cases from four further datasets).
+% src: v5 P549, P620-624; L685-696
+
+\begin{table*}[!t]
+\caption{Evaluation sets. For each set: its role, the number of cases, the source datasets (cases per source in parentheses), and whether any image of that source was used to train a model of this study. ``Other patients'' means that training and test images of the source come from different patients (or, where the source releases no patient identifiers, from different groups of near-identical images).}
+\label{tab:datasets}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{@{}L{0.135\textwidth}L{0.18\textwidth}L{0.16\textwidth}L{0.265\textwidth}L{0.195\textwidth}@{}}
+\toprule
+\textbf{Evaluation set} & \textbf{Role} & \textbf{Cases} & \textbf{Source datasets} & \textbf{Source used in training?} \\
+\midrule
+Validation & Model selection; choice of decision rules; edit-site control & 540 cases, 1,473 views & The five sources of the main test & Yes (other patients) \\
+Main test & Primary comparison & 507 cases (219 with a lesion, 288 lesion-free), 1,115 views & SLAKE (107) \citep{liu2021slake}; Kvasir-SEG with HyperKvasir (174) \citep{jha2020kvasir,borgli2020hyperkvasir}; ChestX-Det (91) \citep{liu2020chestxdet}; BUSI (57) \citep{al2020dataset}; TCGA-LGG (78) \citep{buda2019association} & Yes (other patients) \\
+Tools unseen in training & Main-test erasures and control edits remade with TELEA and Stable Diffusion & 125 cases common to all tools; 219 lesion cases & As main test & Yes (other patients); the two tools: no \\
+External centres & Centres and datasets not used in training & 169 cases (119 with a lesion, 50 lesion-free) & CVC-ClinicDB (40) \citep{bernal2015cvc}; QaTa-COV19 (20) \citep{degerli2022qata}; BUS-BRA (45) \citep{gomez2024busbra}; BraTS-Africa 2023 (64) \citep{adewole2023bratsafrica} & No \\
+Fresh internal & New patients of a training source; no model run before \ms{} was fixed & 76 cases (36 with a lesion, 40 lesion-free) & ChestX-Det \citep{liu2020chestxdet} & Yes (other patients) \\
+Fresh external & New datasets; no model run before \ms{} was fixed & 316 cases & BraTS 2023 meningioma (82) \citep{labella2023meningioma}; BUS-UCLM (99) \citep{vallez2025busuclm}; SIIM-ACR pneumothorax (96) \citep{siim2019pneumothorax}; ETIS-Larib (39) \citep{silva2014etis} & \ms: no. \msp{} and \msn: SIIM-ACR only (other patients) \\
+New SIIM-ACR patients & Pneumothorax detection on unedited films & 200 patients (100 with, 100 without pneumothorax) & SIIM-ACR pneumothorax \citep{siim2019pneumothorax} & \ms: no. \msp{} and \msn: yes (other patients) \\
+CheXthought test films & Pneumothorax detection on unedited films & 600 films (300 with, 300 without pneumothorax) & CheXthought \citep{sharma2026chexthought} on CheXpert Plus images \citep{chambon2024chexpertplus} & \ms{} and \msp: no. \msn: yes (other patients) \\
+REAL-Colon pairs & Unedited same-patient pairs & 103 pairs from 46 of 60 videos, four centres & REAL-Colon \citep{biffi2024realcolon} & \ms{} and \msp: no. \msn: yes; answers cross-validated by video \\
+LDPolypVideo pairs & Unedited same-patient pairs at a hospital unseen by every model of this study & 116 pairs from 160 clips, one hospital & LDPolypVideo \citep{ma2021ldpolyp} & No \\
+Chest X-ray follow-up pairs & Unedited same-patient pairs (secondary) & 183 pairs scored of 200 built & NIH ChestX-ray14 \citep{wang2017chestx} & Yes: ChestX-Det is drawn from it; patients in any ChestX-Det split were excluded \\
+Standard question answering & Accuracy on ordinary medical visual question answering & 1,051 items & Test splits of VQA-RAD (451) \citep{lau2018vqarad}, SLAKE (300) \citep{liu2021slake} and PathVQA (300) \citep{he2020pathvqa} & Yes (training splits, last training stage) \\
+\bottomrule
+\end{tabular}
+\end{table*}
+% src: v5 P620-622, P637-651 (per-source counts); facts D; L441 (451/300/300); L1370 (100 + 100); L1964 (300 + 300); L1430; L2067-2068; L1826; RE206-210 (exclusion of ChestX-Det patients)
+
+\subsection{Erased, control-edited and lesion-free views}
+\label{subsec:views}
+
+Each edit is defined by what it holds fixed and what it changes. The erased image changes the lesion and holds the rest of the image fixed: the lesion mask is dilated by 5 pixels and filled by the inpainting model LaMa \citep{suvorov2022lama}. The control edit holds the lesion fixed and changes only whether an edit was made: the same dilated mask shape is moved to a random tissue location that does not overlap it and is filled with the same tool, so that no lesion pixel changes. It is the matched control for every property of the erasure except the removal of the lesion. Lesion-free images are unedited images of the same source and imaging type. They carry the same expected answer as an erased image, so a model that answers ``absent'' only when it detects an edit fails on them.
+% src: v5 P476-479
+
+Training used two editing tools: LaMa and tissue transplant, in which tissue from the same image is blended over the lesion. Two tools were kept out of training and validation: the fast-marching inpainting method of Telea (TELEA) \citep{telea2004image} and Stable Diffusion inpainting \citep{rombach2022high}. Main-test erasures and control edits were remade with each tool on the same masks.
+% src: v5 P482; PREREGISTRATION_v4 (data); L714-715
+
+An erasure edits the lesion's site and the control edit edits another site, so a model could learn that an edit at the queried site means absence. The \emph{edit-site control} tests this on validation images: the tool fills a ring of the lesion's area that starts 2 pixels outside the lesion and leaves the lesion intact.
+% src: v5 P484; L1250-1255
+
+Edited views passed automated checks; no view was selected by hand. The contrast between the erased region and a surrounding ring of 6 to 14 pixels had to fall to 35\% of its value before the edit or less (or to 1.0, if that is larger). An edit detector had to score the erased region below 0.5, and a control edit could change no lesion pixel. Near-duplicate images across splits were removed by 64-bit difference hashing and pixel correlation. A texture classifier separated main-test erasures from control edits with an area under the receiver operating characteristic curve (AUC) of 0.56. These checks do not establish that a reader would call the lesion absent; the reader study addresses that (Section~\ref{subsec:readers}).
+% src: v5 P486
+
+Three analyses reuse the main-test cases. For the blank-image control, the 183 lesion cases whose question is answered ``yes'' on the original were also shown as a uniform grey image of the same size, and as a lesion-free image of another imaging type, with the same question. \emph{Low-visibility erasures} are those that a ResNet-18 edit detector, trained to separate control-edited from unedited training views, scores at or below the median score of the main-test control edits. Questions were classed as \emph{finding-specific} when they name a finding (114 of the 219 lesion cases) and as \emph{generic} when they ask about an abnormality or about a healthy or normal appearance (105 cases).
+% src: RE258-268, RE423-445; L1766, L1786
+
+\subsection{Unedited image pairs}
+\label{subsec:pairs}
+
+REAL-Colon \citep{biffi2024realcolon} holds 60 complete colonoscopy videos from four centres, with a box on every frame in which a resected polyp is visible. A \emph{track} is a run of boxed frames at least 1~s long, with gaps under 2~s merged. For each of a video's three longest tracks, the polyp frame was taken from the middle half of the track (largest box at least 1\% of the frame). The paired polyp-free frame was taken from the same video 10 to 30~s before the track, or after it when fewer than three frames qualified before (28 of 103 pairs), and at least 10~s from any boxed frame. On each side the sharpest of 12 evenly spaced candidates of usable brightness was kept. Polyp-free means that the dataset marks no box; the frames were not read again by an endoscopist. Both frames were shown with the question ``Is there a polyp in this image?''. This gave 103 pairs from 46 videos; the number was set by the dataset and not by a power calculation.
+% src: v5 P604; RE199-205; L1646
+
+A frame taken before a polyp appears can differ from the polyp frame in more than the polyp, because the endoscopist has not yet stopped to inspect. As the unedited analogue of the control edit, each pair was therefore also given a \emph{context-matched} polyp-free frame, within 10~s of the ends of the track and 3 to 10~s from the nearest boxed frame (found for 96 of the 103 pairs).
+% src: v5 P608; RE349-352
+
+LDPolypVideo \citep{ma2021ldpolyp} holds 160 annotated colonoscopy clips from one hospital, the First Affiliated Hospital of Anhui Medical University. No model of this study was trained, selected or tested on it before this analysis. The clips state no frame rate, so the pairing rules were restated in frames, with one pair per clip. Of the 160 clips, 116 gave a pair; 39 had no polyp-free frame at least 5 frames from a polyp frame, and 5 had no polyp frame with a box of at least 1\% of the frame.
+% src: RE573-586; L2067-2070
+
+Chest films were not paired by patient. Pneumothorax detection was tested on films with and without pneumothorax from 200 new SIIM-ACR patients \citep{siim2019pneumothorax} and on 600 test films from CheXthought \citep{sharma2026chexthought}, which records radiologists' statements and click points on CheXpert Plus images \citep{chambon2024chexpertplus}. A CheXthought film counted as positive when the dataset label was positive and at least one radiologist stated a pneumothorax and marked it, and as negative when the label was negative or blank and no radiologist stated or suspected one. These labels come from report mining and from a rule-based reading of the radiologists' statements, not from a reader of this study. As a secondary analysis, follow-up pairs were built from NIH ChestX-ray14 \citep{wang2017chestx}: a film whose only label is pneumothorax, effusion, nodule or mass, and the nearest film of the same patient and view position labelled as showing no finding.
+% src: RE493-500, RE518-520, RE206-210; L1370; L1964
+
+\subsection{Outcome measures}
+\label{subsec:measures}
+
+Each final answer was classed as \emph{present} (the finding is reported), \emph{absent}, \emph{refer} (the image is usable but the model does not decide) or a request for a better image. The primary measure is the evidence sensitivity gap,
+\begin{equation}
+\label{eq:esg}
+\begin{split}
+\mathrm{ESG} = {} & \Pr(\text{absent or refer} \mid \text{erased image}) \\
+ & - \Pr(\text{absent or refer} \mid \text{control edit}).
+\end{split}
+\end{equation}
+ESG is zero for a model that always answers present, always answers absent or always refers, and for any model that responds to the two edits alike.
+% src: v5 P490-498
+
+\emph{Erased-lesion claims} are the share of erased images answered present, and \emph{lesion-free claims} the share of unedited lesion-free images answered present. \emph{Lesion images correct} is the share of original and control-edited images answered correctly. A model that always answers absent has 0\% erased-lesion claims and no lesion image correct, which is why the two are read together. A box counts as correct when its intersection over union with the reference lesion is at least 0.3.
+% src: v5 P500
+
+\emph{Net utility} is the mean reward per view under a cost matrix (Supplementary Table~\ref{tab:s_cost}). A correct answer earns $+1$; a reported finding on an erased or lesion-free image costs $-2$; a wrong answer on a lesion image costs $-2$, or $-4$ for findings marked in advance as critical, such as pneumothorax. Referral earns $+0.5$ on erased and lesion-free images and costs $-0.3$ on lesion images. The matrix was fixed on 30 October 2026, before any model reported here was trained. It was not elicited from clinicians, and results under five alternative matrices are given in the supplement. On the main test, always reporting the finding, always answering absent and always referring earn $-0.478$, $-0.848$ and $+0.110$.
+% src: v5 P500, P513-515, P695-697
+
+For unedited pairs, the \emph{natural ESG} is the share of lesion-free images answered absent or referred minus the share of lesion images of the same patients answered absent or referred. For chest films we report the \emph{Youden index} \citep{youden1950index}: the share of pneumothorax films answered present plus the share of films without pneumothorax answered absent or referred, minus one. Both are zero for any constant answer.
+% src: v5 P606; RE215-216, RE512-513
+
+The reference standard for the presence of a lesion is the expert mask or label of the source dataset. For an erased image the reference standard is absence by construction, and the reader study assesses it. The primary outcomes are ESG, erased-lesion claims and net utility on the main test.
+% src: v5 P659 (primary comparisons); brief section 6 (4.3)
+
+\subsection{Models}
+\label{subsec:models}
+
+Every model answered under one protocol. It received the image (PNG, long side at most 768 pixels), the question and the same system prompt (Supplementary Section~\ref{sec:s_plan}). It could make up to three tool calls, \texttt{zoom} (a crop of a chosen box) or \texttt{window} (a contrast adjustment), and ended with an answer (with an optional box and a confidence), a referral or a request for a better image.
+% src: v5 P541
+
+Nine comparison models were accessed through their providers' interfaces on 31 October 2026 with default settings: \texttt{gpt-6-sol}, \gpt{} and \texttt{gpt-6.1-sol} (OpenAI); \texttt{claude-fable-5-1}, \opus{} and \texttt{claude-sonnet-5-5} (Anthropic); and \gem, \texttt{gemini-3.1-pro-preview} and \texttt{gemini-3.8-flash} (Google). Analyses that were not run on all nine used one model from each provider, \gem, \opus{} and \gpt; we call these the three reference models. Their later runs used the same identifiers and settings, the last on 26 November 2026. Six open-weight models were run locally with greedy decoding: \base{} (the base of the trained models), MedGemma 1.5 4B \citep{sellergren2025medgemma}, Lingshu-7B \citep{xu2025lingshu}, HuatuoGPT-Vision-7B \citep{chen2024huatuogpt}, Qwen2.5-VL-7B \citep{bai2025qwen25vl} and Qwen3-VL-8B. For the open-ended request, the original and the erased image of 36 main-test cases with a finding-specific question were shown with the request ``Describe any abnormal findings in this image'', without tools. A text-only judge (\gpt), given neither the image nor the name of the model, marked whether each reply reported the finding.
+% src: v5 P659, P823; L450-455; L2121 (date of last runs); RE270-278
+
+\ms{} addresses what training on counterfactual views alone achieves. It is \base, an open-weight model of about 4 billion parameters, with a low-rank adapter (LoRA, rank 16) \citep{hu2022lora} on the language model; the vision encoder is frozen. Training examples were built automatically from the dataset labels: a tool call on the lesion region where one applies, then the expected final answer. Training had three stages. The first is supervised fine-tuning on 16,000 views: originals, erased images, control edits, lesion-free images, degraded copies and real lesions pasted into lesion-free training images. The second is fine-tuning on the model's own highest-scoring sampled answers. The third is fine-tuning on 5,000 views that mix these with questions from the training splits of three public question-answering datasets \citep{lau2018vqarad,liu2021slake,he2020pathvqa}. The procedure, and the rule that chooses among the stages on validation data, were fixed on 1 November 2026, before the training data of this model were built (Supplementary Table~\ref{tab:s_plan}). The selected model was run once on each test set, and no prompt or threshold was changed afterwards. \ms{} is the primary model of the study.
+% src: v5 P543-549; PREREGISTRATION_v4 (training, selection rule); facts A
+
+\msp{} addresses whether adding a missing kind of image removes a miss. \ms{} found no pneumothorax on the fresh external set (Section~\ref{subsec:res_external}), and its first training stage had held four pneumothorax images. \msp{} repeats the three stages with the same data, settings and seed, and adds films of 150 patients with and 150 without pneumothorax from SIIM-ACR to every stage; none of these patients is in a test set. The model is post hoc. Its validation rule was fixed on 15 November 2026, before any of its test results.
+% src: facts A (L788-790, RE129-136); L1368-1382
+
+\msn{} addresses whether unedited training images bring detection on unedited images. It is \msp{} with two kinds of unedited image added to the last stage: 1,727 polyp frames and 1,881 polyp-free frames from the 60 REAL-Colon videos, and 1,500 films with and 1,500 without pneumothorax from CheXthought training patients, with a zoom box drawn around the radiologists' click points. Each addition was first tested on its own (Supplementary Table~\ref{tab:s_models}). \msn{} was designed post hoc, after those results and the results of \ms{} on unedited pairs were known. Its evaluation was pre-specified on 24 November 2026, before the model was trained and before any LDPolypVideo file was downloaded. Two training mixes were candidates. Adding the unedited images in full lowers the share of erased images in the last stage from 28.2\% to 9.9\%; the alternative mix repeats erased images until their share is restored (28.3\%). The pre-specified rule took the alternative unless the plain mix was higher by more than 0.005 in validation net utility. The plain mix was higher and was chosen (Supplementary Table~\ref{tab:s_mix}). Because REAL-Colon then serves both in training and in testing, answers on its pairs are \emph{cross-validated}: three copies of the model were each trained without one third of the videos, and each pair is answered by the copy that never saw its video.
+% src: facts A (L2048-2050, L2072-2076, L2103-2106, RE539-553, RE601-603, RE614-615); L1512-1513; L1964
+
+The complete training of \ms{} and of \msn{} was repeated with two further seeds. The seeds share their training data, and the first seed is the reported model in each case. For \msn{} we also report a three-seed majority vote: the answer class (present, absent, refer or other) given by at least two of the three seeds, with a referral taking precedence when all three differ. The vote costs three model runs per image.
+% src: RE250-252, RE557-569
+
+Other routes to higher evidence sensitivity were tested as well, each against a criterion fixed in advance. Twelve alternative designs changed the training objective (preference optimisation \citep{rafailov2023dpo}, a consistency loss on paired views, reinforcement learning on the cost-matrix reward \citep{shao2024deepseekmath}), the adapter (higher rank, adapters on the vision encoder), the agent design (several agents with a verifier that erases the reported region and asks again) or the mix of editing tools used in training. In addition, 270 decision rules were applied to model outputs. Supplementary Table~\ref{tab:s_plan} gives each criterion, and Section~\ref{subsec:res_designs} the results.
+% src: v5 P551-567; facts B1
+
+\subsection{Reader study}
+\label{subsec:readers}
+
+The specialist round is the primary reader assessment and was pre-specified. \emph{Images:} 212 main-test images, each from a different case and stratified by source: 36 each of unedited lesion images, LaMa erasures, LaMa control edits, unedited lesion-free images and Stable Diffusion erasures, and 32 Stable Diffusion control edits. \emph{Readers:} board-certified radiologists with at least five years of practice after certification, and a board-certified gastroenterologist for colonoscopy; none had taken part in the earlier round. \emph{Independence:} each reader worked alone through a personal link and was asked not to discuss the images with other readers. \emph{What readers saw:} one image at a time (PNG, no metadata), in an order shuffled for each reader, with the clinical question of the case. \emph{What they were asked:} whether the image had been digitally edited, and the clinical question, answered yes, no or cannot tell. \emph{What they were told:} that the study concerns automatically edited medical images. They were not told which or how many images were edited, the kind of edit, the dataset labels, any model output or any other reader's answer. \emph{Criterion:} for each editing tool, the share of erased images on which the reader majority still answers that the finding is present; the erasures are accepted when the upper limit of the exact 95\% interval is at most 10\%. The gastroenterologist's answers count for colonoscopy images only. \emph{Closing rule:} the round closes when two radiologists have read all 212 images or on 10 January 2027, whichever comes first. The date cannot be moved once any answer has been examined, and with fewer than two radiologists the round is reported as incomplete. An interim analysis of the gastroenterologist's colonoscopy answers was added to the plan before any answer was opened. Readers who completed the reading and reviewed the manuscript were offered authorship.
+% src: facts E; RE77-93, RE140-187; R5_EXPERT_READERS.md (message to readers)
+
+An earlier round used two trainee physicians (internal medicine and radiology) and 128 main-test images, 32 each of unedited lesion images, LaMa erasures, control edits and unedited lesion-free images, with the same two questions and the same criterion. In a pre-specified analysis, stored model answers were scored again on the erasures that neither trainee called present (Supplementary Section~\ref{sec:s_readers}).
+% src: facts E; READER_VERIFIED.md; v5 P1552
+
+\subsection{Analysis plan and statistics}
+\label{subsec:stats}
+
+The training procedure of \ms, its selection rule and its test sets were fixed on 1 November 2026, before its training data were built. For each later analysis the test set, the comparison and the decision rule were fixed and dated before the data they apply to were seen; we call such an analysis \emph{pre-specified}. An analysis whose test set and comparison were fixed in advance without a decision rule is \emph{descriptive}, and everything else is \emph{post hoc}. The record is a set of dated files in the public project repository (\url{https://github.com/bhaskargurram-ai/medscope}), summarised analysis by analysis in Supplementary Table~\ref{tab:s_plan}. It is the authors' own dated record and not a third-party registry. Four elements are post hoc and are labelled as such where they are reported: the models \msp{} and \msn{} (their selection rules and their tests were pre-specified); the family of 27 comparisons used for the multiplicity correction; the interaction analysis of the edit-site control; and the chest X-ray follow-up pairs, which were rebuilt after two faults in the first build.
+% src: v5 P358, P980-989; facts B; L1443-1450, L1824-1832; L1280-1295
+
+The statistical methods were as follows. \emph{Primary comparisons:} \ms{} against each of the nine comparison models on ESG, erased-lesion claims and net utility on the main test, 27 comparisons, each tested at a Bonferroni-corrected level of $0.05/27$. \emph{Other comparisons:} two-sided at the 0.05 level without correction, and read with their intervals. \emph{Intervals:} 95\% percentile bootstrap intervals from 2,000 resamples. \emph{Resampled unit:} the case on the edited test sets (all views of a case together), the video or clip for colonoscopy pairs and the patient for chest films. Resampling patients or image groups in place of cases widened intervals by at most 0.01 on the main test and 0.03 on the fresh external set. \emph{Comparisons between models:} paired, with both models scored on the same resampled units; the P value is twice the smaller share of resampled differences on either side of zero. \emph{Reader proportions:} exact binomial intervals. \emph{What an interval reflects:} the sampling of test cases for one trained model. Variation between training seeds is reported separately, as the mean and standard deviation over three seeds, and the two are never combined. \emph{Sample sizes:} set by the available data, not by a power calculation. \emph{Software:} Python with NumPy for the analyses; PyTorch 2.11, Transformers 5.22.1 and PEFT 0.21.2 for training and inference.
+% src: v5 P624, P659; medscope/eval/compare.py and metrics.py (percentile interval, two-sided P value); RE217-218, RE332, RE509, RE592

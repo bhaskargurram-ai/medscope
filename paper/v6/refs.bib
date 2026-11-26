@@ -1,8 +1,21 @@
+% refs.bib -- Medical Image Analysis submission (natbib, plainnat).
+% Conventions: capitals that must survive sentence-casing are braced; accents are
+% written as LaTeX escapes; more than ten authors are given as the first ten "and others";
+% arXiv preprints carry journal + eprint + url; published items carry a DOI where one was
+% confirmed against the publisher, PubMed or the proceedings site (checked 2026-11-26).
+
+% ---------------------------------------------------------------------------
+% Entries carried over from the previous version (audited)
+% ---------------------------------------------------------------------------
+
 @article{gurram2026medscope,
   author = {Gurram, Bhaskar},
-  title = {Seeing Is Not Believing: Counterfactual Lesion Erasure Teaches a Small Medical Vision--Language Agent to Report Only What the Image Shows},
+  title = {Measuring and Attributing Evidence Sensitivity in Medical Vision-Language Models via Symmetric Counterfactual Controls},
   journal = {arXiv preprint arXiv:2611.13006},
-  year = {2026}
+  year = {2026},
+  eprint = {2611.13006},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2611.13006}
 }
 @article{lau2018vqarad,
   author = {Lau, Jason J. and Gayen, Soumya and Ben Abacha, Asma and Demner-Fushman, Dina},
@@ -10,25 +23,30 @@
   journal = {Scientific Data},
   volume = {5},
   pages = {180251},
-  year = {2018}
+  year = {2018},
+  doi = {10.1038/sdata.2018.251}
 }
 @inproceedings{liu2021slake,
   author = {Liu, Bo and Zhan, Li-Ming and Xu, Li and Ma, Lin and Yang, Yan and Wu, Xiao-Ming},
   title = {{SLAKE}: A Semantically-Labeled Knowledge-Enhanced Dataset for Medical Visual Question Answering},
   booktitle = {IEEE International Symposium on Biomedical Imaging (ISBI)},
   pages = {1650--1654},
-  year = {2021}
+  year = {2021},
+  doi = {10.1109/ISBI48211.2021.9434010}
 }
 @article{he2020pathvqa,
   author = {He, Xuehai and Zhang, Yichen and Mou, Luntian and Xing, Eric and Xie, Pengtao},
   title = {{PathVQA}: 30000+ Questions for Medical Visual Question Answering},
   journal = {arXiv preprint arXiv:2003.10286},
-  year = {2020}
+  year = {2020},
+  eprint = {2003.10286},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2003.10286}
 }
 @inproceedings{agrawal2018vqacp,
   author = {Agrawal, Aishwarya and Batra, Dhruv and Parikh, Devi and Kembhavi, Aniruddha},
   title = {Don't Just Assume; Look and Answer: Overcoming Priors for Visual Question Answering},
-  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
   pages = {4971--4980},
   year = {2018}
 }
@@ -37,37 +55,51 @@
   title = {Evaluating Object Hallucination in Large Vision-Language Models},
   booktitle = {Conference on Empirical Methods in Natural Language Processing (EMNLP)},
   pages = {292--305},
-  year = {2023}
+  year = {2023},
+  doi = {10.18653/v1/2023.emnlp-main.20}
 }
-@article{xia2024cares,
+@inproceedings{xia2024cares,
   author = {Xia, Peng and Chen, Ze and Tian, Juanxi and Gong, Yangrui and Hou, Ruibo and Xu, Yue and Wu, Zhenbang and Fan, Zhiyuan and Zhou, Yiyang and Zhu, Kangyu and others},
   title = {{CARES}: A Comprehensive Benchmark of Trustworthiness in Medical Vision Language Models},
-  journal = {Advances in Neural Information Processing Systems (NeurIPS)},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume = {37},
+  pages = {140334--140365},
   year = {2024}
 }
 @inproceedings{yan2024probmed,
   author = {Yan, Qianqi and He, Xuehai and Yue, Xiang and Wang, Xin Eric},
   title = {Worse than Random? {An} Embarrassingly Simple Probing Evaluation of Large Multimodal Models in Medical {VQA}},
   booktitle = {Findings of the Association for Computational Linguistics: ACL 2025},
-  year = {2025}
+  pages = {19188--19205},
+  year = {2025},
+  doi = {10.18653/v1/2025.findings-acl.981}
 }
 @article{gu2024medvh,
   author = {Gu, Zishan and Yin, Changchang and Liu, Fenglin and Zhang, Ping},
   title = {{MedVH}: Towards Systematic Evaluation of Hallucination for Large Vision Language Models in the Medical Context},
   journal = {arXiv preprint arXiv:2407.02730},
-  year = {2024}
+  year = {2024},
+  eprint = {2407.02730},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2407.02730}
 }
 @article{chang2024medheval,
   author = {Chang, Aofei and Huang, Le and Bhatia, Parminder and Kass-Hout, Taha and Ma, Fenglong and Xiao, Cao},
   title = {{MedHEval}: Benchmarking Hallucinations and Mitigation Strategies in Medical Large Vision-Language Models},
   journal = {arXiv preprint arXiv:2503.02157},
-  year = {2025}
+  year = {2025},
+  eprint = {2503.02157},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2503.02157}
 }
 @article{chen2024medhallmark,
   author = {Chen, Jiawei and Yang, Dingkang and Wu, Tong and Jiang, Yue and Hou, Xiaolu and Li, Mingcheng and Wang, Shunli and Xiao, Dongling and Li, Ke and Zhang, Lihua},
   title = {Detecting and Evaluating Medical Hallucinations in Large Vision Language Models},
   journal = {arXiv preprint arXiv:2406.10185},
-  year = {2024}
+  year = {2024},
+  eprint = {2406.10185},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2406.10185}
 }
 @inproceedings{agarwal2020towards,
   author = {Agarwal, Vedika and Shetty, Rakshith and Fritz, Mario},
@@ -80,6 +112,8 @@
   author = {Rong, Yao and Leemann, Tobias and Borisov, Vadim and Kasneci, Gjergji and Kasneci, Enkelejda},
   title = {A Consistent and Efficient Evaluation Strategy for Attribution Methods},
   booktitle = {International Conference on Machine Learning (ICML)},
+  series = {Proceedings of Machine Learning Research},
+  volume = {162},
   pages = {18770--18795},
   year = {2022}
 }
@@ -92,7 +126,7 @@
 }
 @article{telea2004image,
   author = {Telea, Alexandru},
-  title = {An Image Inpainting Technique Based on the Fast Marching Method},
+  title = {An Image Inpainting Technique Based on the {Fast Marching Method}},
   journal = {Journal of Graphics Tools},
   volume = {9},
   number = {1},
@@ -107,30 +141,36 @@
   year = {2022}
 }
 @inproceedings{perez2024radedit,
-  author = {P{\'e}rez-Garc{\'\i}a, Fernando and Bond-Taylor, Sam and Sanchez, Pedro P. and van Overschelde, Boris and Lungren, Matthew P. and Hyland, Stephanie L. and Castro, Daniel C. and Alvarez-Valle, Javier and Ilse, Maximilian},
+  author = {P{\'e}rez-Garc{\'\i}a, Fernando and Bond-Taylor, Sam and Sanchez, Pedro P. and van Breugel, Boris and Castro, Daniel C. and Sharma, Harshita and Salvatelli, Valentina and Wetscherek, Maria T. A. and Richardson, Hannah and Lungren, Matthew P. and others},
   title = {{RadEdit}: Stress-Testing Biomedical Vision Models via Diffusion Image Editing},
   booktitle = {European Conference on Computer Vision (ECCV)},
-  year = {2024}
+  pages = {358--376},
+  publisher = {Springer},
+  year = {2024},
+  doi = {10.1007/978-3-031-73254-6_21}
 }
 @inproceedings{healmedvqa2024,
-  author = {Nguyen, Dung and Ho, Minh Khoi and Ta, Huy and Nguyen, Thanh Tam and Chen, Qi and Rav, Kumar and Dang, Quy Duong and Ramchandre, Satwik and Phung, Son Lam and Liao, Zhibin and To, Minh-Son and Verjans, Johan and Nguyen, Phi Le and Phan, Vu Minh Hieu},
-  title = {Localizing Before Answering: A Hallucination Evaluation Benchmark for Grounded Medical Multimodal {LLMs}},
+  author = {Nguyen, Dung and Ho, Minh Khoi and Ta, Huy and Nguyen, Thanh Tam and Chen, Qi and Rav, Kumar and Dang, Quy Duong and Ramchandre, Satwik and Phung, Son Lam and Liao, Zhibin and others},
+  title = {Localizing Before Answering: A Benchmark for Grounded Medical Visual Question Answering},
   booktitle = {International Joint Conference on Artificial Intelligence (IJCAI)},
-  note = {arXiv:2505.00744},
-  year = {2025}
+  pages = {7670--7678},
+  year = {2025},
+  doi = {10.24963/ijcai.2025/853},
+  note = {Preprint: arXiv:2505.00744}
 }
-@article{rafailov2023dpo,
+@inproceedings{rafailov2023dpo,
   author = {Rafailov, Rafael and Sharma, Archit and Mitchell, Eric and Manning, Christopher D. and Ermon, Stefano and Finn, Chelsea},
   title = {Direct Preference Optimization: Your Language Model is Secretly a Reward Model},
-  journal = {Advances in Neural Information Processing Systems (NeurIPS)},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
   volume = {36},
+  pages = {53728--53741},
   year = {2023}
 }
 @inproceedings{zhu2024mmedpo,
   author = {Zhu, Kangyu and Xia, Peng and Li, Yun and Zhu, Hongtu and Wang, Sheng and Yao, Huaxiu},
   title = {{MMedPO}: Aligning Medical Vision-Language Models with Clinical-Aware Multimodal Preference Optimization},
   booktitle = {International Conference on Machine Learning (ICML)},
-  series = {PMLR},
+  series = {Proceedings of Machine Learning Research},
   volume = {267},
   pages = {80207--80222},
   year = {2025}
@@ -139,26 +179,34 @@
   author = {Wu, Shengguang and Sun, Fan-Yun and Wen, Kaiyue and Haber, Nick},
   title = {Symmetrical Visual Contrastive Optimization: Aligning Vision-Language Models with Minimal Contrastive Images},
   booktitle = {Annual Meeting of the Association for Computational Linguistics (ACL)},
-  year = {2025}
+  pages = {30284--30297},
+  year = {2025},
+  doi = {10.18653/v1/2025.acl-long.1462}
 }
 @inproceedings{wu2025empo,
   author = {Wu, Jiulong and Shi, Zhengliang and Wang, Shuaiqiang and Huang, Jizhou and Yin, Dawei and Yan, Lingyong and Cao, Min and Zhang, Min},
   title = {Mitigating Hallucinations in Large Vision-Language Models via Entity-Centric Multimodal Preference Optimization},
   booktitle = {Conference on Empirical Methods in Natural Language Processing (EMNLP)},
-  year = {2025}
+  pages = {19445--19461},
+  year = {2025},
+  doi = {10.18653/v1/2025.emnlp-main.982}
 }
 @inproceedings{jiang2025mfpo,
   author = {Jiang, Songtao and Zhang, Yan and Chen, Ruizhe and Hu, Tianxiang and Jin, Yeying and He, Qinglin and Feng, Yang and Wu, Jian and Liu, Zuozhu},
   title = {Modality-Fair Preference Optimization for Trustworthy {MLLM} Alignment},
   booktitle = {International Joint Conference on Artificial Intelligence (IJCAI)},
   pages = {403--411},
-  year = {2025}
+  year = {2025},
+  doi = {10.24963/ijcai.2025/46}
 }
 @article{shao2024deepseekmath,
   author = {Shao, Zhihong and Wang, Peiyi and Zhu, Qihao and Xu, Runxin and Song, Junxiao and Bi, Xiao and Zhang, Haowei and Zhang, Mingchuan and Li, Y. K. and Wu, Y. and others},
   title = {{DeepSeekMath}: Pushing the Limits of Mathematical Reasoning in Open Language Models},
   journal = {arXiv preprint arXiv:2402.03300},
-  year = {2024}
+  year = {2024},
+  eprint = {2402.03300},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2402.03300}
 }
 @inproceedings{geifman2017selective,
   author = {Geifman, Yonatan and El-Yaniv, Ran},
@@ -170,29 +218,40 @@
 @inproceedings{alain2016understanding,
   author = {Alain, Guillaume and Bengio, Yoshua},
   title = {Understanding Intermediate Layers Using Linear Classifier Probes},
-  booktitle = {International Conference on Learning Representations (ICLR) Workshop},
-  year = {2017}
+  booktitle = {International Conference on Learning Representations (ICLR), Workshop Track},
+  year = {2017},
+  url = {https://openreview.net/forum?id=HJ4-rAVtl}
 }
 @inproceedings{jha2020kvasir,
   author = {Jha, Debesh and Smedsrud, Pia H. and Riegler, Michael A. and Halvorsen, P{\aa}l and de Lange, Thomas and Johansen, Dag and Johansen, H{\aa}vard D.},
   title = {{Kvasir-SEG}: A Segmented Polyp Dataset},
   booktitle = {International Conference on Multimedia Modeling (MMM)},
+  series = {Lecture Notes in Computer Science},
+  volume = {11962},
   pages = {451--462},
-  year = {2020}
+  publisher = {Springer},
+  year = {2020},
+  doi = {10.1007/978-3-030-37734-2_37}
 }
 @article{borgli2020hyperkvasir,
   author = {Borgli, Hanna and Thambawita, Vajira and Smedsrud, Pia H. and Hicks, Steven and Jha, Debesh and Eskeland, Sigrun L. and Randel, Kristin Ranheim and Pogorelov, Konstantin and Lux, Mathias and Nguyen, Duc Tien Dang and others},
   title = {{HyperKvasir}, a comprehensive multi-class image and video dataset for gastrointestinal endoscopy},
   journal = {Scientific Data},
   volume = {7},
+  number = {1},
   pages = {283},
-  year = {2020}
+  year = {2020},
+  doi = {10.1038/s41597-020-00622-y}
 }
 @article{liu2020chestxdet,
   author = {Lian, Jie and Liu, Jingyu and Zhang, Shu and Gao, Kai and Liu, Xiaoqing and Zhang, Dingwen and Yu, Yizhou},
   title = {A Structure-Aware Relation Network for Thoracic Diseases Detection and Segmentation},
   journal = {IEEE Transactions on Medical Imaging},
-  year = {2021}
+  volume = {40},
+  number = {8},
+  pages = {2042--2052},
+  year = {2021},
+  doi = {10.1109/TMI.2021.3070847}
 }
 @article{al2020dataset,
   author = {Al-Dhabyani, Walid and Gomaa, Mohammed and Khaled, Hussien and Fahmy, Aly},
@@ -200,7 +259,8 @@
   journal = {Data in Brief},
   volume = {28},
   pages = {104863},
-  year = {2020}
+  year = {2020},
+  doi = {10.1016/j.dib.2019.104863}
 }
 @article{buda2019association,
   author = {Buda, Mateusz and Saha, Ashirbani and Mazurowski, Maciej A.},
@@ -208,31 +268,46 @@
   journal = {Computers in Biology and Medicine},
   volume = {109},
   pages = {218--225},
-  year = {2019}
+  year = {2019},
+  doi = {10.1016/j.compbiomed.2019.05.002}
 }
 @article{zafar2026coral,
   author = {Zafar, Anas and Murali, Leema Krishna and Bharadwaj, Siddhant and Vashist, Ashish and Wu, Jia},
   title = {Do Medical Vision Language Models Actually See? {A} Counterfactual Grounding Framework and Hard-Negative Contrastive Training for Visually-Reliant Medical {VLMs}},
   journal = {arXiv preprint arXiv:2607.03647},
-  year = {2026}
+  year = {2026},
+  eprint = {2607.03647},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2607.03647}
 }
 @inproceedings{huang2026medcap,
   author = {Huang, Zaiqiang and Zhu, Zhihong and Huang, Zixuan and Zhang, Yunyan and Zhang, Hui and Wu, Xian},
   title = {{Med-CAP}: Counterfactual Evidence and Adaptive Prior Suppression for Robust Medical Visual Question Answering},
   booktitle = {Medical Image Computing and Computer Assisted Intervention (MICCAI)},
-  year = {2026}
+  series = {Lecture Notes in Computer Science},
+  volume = {16878},
+  pages = {313--323},
+  publisher = {Springer},
+  year = {2026},
+  doi = {10.1007/978-3-032-38059-3_30}
 }
 @article{sun2026prive,
-  author = {Sun, Jingyu and Tu, Jiachen and Xue, Yuyang and Jiang, Yaoxin and Xu, Guoyi and Yao, Zhengtao and Qian, Rui and Sun, Yizheng and Zhou, Hongpeng and Sun, Jingyuan and Lin, Yan},
+  author = {Sun, Jingyu and Tu, Jiachen and Xue, Yuyang and Jiang, Yaoxin and Xu, Guoyi and Yao, Zhengtao and Qian, Rui and Sun, Yizheng and Zhou, Hongpeng and Sun, Jingyuan and others},
   title = {Seeing What Is Actually There: {PriVE-Bench} and {PriVE-Tools} for Counterfactual Evaluation of Agentic Visual Evidence in {VLMs}},
   journal = {arXiv preprint arXiv:2607.16311},
-  year = {2026}
+  year = {2026},
+  eprint = {2607.16311},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2607.16311}
 }
 @article{lin2026medcausalx,
   author = {Lin, Jianxin and Zhu, Chunzheng and Kneuertz, Peter J. and Bai, Yunfei and Xue, Yuan},
-  title = {When Models Learn to Ask Why: Adaptive Causal Reasoning for Trustworthy Medical Vision--Language Models},
+  title = {When Models Learn to Ask Why: Adaptive Causal Reasoning for Trustworthy Medical Vision-Language Models},
   journal = {arXiv preprint arXiv:2603.23085},
-  year = {2026}
+  year = {2026},
+  eprint = {2603.23085},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2603.23085}
 }
 @article{mongan2020claim,
   author = {Mongan, John and Moy, Linda and Kahn, Jr., Charles E.},
@@ -241,24 +316,28 @@
   volume = {2},
   number = {2},
   pages = {e200029},
-  year = {2020}
+  year = {2020},
+  doi = {10.1148/ryai.2020200029}
 }
 @article{tejani2024claim,
-  author = {Tejani, Ali S. and Klontzas, Michail E. and Gatti, Anthony A. and Mongan, John T. and Moy, Linda and Park, Seong Ho and Kahn, Jr., Charles E.},
+  author = {Tejani, Ali S. and Klontzas, Michail E. and Gatti, Anthony A. and Mongan, John T. and Moy, Linda and Park, Seong Ho and Kahn, Jr., Charles E. and {CLAIM 2024 Update Panel}},
   title = {Checklist for Artificial Intelligence in Medical Imaging ({CLAIM}): 2024 Update},
   journal = {Radiology: Artificial Intelligence},
   volume = {6},
   number = {4},
   pages = {e240300},
-  year = {2024}
+  year = {2024},
+  doi = {10.1148/ryai.240300}
 }
 @article{biffi2024realcolon,
   author = {Biffi, Carlo and Antonelli, Giulio and Bernhofer, Sebastian and Hassan, Cesare and Hirata, Daizen and Iwatate, Mineo and Maieron, Andreas and Salvagnini, Pietro and Cherubini, Andrea},
   title = {{REAL-Colon}: A dataset for developing real-world {AI} applications in colonoscopy},
   journal = {Scientific Data},
   volume = {11},
+  number = {1},
   pages = {539},
-  year = {2024}
+  year = {2024},
+  doi = {10.1038/s41597-024-03359-0}
 }
 @inproceedings{wang2017chestx,
   author = {Wang, Xiaosong and Peng, Yifan and Lu, Le and Lu, Zhiyong and Bagheri, Mohammadhadi and Summers, Ronald M.},
@@ -271,5 +350,206 @@
   author = {Sharma, Sonali and Long, Jin and Shih, George and Eid, Sarah and Bluethgen, Christian and Jacobson, Francine L. and Tsai, Emily B. and {Global Radiology Consortium} and Alaa, Ahmed M. and Langlotz, Curtis P.},
   title = {{CheXthought}: A global multimodal dataset of clinical chain-of-thought reasoning and visual attention for chest {X}-ray interpretation},
   journal = {arXiv preprint arXiv:2604.26288},
-  year = {2026}
+  year = {2026},
+  eprint = {2604.26288},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2604.26288}
+}
+
+% ---------------------------------------------------------------------------
+% Entries added for v6: datasets
+% ---------------------------------------------------------------------------
+
+@inproceedings{ma2021ldpolyp,
+  author = {Ma, Yiting and Chen, Xuejin and Cheng, Kai and Li, Yang and Sun, Bin},
+  title = {{LDPolypVideo} Benchmark: A Large-Scale Colonoscopy Video Dataset of Diverse Polyps},
+  booktitle = {Medical Image Computing and Computer Assisted Intervention (MICCAI)},
+  series = {Lecture Notes in Computer Science},
+  volume = {12905},
+  pages = {387--396},
+  publisher = {Springer},
+  year = {2021},
+  doi = {10.1007/978-3-030-87240-3_37}
+}
+@article{chambon2024chexpertplus,
+  author = {Chambon, Pierre and Delbrouck, Jean-Benoit and Sounack, Thomas and Huang, Shih-Cheng and Chen, Zhihong and Varma, Maya and Truong, Steven Q. H. and Chuong, Chu The and Langlotz, Curtis P.},
+  title = {{CheXpert Plus}: Augmenting a Large Chest {X}-ray Dataset with Text Radiology Reports, Patient Demographics and Additional Image Formats},
+  journal = {arXiv preprint arXiv:2405.19538},
+  year = {2024},
+  eprint = {2405.19538},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2405.19538}
+}
+@misc{siim2019pneumothorax,
+  author = {Zawacki, Anna and Wu, Carol and Shih, George and Elliott, Julia and Fomitchev, Mikhail and Hussain, Mohannad and Lakhani, Paras and Culliton, Phil and Bao, Shunxing},
+  title = {{SIIM-ACR} Pneumothorax Segmentation},
+  howpublished = {Kaggle competition},
+  year = {2019},
+  url = {https://www.kaggle.com/competitions/siim-acr-pneumothorax-segmentation}
+}
+@article{bernal2015cvc,
+  author = {Bernal, Jorge and S{\'a}nchez, F. Javier and Fern{\'a}ndez-Esparrach, Gloria and Gil, Debora and Rodr{\'\i}guez, Cristina and Vilari{\~n}o, Fernando},
+  title = {{WM-DOVA} maps for accurate polyp highlighting in colonoscopy: Validation vs. saliency maps from physicians},
+  journal = {Computerized Medical Imaging and Graphics},
+  volume = {43},
+  pages = {99--111},
+  year = {2015},
+  doi = {10.1016/j.compmedimag.2015.02.007}
+}
+@article{degerli2022qata,
+  author = {Degerli, Aysen and Ahishali, Mete and Yamac, Mehmet and Kiranyaz, Serkan and Chowdhury, Muhammad E. H. and Hameed, Khalid and Hamid, Tahir and Mazhar, Rashid and Gabbouj, Moncef},
+  title = {{COVID}-19 infection map generation and detection from chest {X}-ray images},
+  journal = {Health Information Science and Systems},
+  volume = {9},
+  number = {1},
+  pages = {15},
+  year = {2021},
+  doi = {10.1007/s13755-021-00146-8}
+}
+@article{gomez2024busbra,
+  author = {G{\'o}mez-Flores, Wilfrido and Gregorio-Calas, Maria Julia and {Coelho de Albuquerque Pereira}, Wagner},
+  title = {{BUS-BRA}: A breast ultrasound dataset for assessing computer-aided diagnosis systems},
+  journal = {Medical Physics},
+  volume = {51},
+  number = {4},
+  pages = {3110--3123},
+  year = {2024},
+  doi = {10.1002/mp.16812}
+}
+@article{adewole2023bratsafrica,
+  author = {Adewole, Maruf and Rudie, Jeffrey D. and Gbadamosi, Anu and Toyobo, Oluyemisi and Raymond, Confidence and Zhang, Dong and Omidiji, Olubukola and Akinola, Rachel and Suwaid, Mohammad Abba and Emegoakor, Adaobi and others},
+  title = {The {Brain Tumor Segmentation} ({BraTS}) Challenge 2023: Glioma Segmentation in {Sub-Saharan Africa} Patient Population ({BraTS-Africa})},
+  journal = {arXiv preprint arXiv:2305.19369},
+  year = {2023},
+  eprint = {2305.19369},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2305.19369},
+  note = {Journal version: Neuro-Oncology Advances 8(1):vdag082, 2026}
+}
+@article{silva2014etis,
+  author = {Silva, Juan and Histace, Aymeric and Romain, Olivier and Dray, Xavier and Granado, Bertrand},
+  title = {Toward embedded detection of polyps in {WCE} images for early diagnosis of colorectal cancer},
+  journal = {International Journal of Computer Assisted Radiology and Surgery},
+  volume = {9},
+  number = {2},
+  pages = {283--293},
+  year = {2014},
+  doi = {10.1007/s11548-013-0926-3}
+}
+@article{vallez2025busuclm,
+  author = {Vallez, Noelia and Bueno, Gloria and Deniz, Oscar and Rienda, Miguel Angel and Pastor, Carlos},
+  title = {{BUS-UCLM}: Breast ultrasound lesion segmentation dataset},
+  journal = {Scientific Data},
+  volume = {12},
+  number = {1},
+  pages = {242},
+  year = {2025},
+  doi = {10.1038/s41597-025-04562-3}
+}
+@article{labella2023meningioma,
+  author = {LaBella, Dominic and Adewole, Maruf and Alonso-Basanta, Michelle and Altes, Talissa and Anwar, Syed Muhammad and Baid, Ujjwal and Bergquist, Timothy and Bhalerao, Radhika and Chen, Sully and Chung, Verena and others},
+  title = {The {ASNR-MICCAI} {Brain Tumor Segmentation} ({BraTS}) Challenge 2023: Intracranial Meningioma},
+  journal = {arXiv preprint arXiv:2305.07642},
+  year = {2023},
+  eprint = {2305.07642},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2305.07642}
+}
+
+% ---------------------------------------------------------------------------
+% Entries added for v6: hallucination, text reliance and shortcut learning
+% ---------------------------------------------------------------------------
+
+@inproceedings{guan2024hallusionbench,
+  author = {Guan, Tianrui and Liu, Fuxiao and Wu, Xiyang and Xian, Ruiqi and Li, Zongxia and Liu, Xiaoyu and Wang, Xijun and Chen, Lichang and Huang, Furong and Yacoob, Yaser and others},
+  title = {{HallusionBench}: An Advanced Diagnostic Suite for Entangled Language Hallucination and Visual Illusion in Large Vision-Language Models},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages = {14375--14385},
+  year = {2024}
+}
+@article{buckley2026text,
+  author = {Buckley, Thomas A. and Diao, James A. and Srivastava, Cam N. and Brodeur, Peter G. and Rajpurkar, Pranav and Rodman, Adam and Manrai, Arjun K.},
+  title = {Multimodal foundation models exploit text to make medical image predictions},
+  journal = {Nature Communications},
+  volume = {17},
+  number = {1},
+  pages = {7475},
+  year = {2026},
+  doi = {10.1038/s41467-026-74207-5}
+}
+@article{gu2025illusion,
+  author = {Gu, Yu and Fu, Jingjing and Liu, Xiaodong and Valanarasu, Jeya Maria Jose and Codella, Noel C. F. and Tan, Reuben and Liu, Qianchu and Jin, Ying and Zhang, Sheng and Wang, Jinyu and others},
+  title = {The Illusion of Readiness in Health {AI}},
+  journal = {arXiv preprint arXiv:2509.18234},
+  year = {2025},
+  eprint = {2509.18234},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2509.18234}
+}
+@article{lotfinia2026image,
+  author = {Lotfinia, Mahshad and Ziegelmayer, Sebastian and Adams, Lisa and Nguyen, Tri-Thien and Truhn, Daniel and Maier, Andreas and {Tayebi Arasteh}, Soroosh},
+  title = {Vision-language models for chest radiography do not always need the image},
+  journal = {arXiv preprint arXiv:2606.17710},
+  year = {2026},
+  eprint = {2606.17710},
+  archiveprefix = {arXiv},
+  url = {https://arxiv.org/abs/2606.17710}
+}
+@article{jin2024hidden,
+  author = {Jin, Qiao and Chen, Fangyuan and Zhou, Yiliang and Xu, Ziyang and Cheung, Justin M. and Chen, Robert and Summers, Ronald M. and Rousseau, Justin F. and Ni, Peiyun and Landsman, Marc J. and others},
+  title = {Hidden flaws behind expert-level accuracy of multimodal {GPT-4} vision in medicine},
+  journal = {npj Digital Medicine},
+  volume = {7},
+  number = {1},
+  pages = {190},
+  year = {2024},
+  doi = {10.1038/s41746-024-01185-7}
+}
+@article{winkler2019markings,
+  author = {Winkler, Julia K. and Fink, Christine and Toberer, Ferdinand and Enk, Alexander and Deinlein, Teresa and Hofmann-Wellenhof, Rainer and Thomas, Luc and Lallas, Aimilios and Blum, Andreas and Stolz, Wilhelm and others},
+  title = {Association Between Surgical Skin Markings in Dermoscopic Images and Diagnostic Performance of a Deep Learning Convolutional Neural Network for Melanoma Recognition},
+  journal = {JAMA Dermatology},
+  volume = {155},
+  number = {10},
+  pages = {1135--1141},
+  year = {2019},
+  doi = {10.1001/jamadermatol.2019.1735}
+}
+@article{degrave2021shortcuts,
+  author = {DeGrave, Alex J. and Janizek, Joseph D. and Lee, Su-In},
+  title = {{AI} for radiographic {COVID}-19 detection selects shortcuts over signal},
+  journal = {Nature Machine Intelligence},
+  volume = {3},
+  number = {7},
+  pages = {610--619},
+  year = {2021},
+  doi = {10.1038/s42256-021-00338-7}
+}
+@article{zech2018variable,
+  author = {Zech, John R. and Badgeley, Marcus A. and Liu, Manway and Costa, Anthony B. and Titano, Joseph J. and Oermann, Eric Karl},
+  title = {Variable generalization performance of a deep learning model to detect pneumonia in chest radiographs: A cross-sectional study},
+  journal = {PLOS Medicine},
+  volume = {15},
+  number = {11},
+  pages = {e1002683},
+  year = {2018},
+  doi = {10.1371/journal.pmed.1002683}
+}
+@inproceedings{oakden2020hidden,
+  author = {Oakden-Rayner, Luke and Dunnmon, Jared and Carneiro, Gustavo and R{\'e}, Christopher},
+  title = {Hidden stratification causes clinically meaningful failures in machine learning for medical imaging},
+  booktitle = {ACM Conference on Health, Inference, and Learning (CHIL)},
+  pages = {151--159},
+  year = {2020},
+  doi = {10.1145/3368555.3384468}
+}
+@article{geirhos2020shortcut,
+  author = {Geirhos, Robert and Jacobsen, J{\"o}rn-Henrik and Michaelis, Claudio and Zemel, Richard and Brendel, Wieland and Bethge, Matthias and Wichmann, Felix A.},
+  title = {Shortcut learning in deep neural networks},
+  journal = {Nature Machine Intelligence},
+  volume = {2},
+  number = {11},
+  pages = {665--673},
+  year = {2020},
+  doi = {10.1038/s42256-020-00257-z}
 }
