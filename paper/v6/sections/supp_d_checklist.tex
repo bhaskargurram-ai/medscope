@@ -1,1 +1,42 @@
-% supp_d_checklist: to be written
+% ===================== Supplement D: reporting checklist (Writer A) =====================
+% The table of paper/v5/paper.tex lines 1135-1174 with every pointer updated to the sections and labels of this version.
+\section{Reporting checklist}\label{sec:s_claim}
+
+Table~\ref{tab:s_claim} maps the manuscript to the Checklist for Artificial Intelligence in Medical Imaging (CLAIM) \citep{mongan2020claim}, 2024 update \citep{tejani2024claim}, grouped by the sections of the checklist.
+% src: v5 P1137
+
+\begin{table}[!htbp]
+\caption{Where each part of the CLAIM 2024 checklist is addressed. ESG: evidence sensitivity gap. LoRA: low-rank adapter.}
+\label{tab:s_claim}
+\centering
+\small
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{@{}L{0.25\textwidth}L{0.71\textwidth}@{}}
+\toprule
+\textbf{Checklist section} & \textbf{Where and how it is addressed} \\
+\midrule
+Title, abstract & Title; abstract (design, data, main results with intervals, and the comparison that was not shown). \\
+Introduction: background, objectives, hypotheses & Section~\ref{sec:intro}: the clinical setting, the logical limit of accuracy on unaltered images, four requirements for an intervention on the finding, and the aim. Predictions for a model that uses the image and for one that does not: Section~\ref{subsec:design}. \\
+Study design and intended use & Retrospective study of public, de-identified datasets. A benchmark and research models, not a clinical device (Sections~\ref{subsec:design} and~\ref{subsec:data}; Table~\ref{tab:overview}). \\
+Data sources, selection, preprocessing & Sources and counts (Section~\ref{subsec:data}, Table~\ref{tab:datasets}); lesions smaller than 20 pixels or larger than 20\% of the image excluded; closed questions; automated checks of the edited views (Section~\ref{subsec:views}, \ref{sec:s_views}); long side of every image at most 768 pixels (Section~\ref{subsec:models}). \\
+De-identification & Public releases, de-identified by their providers; no new patient data were collected; the reader study used the same images. \\
+Missing data & Cases that failed an automated check or an edit were dropped with both edited views; exclusions before splitting are counted in \ref{sec:s_plan}. Analyses on fewer cases state the number kept and the reason: 125 cases with valid views for all four editing tools, 116 of 160 clips with an unedited pair, 183 of 200 chest X-ray follow-up pairs (Sections~\ref{subsec:data} and~\ref{subsec:pairs}, \ref{sec:s_views}). \\
+Imaging parameters & As released by each source; not available per image and not analysed (Section~\ref{sec:discussion}, limitation iv). \\
+Reference standard & Expert lesion masks and labels of the source datasets. For an erased image, absence by construction, assessed by a specialist reader round that is still open and by an earlier trainee round (Sections~\ref{subsec:measures}, \ref{subsec:readers} and~\ref{subsec:res_readers}; \ref{sec:s_readers}). \\
+Data partitions and independence & Splits by patient or by group of near-identical images, made before any view was built; hash comparison of all images across sets; an analysis without the test cases most similar to a training image; cross-validated answers where a source serves in training and in testing (Sections~\ref{subsec:data}, \ref{subsec:models} and~\ref{subsec:res_alternatives}). \\
+Test-set size & Set by the available cases and fixed in advance, not by a power calculation (Sections~\ref{subsec:data} and~\ref{subsec:pairs}). \\
+Model, software, initialization & \base{} with a LoRA adapter of rank 16 and a frozen vision encoder, initialized from the public base model; software versions (Sections~\ref{subsec:models} and~\ref{subsec:stats}; \ref{sec:s_plan}). \\
+Training and model selection & Three training stages and a selection rule fixed in advance for \ms; \msp{} and \msn{} post hoc, each with a validation rule fixed before its test results; three training seeds; a three-seed majority vote reported next to the single model (Section~\ref{subsec:models}; Supplementary Tables~\ref{tab:s_models} and~\ref{tab:s_mix}). \\
+Metrics and statistics & ESG, erased-lesion claims, lesion-free claims, lesion images correct, net utility, natural ESG and Youden index, each with the value a constant answer earns (Section~\ref{subsec:measures}); bootstrap over cases, videos or patients, paired comparisons, Bonferroni correction over 27 primary comparisons (Section~\ref{subsec:stats}). \\
+Robustness and interpretability & Prompting conditions, question wordings, cost matrices, editing tools, lesion size and training seeds (Sections~\ref{subsec:res_main} and~\ref{subsec:res_alternatives}; Supplementary Tables~\ref{tab:s_prompts}, \ref{tab:s_sensitivity}, \ref{tab:s_cost}, \ref{tab:s_tools}, \ref{tab:s_size} and~\ref{tab:s_seeds}); probes of hidden states (Supplementary Table~\ref{tab:s_site}). \\
+Internal and external testing & Main test; external centres, fresh internal and fresh external sets (Section~\ref{subsec:res_external}, Supplementary Table~\ref{tab:s_external}); unedited same-patient pairs, including a hospital not used in training (Section~\ref{subsec:res_pairs}); chest films (Section~\ref{subsec:res_nmodel}). \\
+Registration & The analysis plan is a set of dated files in the public project repository, the authors' own record and not a third-party registry (Section~\ref{subsec:stats}, Supplementary Table~\ref{tab:s_plan}). The study is not a clinical trial. \\
+Data flow and demographics & Counts per source and per evaluation set (Table~\ref{tab:datasets}); demographics were not compiled (Section~\ref{sec:discussion}, limitation iv). \\
+Performance and errors & Tables with intervals; results by imaging type, editing tool and lesion size (Supplementary Tables~\ref{tab:s_modality}, \ref{tab:s_tools} and~\ref{tab:s_size}); a counted analysis of the pneumothorax miss (Section~\ref{subsec:res_external}); model answers scored again on erasures that readers called clean (Section~\ref{subsec:res_readers}). \\
+Discussion & What the results do and do not show, limitations and the evidence still needed (Section~\ref{sec:discussion}). \\
+Protocols, code, data & Data and code availability statement: analysis plan, code, models and stored model answers. \\
+Funding & No external funding. \\
+\bottomrule
+\end{tabular}
+\end{table}
+% src: v5 P1139-1174 (checklist rows); pointers and facts from 03_methods.tex (subsec:data: 20 pixels, 20%; subsec:models: 768 pixels, rank 16; subsec:stats: 27 comparisons), 04_results_a.tex and 05_results_b.tex (125 cases; 116 of 160 clips; 183 of 200 pairs)

@@ -1,1 +1,42 @@
-% 02_related: to be written
+% ===================== 2. Related work (Writer A) =====================
+% No results of this study. Numbers of prior studies carry a "% src:" line. Descriptions of prior work follow
+% writing_study/group3_vlm_benchmarks.md ("How the closest prior work describes itself"), group2 (RadEdit) and v5 P407-447.
+\section{Related work}\label{sec:related}
+
+\textit{Changing the question.} Most tests of whether a VLM reports a finding that is absent change the question and leave the image as it is. POPE asks balanced yes/no questions about objects that are or are not in a photograph \citep{li2023pope}. ProbMed pairs each true question about a medical image with an adversarial question that names an invented finding or attribute, and scores the pair only when both answers are right \citep{yan2024probmed}. CARES, Med-HallMark and MedHEval grade answers or generated text about unaltered medical images over wider sets of properties \citep{xia2024cares,chen2024medhallmark,chang2024medheval}. \citet{jin2024hidden} had physicians read the rationales of one model: 35.5\% of its correct answers came with a flawed rationale, most often in the description of the image (27.2\%). In all of these studies the image is held fixed, so a correct ``no'' cannot be attributed to the image.
+% src: writing_study/papers_g3/jin_npj.md L22, L101 (35.5%; 27.2%); group3 notes (POPE, ProbMed, CARES, Med-HallMark); v5 P405 (MedHEval)
+
+\textit{Changing the image.} A second group holds the question fixed and changes the whole image. MedVH replaces a chest radiograph with an unrelated image \citep{gu2024medvh}, and \citet{gu2025illusion} remove the image from multiple-choice cases or substitute one that fits another answer option. The closest work is that of \citet{lotfinia2026image}. They exchanged a chest radiograph for another patient's with the same or the opposite label, occluded the radiologist-marked region or an equal region elsewhere, and had radiologists read the same altered images. A language model given only the question scored 55.3\% on their pooled questions, above two multimodal systems. The authors state that their swaps are not minimal pairs, and that images which remove the finding and preserve the image statistics would be more faithful. Such paired edits exist for general images \citep{agarwal2020towards}: HallusionBench pairs an original with a hand-edited image for which the correct answer differs \citep{guan2024hallusionbench}. In medical imaging, RadEdit edits chest radiographs with a diffusion model to stress-test classifiers and segmentation models \citep{perez2024radedit}, and HEAL-MedVQA swaps the queried anatomical region of a chest radiograph \citep{healmedvqa2024}. Recent preprints replace the whole image \citep{zafar2026coral}, exchange tumour intensities between MRI sequences \citep{sun2026prive}, or build counterfactuals from image features or local perturbations \citep{huang2026medcap,lin2026medcausalx}. None of these editing studies pairs a lesion-shaped erasure with an edit of the same shape and tool elsewhere in the same image, or reports an assessment of the edited images by clinicians (Table~\ref{tab:related}).
+% src: writing_study/papers_g3/lotfinia_main.md (abstract: 55.3% text-only, higher than two multimodal systems; Discussion L311, L328-330: not minimal pairs, off the training distribution, finding-removing counterfactuals more faithful); group3 notes (MedVH, The Illusion of Readiness, HallusionBench); group2 notes (RadEdit); v5 P409-413 (Agarwal et al., HEAL-MedVQA, CORAL, PriVE-Bench, Med-CAP, MedCausalX)
+
+\textit{Training remedies.} Similar pairs have been used for training. MMedPO adds noise to lesion regions to build the rejected side of preference pairs \citep{zhu2024mmedpo}. S-VCO, EMPO and MFPO train general VLMs on minimal-pair or contrasting images with preference optimisation \citep{svco2024,wu2025empo,jiang2025mfpo,rafailov2023dpo}, and CORAL penalises answers that stay the same when the image is replaced \citep{zafar2026coral}. These methods are evaluated by accuracy, or by the rate of unsupported statements, on benchmarks of unaltered images. Such measures do not separate answering ``absent'' more often from answering ``absent'' when the finding is absent. A matched control edit does, because a model that answers ``absent'' more often also denies lesions that are intact. The present study applies this control to a trained model and to the models it is compared with, and adds a test on unedited image pairs.
+% src: v5 P415-421, P437-439 (MMedPO, S-VCO, EMPO, MFPO, CORAL and how each is validated); no numbers
+
+\begin{table*}[!t]
+\caption{Design features of the closest prior work and of this study, taken from the published descriptions. Yes: the feature is present. Partly: present in the restricted form given in the note. No: absent. --: not applicable. n.s.: not stated in the sources consulted. Works are ordered as in the text.}
+\label{tab:related}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{@{}L{0.25\textwidth}*{8}{>{\centering\arraybackslash}p{0.08\textwidth}}@{}}
+\toprule
+\textbf{Study} & \textbf{Medical images} & \textbf{Image varied, question fixed} & \textbf{Edit confined to the finding} & \textbf{Matched control edit} & \textbf{Tested with editing tools unseen in training} & \textbf{Altered images assessed by clinicians} & \textbf{Unedited same-patient pairs} & \textbf{Trained remedy} \\
+\midrule
+ProbMed \citep{yan2024probmed} & Yes & No & -- & -- & -- & -- & No & No \\
+MedVH \citep{gu2024medvh} & Yes & Yes$^{a}$ & No & No & -- & No & No & No \\
+\citet{gu2025illusion} & Yes & Yes$^{a}$ & No & No & -- & Yes$^{b}$ & No & No \\
+\citet{lotfinia2026image} & Yes & Yes & Partly$^{c}$ & Yes$^{d}$ & -- & Yes & No$^{e}$ & No \\
+HallusionBench \citep{guan2024hallusionbench} & No & Yes & Partly$^{f}$ & No & -- & -- & No & No \\
+RadEdit \citep{perez2024radedit} & Yes & Yes$^{g}$ & Yes & No & -- & No & No & No \\
+HEAL-MedVQA \citep{healmedvqa2024} & Yes & Yes & Partly$^{h}$ & No & No & No & n.s. & Yes \\
+PriVE-Bench \citep{sun2026prive} & Partly$^{i}$ & Yes & Partly$^{i}$ & No & No & No & n.s. & n.s. \\
+MMedPO \citep{zhu2024mmedpo} & Yes & No$^{j}$ & Partly$^{j}$ & No & No & No & n.s. & Yes \\
+CORAL \citep{zafar2026coral} & Yes & Yes$^{a}$ & No & No & No & No & n.s. & Yes \\
+\midrule
+This study & Yes & Yes & Yes & Yes & Yes & Partly$^{k}$ & Yes$^{l}$ & Yes \\
+\bottomrule
+\multicolumn{9}{@{}p{0.97\textwidth}@{}}{$^{a}$\,The whole image is removed or replaced. $^{b}$\,Clinicians verified that each substituted image supported the new answer. $^{c}$\,The radiologist-marked region is occluded, not removed. $^{d}$\,An equal region occluded elsewhere, and a swap with a radiograph of the same label. $^{e}$\,Swaps use unedited radiographs of other patients. $^{f}$\,Hand edits of general images (charts, maps, illusions). $^{g}$\,Classification and segmentation models; no questions are asked. $^{h}$\,The queried anatomical region is swapped in from another radiograph. $^{i}$\,One of five domains is medical: tumour-region intensities exchanged between MRI sequences. $^{j}$\,Noise in lesion regions, used to build training pairs; evaluation uses unaltered images. $^{k}$\,Complete for colonoscopy; in progress for the other imaging types (Section~\ref{subsec:res_readers}). $^{l}$\,Colonoscopy frames; chest films are unedited but not paired by patient.} \\
+\end{tabular}
+\end{table*}
+% src: group3 notes, section "How the closest prior work describes itself" (ProbMed, MedVH, The Illusion of Readiness, Lotfinia et al., HallusionBench); group2 notes section 8 (RadEdit); v5 P423-447 (table of closest work: control, unseen tools and reader columns for HEAL-MedVQA, RadEdit, MMedPO, CORAL, PriVE-Bench). Cells that neither source supports are "n.s.".

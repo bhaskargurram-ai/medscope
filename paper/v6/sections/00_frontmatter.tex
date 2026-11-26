@@ -1,1 +1,29 @@
-% 00_frontmatter: to be written
+% ===================== Front matter (Writer A) =====================
+% Every number in the abstract is copied from 04_results_a.tex or 05_results_b.tex; sources are named after it.
+\begin{frontmatter}
+
+\title{Vision-language models report lesions erased from medical images: a matched counterfactual evaluation with unedited same-patient pairs}
+
+\author[ind]{Bhaskar Gurram\corref{cor}}
+\ead{gurrambhaskar.ai@gmail.com}
+\author[ind]{Yoshitha Challagulla}
+\author[jc]{Jyothirmaye Challagulla}
+\author[shn,uoft]{Samir C. Grover}
+\cortext[cor]{Corresponding author.}
+\address[ind]{Independent Researcher}
+\address[jc]{\toconfirm{affiliation of Jyothirmaye Challagulla (internal medicine)}}
+\address[shn]{Scarborough Health Network Research Institute, Toronto, Ontario, Canada}
+\address[uoft]{Department of Medicine, University of Toronto, Toronto, Ontario, Canada}
+
+\begin{abstract}
+Vision-language models for medical imaging are assessed on unaltered images. However, a correct answer cannot then show that the image was used. We erased lesions from medical images, made matched control edits elsewhere, and asked the same closed question (MedScope-Bench; 507 test cases, five imaging types). The evidence sensitivity gap (ESG), the share of lesions denied after erasure minus that after the control edit, is zero for any constant answer. Nine frontier models reported the finding on 41.1\% to 61.6\% of 219 erased images (ESG 0.269 to 0.470) and on none of 183 blank images, so the question alone did not produce them. \ms, a 4-billion-parameter model trained on such views, reported 9.6\% (95\% confidence interval 6.1 to 13.7; ESG 0.758, 0.701 to 0.815). On 103 unedited same-patient colonoscopy pairs, its analogous gap (natural ESG) equalled its base model's (0.243). \msn, trained also on unedited images, reached 0.612 (0.526 to 0.698) on 116 pairs from a hospital absent from training. It exceeded two comparison models, by 0.310 (0.181 to 0.431) and 0.147 (0.043 to 0.250); a difference from the third, 0.086 ($-0.017$ to 0.190), was not shown. It reported more erased lesions than its predecessor on new external datasets (22.0\% against 11.3\%; difference 0.107, 0.054 to 0.162). On public images with closed questions, the models tested often reported lesions no longer shown. Counterfactual training reduced such reports in one small model; detection on unedited images required unedited training images. Complete specialist reading of the erasures and prospective evaluation are needed.
+\end{abstract}
+% src: 04_results_a.tex subsec:res_main (507 cases; 41.1-61.6% of 219; ESG 0.269-0.470; 9.6% [6.1, 13.7]; 0.758 [0.701, 0.815]; blank image 0% of 183 = L1784-1805);
+%      05_results_b.tex subsec:res_pairs (103 pairs, 0.243 for both; 116 pairs, 0.612 [0.526, 0.698]; +0.147 [+0.043, +0.250]; +0.310 [+0.181, +0.431]; +0.086 [-0.017, +0.190] = L2145-2159);
+%      05_results_b.tex subsec:res_nmodel (22.0% against 11.3%, +0.107 [+0.054, +0.162] = L2178-2183); 03_methods.tex subsec:models (about 4 billion parameters)
+
+\begin{keyword}
+vision-language models \sep medical imaging \sep counterfactual evaluation \sep inpainting \sep evidence sensitivity \sep reader study \sep colonoscopy
+\end{keyword}
+
+\end{frontmatter}
