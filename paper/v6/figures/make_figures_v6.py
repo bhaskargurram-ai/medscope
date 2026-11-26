@@ -1,9 +1,9 @@
 """Figures 2 and 3 and supplementary figures S (designs, site probes, readers and prompts) of manuscript v6.
 
-This is make_figures_v3.py with the LABELS changed to the names fixed for v6. Every plotted number is the one in
-make_figures_v3.py, unchanged (that script copied them from docs/RESULTS_LOG.md and the preprint; the source table
-is named next to each block). Nothing is estimated, interpolated or re-rounded. Label changes are listed in
-README.md.
+This is the earlier plotting script (paper/v3/figures/make_figures.py, which drew the v5 figures) with the LABELS
+changed to the names fixed for v6. Every plotted number is the one in that script, unchanged (it copied them from
+docs/RESULTS_LOG.md and the preprint; the source table is named next to each block). Nothing is estimated,
+interpolated or re-rounded. Label changes are listed in README.md.
 
 Style: figures are drawn at their printed size (full text width, 7.16 in) so no scaling happens in LaTeX; 7 pt
 sans-serif, 0.5 pt lines; Paul Tol's colour-blind-safe "bright" palette; bars start at zero; panel letters bold
@@ -275,7 +275,7 @@ OFFS = {"unmatched control edit": (5, -3, "left", "center"),
         "multi-agent reader 1": (-5, 2, "right", "center"),
         "multi-agent reader 2": (5, 0, "left", "center"),
         "larger adapter (rank 64)": (5, -1, "left", "center"),
-        "vision-encoder adapter": (-2, -12, "center", "top"),
+        "vision-encoder adapter": (-7, 6, "center", "bottom"),
         "editing-tool mix": (5, -12, "left", "center"),
         "editing-tool mix +\nconsistency loss": (5, -3, "left", "center")}
 
@@ -293,7 +293,7 @@ def figS_designs():
         ox, oy, ha, va = OFFS[lab]
         a.annotate(lab, (dx, dy), xytext=(ox, oy), textcoords="offset points", fontsize=FS, ha=ha, va=va,
                    linespacing=1.05, path_effects=[pe.withStroke(linewidth=2.2, foreground="white")], zorder=4)
-    a.set_xlim(-10.5, 12.5)
+    a.set_xlim(-12.5, 12.5)  # axis range only (wider than v3 so that the longer labels fit)
     a.set_ylim(-4.5, 10)
     a.set_xlabel("Δ erased-lesion claims (percentage points)")
     a.set_ylabel("Δ sensitivity on intact lesions (percentage points)")
@@ -461,8 +461,8 @@ def figS_readers_prompts():
     for k, (lab, vals) in enumerate(RV.items()):
         c.bar(x + (k - 1) * 0.27, vals, 0.27, color=[OK["verm"], OK["sky"]][k], label=lab, lw=0)
     c.bar([0 + 0.27, 2 + 0.27], [MEDSCOPE_RV[0], MEDSCOPE_RV[1]], 0.27, color=OK["blue"], label="MedScope-4B", lw=0)
-    c.text(0 + 0.30, 3, "0/10", fontsize=FS, ha="center")
-    c.text(2 + 0.30, MEDSCOPE_RV[1] + 2, "4/13", fontsize=FS, ha="center")
+    c.text(0 + 0.38, 3, "0/10", fontsize=FS, ha="center")
+    c.text(2 + 0.40, MEDSCOPE_RV[1] + 2, "4/13", fontsize=FS, ha="center")
     c.set_xticks(x)
     c.set_xticklabels(grp, fontsize=FS)
     c.set_ylim(0, 140)

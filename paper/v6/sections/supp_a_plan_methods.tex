@@ -2,12 +2,12 @@
 \section{Analysis plan, models and methods in detail}
 \label{sec:s_plan}
 
-This section gives the dated analysis plan (Table~\ref{tab:s_plan}), the trained models (Table~\ref{tab:s_models}), the cost matrix (Table~\ref{tab:s_cost}), a bound on what a decision rule can add, the training details, the reader study protocol, and the prompts and model settings.
+This section gives the dated analysis plan (Table~\ref{tab:s_plan}), the trained models (Table~\ref{tab:s_models}), the cost matrix (Table~\ref{tab:s_cost}), a bound on what a decision rule can add, the construction of the test views and pairs, the training details, the reader study protocol, and the prompts and model settings.
 % src: none (pointer)
 
 \subsection{Dated analysis plan}
 
-Table~\ref{tab:s_plan} lists every analysis that had a decision rule, with the date on which the rule was fixed, the rule and its outcome. Each rule was written to a dated file in the public project repository (\url{https://github.com/bhaskargurram-ai/medscope}) before the data it applies to were seen; the file history of the repository is the record. It is the authors' own record and not a third-party registry. ``Pre-specified'' means that the test set, the comparison and the decision rule were fixed in advance. ``Post hoc model'' means that the model was designed after earlier results were known; where its selection rule or its test was fixed before the model was trained, the table says so. Outcomes are given in the terms of the rule: met, not met, or mixed where the rule defines an intermediate result. Analyses that were fixed in advance without a decision rule (descriptive analyses) are reported in Sections~\ref{sec:results} and in the supplementary tables and are not repeated here.
+Table~\ref{tab:s_plan} lists every analysis that had a decision rule, with the date on which the rule was fixed, the rule and its outcome. Each rule was written to a dated file in the public project repository (\url{https://github.com/bhaskargurram-ai/medscope}) before the data it applies to were seen; the file history of the repository is the record. It is the authors' own record and not a third-party registry. ``Pre-specified'' means that the test set, the comparison and the decision rule were fixed in advance. ``Post hoc model'' means that the model was designed after earlier results were known; where its selection rule or its test was fixed before the model was trained, the table says so. Outcomes are given in the terms of the rule: met, not met, or mixed where the rule defines an intermediate result. Analyses that were fixed in advance without a decision rule (descriptive analyses) are reported in Section~\ref{sec:results} and in the supplementary tables and are not repeated here.
 % src: v5 P358, P980; facts B
 
 \newcommand{\planhead}{\toprule
@@ -15,8 +15,8 @@ Table~\ref{tab:s_plan} lists every analysis that had a decision rule, with the d
 \midrule}
 \newenvironment{plantab}{\tabular{@{}L{0.205\textwidth}L{0.12\textwidth}L{0.105\textwidth}L{0.285\textwidth}L{0.215\textwidth}@{}}}{\endtabular}
 
-\begin{table}[p]
-\caption{Analyses with a decision rule fixed in advance: what was asked, when the rule was fixed, the status of the analysis, the rule, and the outcome. Part 1 of 5: the trained models and their selection. All dates are in 2026. ESG: evidence sensitivity gap. Intervals are 95\% bootstrap intervals. The three reference models are \gem, \opus{} and \gpt.}
+\begin{table}[!p]
+\caption{Analyses with a decision rule fixed in advance: what was asked, when the rule was fixed, the status of the analysis, the rule, and the outcome. Part 1 of 6: the trained models and their selection. All dates are in 2026. ESG: evidence sensitivity gap. Intervals are 95\% bootstrap intervals. The three reference models are \gem, \opus{} and \gpt.}
 \label{tab:s_plan}
 \centering
 \footnotesize
@@ -27,7 +27,7 @@ Table~\ref{tab:s_plan} lists every analysis that had a decision rule, with the d
 Which training stage becomes \ms? & 1 Nov, before its training data were built. A clause on the earlier prototype was added on 2 Nov, before any validation result of stages 2 and 3. & Pre-specified & Take stage 3 if its validation net utility is at most 0.02 below that of stage 2 and its lesion-free claims are at most 2 percentage points above; otherwise apply the same test to stage 2 against stage 1. Keep the earlier prototype if the chosen stage is more than 0.02 below it in validation net utility. & Met: stage 3 chosen (net utility 0.613 against 0.610 for stage 2; lesion-free claims 7.7\% against 12.7\%; earlier prototype 0.593). \\
 Main test: is \ms{} ahead of each of the nine comparison models on the three primary outcomes? & Model, test set and measures: 1 Nov. The family of 27 comparisons was defined after the results were known. & Pre-specified; multiplicity family post hoc & Bonferroni correction over ESG, erased-lesion claims and net utility against each of the nine comparison models. & All 27 comparisons at $p \le 0.001$. \\
 Fresh internal and fresh external sets: does the result hold on data on which no model had been run? & 1 Nov & Pre-specified & Each set is run once after the model is fixed, with the measures of the main test. & Fresh internal: ESG 0.472 against 0.000--0.083 for the three reference models. Fresh external: erased-lesion claims 8.3\% against 31.5--42.3\%; net utility below \gem{} ($-0.363$ $\ci{-0.496}{-0.233}$); pneumothorax found on 0 of 48 films. \\
-Does repeating only the last stage with pneumothorax films pass the selection rule? (variant not carried forward) & 4 Nov, before any of its results & Post hoc model; rule pre-specified & Validation net utility at most 0.02 below that of \ms, lesion-free claims at most 2 points above, and more pneumothoraces found on SIIM-ACR validation patients. & Not met (lesion-free claims 10.0\% against 7.7\%). \\
+Does repeating only the last stage with pneumothorax films pass the selection rule? (variant not carried forward) & 4 Nov, before any of its results & Post hoc model; rule pre-specified & Validation net utility at most 0.02 below that of \ms, lesion-free claims at most 2 points above, and more pneumothoraces found than \ms{} on SIIM-ACR validation patients. & Not met (lesion-free claims 10.0\% against 7.7\%). \\
 Does \msp{} pass its validation rule? & 15 Nov, before any of its test results & Post hoc model; rule pre-specified & Validation net utility at most 0.02 below that of \ms, lesion-free claims at most 2 points above, and at least as many SIIM-ACR validation pneumothoraces found as the last-stage variant. & Met (net utility 0.632 against 0.613; lesion-free claims 9.1\% against 7.7\%; pneumothoraces found 65\% against 48\%). \\
 \msp{} with colonoscopy pairs: with unedited pairs in training, does the advantage hold on unseen patients? & 21 Nov, before any training frame was drawn & Post hoc model; guard and test pre-specified & Guard: validation net utility at most 0.02 below that of \ms{} and lesion-free claims at most 2 points above. Test (cross-validated answers on the 103 REAL-Colon pairs): natural ESG above each of the three reference models with the interval above zero, holds; above none, does not hold; otherwise mixed. & Guard met (0.654; 9.1\%). Mixed: natural ESG 0.553 $\ci{0.430}{0.670}$, above \gpt{} only. \\
 \msp{} with CheXthought films: do these films raise pneumothorax detection without more claims on films without pneumothorax? & 22 Nov, before any CheXthought image was downloaded & Post hoc model; guard and test pre-specified & Guard: validation net utility at most 0.02 below that of \msp{} and lesion-free claims at most 2 points above. Raised if, on the 200 new SIIM-ACR patients, the share of pneumothorax films answered present exceeds that of \msp{} with the interval above zero, and films without pneumothorax answered present are not more frequent by more than 5 points. & Guard met (0.628; 9.5\%). Raised: 69 against 53 of 100 ($+0.160$ $\ci{+0.070}{+0.260}$); 7 against 5 of 100 films without pneumothorax. \\
@@ -37,9 +37,9 @@ Does \msp{} pass its validation rule? & 15 Nov, before any of its test results &
 \end{table}
 % src: PREREGISTRATION_v4 (rule, amendment 1, post-hoc note 2); L728-732; v5 P1000-1003; L769-772; L818-824; RE127-136, L1368-1369; RE295-344, L1517-1533; RE485-510, L1962-1970; RE523-553, L2103-2106
 
-\begin{table}[p]
+\begin{table}[!p]
 \ContinuedFloat
-\caption{(continued) Part 2 of 5: analyses of the main result and of the alternative explanations.}
+\caption{(continued) Part 2 of 6: analyses of the main result and of the alternative explanations.}
 \centering
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -55,16 +55,16 @@ Does the public release reproduce the main result? & 20 Nov & Pre-specified & Re
 Near-duplicate exclusion: could test images that resemble training images explain the result? & 15 Nov & Pre-specified & Not explained if, after the 25\% of test cases most similar to a training image are removed in every source, the ESG advantage over each of the three reference models keeps its sign with the interval above zero. & Met (smallest advantage $+0.306$ $\ci{0.200}{0.405}$; 378 cases kept). \\
 Edit-site control: does an edit at the lesion's site, with the lesion intact, produce the answer ``absent''? & 14 Nov, before any score was computed; the scoring was changed the same day after the first score failed its own validity check & Pre-specified; interaction analysis post hoc & A site effect is flagged if the share of intact lesions denied after a ring edit is at least 0.10, at least 0.05 above the share after a control edit elsewhere, and at least 0.05 above that of the base model. & Flag met for TELEA only (0.203; ring minus control edit elsewhere $+0.077$ $\ci{0.000}{0.154}$). Post hoc: the part specific to the site, relative to the base model, was $+0.018$ $\ci{-0.080}{0.116}$. \\
 Probes: do hidden states separate erased from intact lesions better than the answers do? & 14 Nov & Pre-specified & A read-out gap exists if the best linear probe exceeds the model's own answers by at least 0.05 in AUC (erased against ring-edited views, TELEA). & Not found (at most 0.028). \\
-The bound of Section~\ref{sec:s_bound}, measured: do the answers use the separation that the hidden states hold? & 15 Nov & Pre-specified & No read-out gap if a lower bound on the separation in the hidden states is within 0.05 of the model's own difference in ``absent or refer'' answers. & No gap (LaMa: 0.665 and 0.642 against 0.648; TELEA: 0.492 and 0.615 against 0.642). \\
+The bound of \ref{sec:s_bound}, measured: do the answers use the separation that the hidden states hold? & 15 Nov & Pre-specified & No read-out gap if a lower bound on the separation in the hidden states is within 0.05 of the model's own difference in ``absent or refer'' answers. & No gap (LaMa: 0.665 and 0.642 against 0.648; TELEA: 0.492 and 0.615 against 0.642). \\
 Is the limit specific to the image encoder? & 15 Nov & Pre-specified & Another frozen encoder holds more if it separates erasures from control edits better by at least 0.05 in AUC with the paired interval above zero. & None did. \\
 \bottomrule
 \end{plantab}
 \end{table}
 % src: RE247-291, L1934-1960, L1416-1441, L1414-1415; RE423-449, L1764-1805; RE115-125, L1354-1363; FRAMEWORK_STAGE0.md, L1258-1299; v5 P1015; RE50-75, L1327-1336
 
-\begin{table}[p]
+\begin{table}[!p]
 \ContinuedFloat
-\caption{(continued) Part 3 of 5: reader assessment and unedited image pairs.}
+\caption{(continued) Part 3 of 6: reader assessment and unedited image pairs.}
 \centering
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -84,9 +84,9 @@ Two-by-two: do counterfactual views add anything on unedited frames once unedite
 \end{table}
 % src: RESULTS_SUMMARY L110-111 (trainee design fixed before answers); L1153-1166; READER_VERIFIED.md, L1209-1211; RE77-93, RE157-187, L1385-1394; RE191-224, L1458-1465; RE402-410, L1867-1879; RE373-393, L2002-2004; RE571-595, L2145-2160; RE601-603, L2162-2165
 
-\begin{table}[p]
+\begin{table}[!p]
 \ContinuedFloat
-\caption{(continued) Part 4 of 5: \msn{} on the earlier test sets.}
+\caption{(continued) Part 4 of 6: \msn{} on the earlier test sets.}
 \centering
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -103,26 +103,40 @@ Fresh external set: are the erased-lesion claims of \msn{} above those of \msp? 
 \end{table}
 % src: RE555-569, L2127-2139; RE599-612, L2141-2143, L2169-2172, L2178-2183
 
-\begin{table}[p]
+\begin{table}[!p]
 \ContinuedFloat
-\caption{(continued) Part 5 of 5: alternative training objectives, adapter settings, agent designs, editing-tool mixes and decision rules. Each design was compared with a matched comparator. ``Tools unseen in training'' are TELEA and Stable Diffusion. The twelve alternative designs counted in Section~\ref{subsec:res_designs} are the first four rows (one design each), the two adapter rows above the reinforcement-learning row (three designs), reinforcement learning (one), the multi-agent reader (two) and training with a family of editing tools (two).}
+\caption{(continued) Part 5 of 6: alternative training objectives and adapter settings. Each design was compared with a matched comparator. ``Tools unseen in training'' are TELEA and Stable Diffusion. Rows marked $\dagger$ in parts 5 and 6 make up the twelve alternative designs of Section~\ref{subsec:res_designs}; a row with two designs counts twice.}
 \centering
 \footnotesize
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{1.1}
 \begin{plantab}
 \planhead
-Must the control edit match the erasure in shape and tool? & 6 Nov & Pre-specified & Matching matters if, with a matched control in training, intact lesions are denied after a control edit less often by at least 5 points, with the interval excluding zero, on the fresh external set and on tools unseen in training. & Inconclusive under the rule; matching was not shown to matter. \\
-Is counterfactual training better than preference optimisation applied after training without counterfactual views? & 6 Nov (three seeds: 6 Nov) & Pre-specified & Better if ESG and net utility are both higher on the fresh external set with intervals excluding zero, in all three seed pairs. & No difference shown (ESG 0.381 $\pm$ 0.018 against 0.355 $\pm$ 0.015 over three seeds). \\
-Does preference optimisation on top of counterfactual training help? & 6 Nov & Pre-specified & Passes if, on the fresh external set and on tools unseen in training, lesion images correct rise by at least 0.03 with the interval excluding zero and erased-lesion claims do not rise by more than 0.03. A further training stage is added only if it passes. & Not met (tools unseen in training: erased-lesion claims 24.4\% against 16.3\%). The further stage was not trained. \\
-Does a consistency loss on paired views lower erased-lesion claims on tools unseen in training? & 7 Nov, after a favourable one-seed trial on the same test sets & Pre-specified & Lower in every one of three seed pairs with the pooled interval excluding zero; ESG not lower by more than 0.03; guards: main-test lesion-free claims not higher by more than 0.03, fresh-external ESG and net utility not lower by more than 0.03. & Not met ($+0.011$ $\ci{-0.009}{+0.030}$; main-test guard not met, $+0.052$). \\
+Must the control edit match the erasure in shape and tool?$^{\dagger}$ & 6 Nov & Pre-specified & Matching matters if, with a matched control in training, intact lesions are denied after a control edit less often by at least 5 points, with the interval excluding zero, on the fresh external set and on tools unseen in training. & Inconclusive under the rule; matching was not shown to matter. \\
+Is counterfactual training better than preference optimisation applied after training without counterfactual views?$^{\dagger}$ & 6 Nov (three seeds: 6 Nov) & Pre-specified & Better if ESG and net utility are both higher on the fresh external set with intervals excluding zero, in all three seed pairs. & No difference shown (ESG 0.381 $\pm$ 0.018 against 0.355 $\pm$ 0.015 over three seeds). \\
+Does preference optimisation on top of counterfactual training help?$^{\dagger}$ & 6 Nov & Pre-specified & Passes if, on the fresh external set and on tools unseen in training, lesion images correct rise by at least 0.03 with the interval excluding zero and erased-lesion claims do not rise by more than 0.03. A further training stage is added only if it passes. & Not met (tools unseen in training: erased-lesion claims 24.4\% against 16.3\%). The further stage was not trained. \\
+Does a consistency loss on paired views lower erased-lesion claims on tools unseen in training?$^{\dagger}$ & 7 Nov, after a favourable one-seed trial on the same test sets & Pre-specified & Lower in every one of three seed pairs with the pooled interval excluding zero; ESG not lower by more than 0.03; guards: main-test lesion-free claims not higher by more than 0.03, fresh-external ESG and net utility not lower by more than 0.03. & Not met ($+0.011$ $\ci{-0.009}{+0.030}$; main-test guard not met, $+0.052$). \\
 Does ESG with its matched control select better models than measures without it? (new reader-assessed cohort) & 8 Nov & Pre-specified & The model selected with ESG has a net utility higher by at least 0.05, with the interval excluding zero, on a second source or editing tool as well. & Not run. \\
-Do adapters of rank 64 help? & 11 Nov & Pre-specified, one seed & On the fresh external set, lesion images correct higher by at least 0.05 or more pneumothorax films found, without erased-lesion claims rising by more than 0.03 on the main test or on tools unseen in training. & Not met (main-test ESG 0.731 against 0.735). \\
-Do adapters on the vision encoder help? (two learning rates; the second was declared as the only repeat) & 11 Nov & Pre-specified, one seed each & The rule of the row above. & Not met (higher learning rate: ESG 0.000 on every set; lower learning rate: fresh-external lesion images correct 0.488 against 0.560). \\
-Does reinforcement learning on the cost-matrix reward help? & 11 Nov & Pre-specified, one seed & On tools unseen in training: erased-lesion claims not higher than the comparator's, net utility higher by at least 0.05, lesion images correct not lower by more than 0.03; main-test lesion-free claims not higher by more than 0.03. & Not met (net utility about $+0.056$; erased-lesion claims about $+0.022$). \\
-Does a multi-agent reader with an erase-and-ask-again verifier help? (two versions; the second was declared as the only repeat) & 13 Nov & Pre-specified, one seed each & On tools unseen in training: net utility higher by at least 0.05, erased-lesion claims not higher, lesion images correct not lower by more than 0.03; guards on main-test lesion-free claims and fresh-external lesion images correct. & Not met twice (first: fresh-external lesion images correct 0.378 against 0.560; second: erased-lesion claims $+0.061$ $\ci{+0.027}{+0.096}$). \\
+Do adapters of rank 64 help?$^{\dagger}$ & 11 Nov & Pre-specified, one seed & On the fresh external set, lesion images correct higher by at least 0.05 or more pneumothorax films found, without erased-lesion claims rising by more than 0.03 on the main test or on tools unseen in training. & Not met (main-test ESG 0.731 against 0.735). \\
+Do adapters on the vision encoder help?$^{\dagger}$ (two learning rates; the second was declared as the only repeat) & 11 Nov & Pre-specified, one seed each & The rule of the row above. & Not met (higher learning rate: ESG 0.000 on every set; lower learning rate: fresh-external lesion images correct 0.488 against 0.560). \\
+Does reinforcement learning on the cost-matrix reward help?$^{\dagger}$ & 11 Nov & Pre-specified, one seed & On tools unseen in training: erased-lesion claims not higher than the comparator's, net utility higher by at least 0.05, lesion images correct not lower by more than 0.03; main-test lesion-free claims not higher by more than 0.03. & Not met (net utility about $+0.056$; erased-lesion claims about $+0.022$). \\
+\bottomrule
+\end{plantab}
+\end{table}
+% src: PREREGISTRATION_v5/v6/v7/v8.md, PILOTS_v9.md (rules, dates); L876-981, L1052-1115; v5 P1004-1010
+
+\begin{table}[!p]
+\ContinuedFloat
+\caption{(continued) Part 6 of 6: agent designs, decision rules, editing-tool mixes and later tests of single changes. Rows marked $\dagger$ belong to the twelve alternative designs (see part 5).}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{plantab}
+\planhead
+Does a multi-agent reader with an erase-and-ask-again verifier help?$^{\dagger}$ (two versions; the second was declared as the only repeat) & 13 Nov & Pre-specified, one seed each & On tools unseen in training: net utility higher by at least 0.05, erased-lesion claims not higher, lesion images correct not lower by more than 0.03; guards on main-test lesion-free claims and fresh-external lesion images correct. & Not met twice (first: fresh-external lesion images correct 0.378 against 0.560; second: erased-lesion claims $+0.061$ $\ci{+0.027}{+0.096}$). \\
 Can any of 270 decision rules applied to model outputs raise ESG? & 13 Nov, before each of the two sets of rules was run & Pre-specified & A rule passes on one half of the validation cases and again on the other: net utility $+0.03$ or more, ESG $+0.02$ or more, lesion images correct not lower by more than 0.03, lesion-free claims not higher by more than 0.03. & None met (19 of 128 rules on stored outputs passed the first half, none the second; none of 142 rules with new test-time evidence passed the first half). \\
-Does training with a family of four editing tools transfer to TELEA? (two designs) & 14 Nov & Pre-specified, one seed each & TELEA ESG $+0.03$ or more and denial of intact lesions after a TELEA control edit $-0.03$ or less; LaMa ESG, lesions found and lesion-free claims within 0.02, 0.03 and 0.03. & Not met (TELEA ESG $+0.017$ $\ci{-0.034}{0.067}$ and $+0.011$ $\ci{-0.056}{0.084}$). \\
+Does training with a family of four editing tools transfer to TELEA?$^{\dagger}$ (two designs) & 14 Nov & Pre-specified, one seed each & TELEA ESG $+0.03$ or more and denial of intact lesions after a TELEA control edit $-0.03$ or less; LaMa ESG, lesions found and lesion-free claims within 0.02, 0.03 and 0.03. & Not met (TELEA ESG $+0.017$ $\ci{-0.034}{0.067}$ and $+0.011$ $\ci{-0.056}{0.084}$). \\
 Does a term that swaps the whole image for a similar lesion-free image help? & 15 Nov & Pre-specified, one seed & TELEA ESG $+0.03$ or more; LaMa ESG, lesions found and lesion-free claims within 0.02, 0.03 and 0.03. & Not met (TELEA ESG $-0.028$ $\ci{-0.073}{0.017}$). \\
 Do vision-encoder adapters with layer-wise learning-rate decay find more lesions? & 15 Nov & Pre-specified, one seed & Unedited lesions found $+0.03$ or more; LaMa and TELEA ESG not lower by more than 0.02; lesion-free claims not higher by more than 0.03. & Not met ($+0.017$ $\ci{-0.034}{0.067}$). \\
 Does subtracting a question-only prior at decision time help? & 15 Nov & Pre-specified & AUC for erased against ring-edited TELEA views higher by at least 0.03 with the interval above zero. & Not met ($+0.003$ $\ci{-0.018}{0.024}$). \\
@@ -130,14 +144,16 @@ Does rewarding inspection before the answer help on unedited pairs? (two designs
 \bottomrule
 \end{plantab}
 \end{table}
-% src: PREREGISTRATION_v5/v6/v7/v8/v10/v11.md, PILOTS_v9.md, SCREENING.md, FRAMEWORK_STAGE1.md (rules, dates); L876-981 (C1-C4), L1052-1115, L1127-1205, L1309-1353; RE11-48, RE103-113, RE451-471, L2028-2044; v5 P1004-1013, P1018-1022
+% src: PREREGISTRATION_v10/v11.md, SCREENING.md, FRAMEWORK_STAGE1.md (rules, dates); L1127-1205, L1309-1353; RE11-48, RE103-113, RE451-471, L2028-2044; v5 P1011-1013, P1018-1022
+
+\clearpage
 
 \subsection{Trained models}
 
 Table~\ref{tab:s_models} lists the trained models. Three are named in the main text. \ms{} is the primary model. \msp{} adds pneumothorax films to every stage. \msn{} adds unedited colonoscopy frames and unedited pneumothorax films to the last stage of \msp. Before \msn{} was defined, each of its two additions was tested on its own; these two models, and a first variant that added pneumothorax films to the last stage only, appear in this table and in Supplementary Table~\ref{tab:s_additions} and are not carried forward. No test result was used to choose among models: \ms{} and the training mix of \msn{} were chosen on validation data by rules fixed in advance (Table~\ref{tab:s_plan}).
 % src: facts A
 
-\begin{table}[!htbp]
+\begin{table}[!htb]
 \caption{Trained models. Each model is described by what it adds to the model named in the second column. Validation values are net utility and lesion-free claims on the main validation set (540 cases, 1,473 views). All dates are in 2026.}
 \label{tab:s_models}
 \centering
@@ -171,7 +187,7 @@ Cross-validated answers on REAL-Colon use three copies of a model, each trained 
 Net utility is the mean reward per view under the cost matrix of Table~\ref{tab:s_cost}. The matrix was fixed on 30 October 2026, before any model reported here was trained, and was not elicited from clinicians. The rows for erased and for lesion-free images are identical, so detecting an edit earns nothing.
 % src: v5 P500-503; L229-238; configs/reward.yaml
 
-\begin{table}[!htbp]
+\begin{table}[!htb]
 \caption{Cost matrix: reward per view by kind of view and final action. A wrong answer on an original or control-edited image costs $-4.0$ when the finding had been marked in advance as critical (brain tumour, malignant breast lesion, pneumothorax or mass on chest X-ray, and CT or MRI findings labelled cancer or tumour). A correct answer on an original or control-edited image earns a further $+0.5$ when its box has an intersection over union of at least 0.3 with the lesion and covers at most half of the image. An output that cannot be parsed scores $-1.0$, and each tool call beyond the first costs $0.05$.}
 \label{tab:s_cost}
 \centering
@@ -238,6 +254,7 @@ The closing rule was fixed on 18 November 2026, before any answer was examined: 
 % src: RE157-187; facts E; R5_interim_R1.md; v5 P796, P943
 
 \subsection{Prompts and model settings}
+\label{sec:s_prompts}
 
 \emph{System prompt.} Every model, in every analysis that uses the agent protocol, received the following system prompt, followed by the image and the line ``Question:'' with the question of the case.
 % src: medscope/agent/prompts.py
@@ -269,7 +286,7 @@ Keep answers short, using the wording a radiologist would use (for example "Yes"
 \end{quote}
 % src: medscope/agent/prompts.py (SYSTEM_PROMPT, verbatim; line breaks adapted)
 
-\emph{Prompting conditions.} Five further conditions were applied to the three reference models on 150 main-test cases. The cautionary prompt appends to the system prompt: ``Important: a question may name a finding that is not in the image. Do not assume the question is correct. Before answering, check carefully whether the finding is actually visible. If you cannot clearly see it, say it is not there (`No'). Reporting a finding that is not visible is a serious error.'' The condition with solved examples adds four solved training cases of other patients before the case. The plain prompt replaces the system prompt by ``You are a medical imaging assistant. Look at the image and answer the question. Keep the answer short.'' and offers no tools. The remaining two conditions use the provider's highest reasoning setting and highest image-resolution setting. The open-ended request uses the plain prompt.
+\emph{Prompting conditions.} Five further conditions were applied to the three reference models on 150 main-test cases. The cautionary prompt appends to the system prompt: ``Important: a question may name a finding that is not in the image. Do not assume the question is correct. Before answering, check carefully whether the finding is actually visible. If you cannot clearly see it, say it is not there (`No'). Reporting a finding that is not visible is a serious error.'' The condition with solved examples adds the cautionary text and four solved training cases of other patients before the case. The plain prompt replaces the system prompt by ``You are a medical imaging assistant. Look at the image and answer the question. Keep the answer short.'' and offers no tools. The remaining two conditions use the provider's highest reasoning setting and highest image-resolution setting. The open-ended request uses the plain prompt.
 % src: medscope/agent/prompts.py; v5 P719; L698-715 (four solved examples); RE270-278
 
 \emph{Comparison models.} The nine comparison models were called through the providers' interfaces under the identifiers given in Section~\ref{subsec:models}, with each provider's default settings (reasoning switched on where that is the default). The main test was run on 31 October 2026; later test sets were run for the three reference models between 1 and 26 November 2026 under the same identifiers. Images were sent as PNG files with a long side of at most 768 pixels. The output limit was 16,000 tokens (64,000 at the highest reasoning setting). A request that failed was repeated up to six times and then scored as an output that cannot be parsed. The highest reasoning setting is reasoning effort ``high'' (OpenAI), effort ``max'' with adaptive thinking (Anthropic) and thinking level ``high'' (Google). The highest image-resolution setting is image detail ``high'' (OpenAI) and media resolution ``high'' (Google); Anthropic offers no such setting. The same system prompt, images, tool results and turn structure were used as for the open-weight models. Frames of REAL-Colon and LDPolypVideo and the CheXthought test films were sent to the three providers for these runs. Because the datasets are public, nothing can be said about whether the comparison models were trained on them.
