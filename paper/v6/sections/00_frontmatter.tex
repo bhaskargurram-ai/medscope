@@ -2,7 +2,7 @@
 % Every number in the abstract is copied from 04_results_a.tex or 05_results_b.tex; sources are named after it.
 \begin{frontmatter}
 
-\title{Vision-language models report lesions erased from medical images: a matched counterfactual evaluation with unedited same-patient pairs}
+\title{Answers of vision-language models persist after lesions are erased from medical images: a matched counterfactual evaluation}
 
 \author[ind]{Bhaskar Gurram\corref{cor}}
 \ead{gurrambhaskar.ai@gmail.com}
@@ -10,20 +10,23 @@
 \author[jc]{Jyothirmaye Challagulla}
 \author[shn,uoft]{Samir C. Grover}
 \cortext[cor]{Corresponding author.}
-\address[ind]{Independent Researcher}
+\address[ind]{Independent Researcher, \toconfirm{city, country}}
 \address[jc]{\toconfirm{affiliation of Jyothirmaye Challagulla (internal medicine)}}
 \address[shn]{Scarborough Health Network Research Institute, Toronto, Ontario, Canada}
 \address[uoft]{Department of Medicine, University of Toronto, Toronto, Ontario, Canada}
 
 \begin{abstract}
-Vision-language models for medical imaging are assessed on unaltered images. However, a correct answer cannot then show that the image was used. We erased lesions from medical images, made matched control edits elsewhere, and asked the same closed question (MedScope-Bench; 507 test cases, five imaging types). The evidence sensitivity gap (ESG), the share of lesions denied after erasure minus that after the control edit, is zero for any constant answer. Nine frontier models reported the finding on 41.1\% to 61.6\% of 219 erased images (ESG 0.269 to 0.470) and on none of 183 blank images, so the question alone did not produce them. \ms, a 4-billion-parameter model trained on such views, reported 9.6\% (95\% confidence interval 6.1 to 13.7; ESG 0.758, 0.701 to 0.815). On 103 unedited same-patient colonoscopy pairs, its analogous gap (natural ESG) equalled its base model's (0.243). \msn, trained also on unedited images, reached 0.612 (0.526 to 0.698) on 116 pairs from a hospital absent from training. It exceeded two comparison models, by 0.310 (0.181 to 0.431) and 0.147 (0.043 to 0.250); a difference from the third, 0.086 ($-0.017$ to 0.190), was not shown. It reported more erased lesions than its predecessor on new external datasets (22.0\% against 11.3\%; difference 0.107, 0.054 to 0.162). On public images with closed questions, the models tested often reported lesions no longer shown. Counterfactual training reduced such reports in one small model; detection on unedited images required unedited training images. Complete specialist reading of the erasures and prospective evaluation are needed.
+Medical vision-language models (VLMs) are mostly tested on unaltered images, where a correct answer cannot show use of the image. We erased each lesion, made a matched control edit elsewhere in the image and asked one yes/no question per view (507 cases, five public sources). The evidence sensitivity gap (ESG), the share of erased minus control-edited images answered ``absent'' or referred, is zero for constant answers. Nine commercial VLMs, correct on 82.9\% to 88.8\% of intact lesions, reported the finding on 41.1\% to 61.6\% of 219 erased images (ESG 0.269 to 0.470), 9.0\% to 30.9\% of 288 lesion-free images and no blank image. \ms, trained on such views, reported 9.6\% (ESG 0.758, 95\% CI 0.701 to 0.815); on new external datasets, 8.3\% against 31.5\% to 42.3\% for three reference VLMs, with fewer lesion images correct (47.6\% against 63.4\% to 74.1\%). This advantage did not carry over to 103 unedited same-patient colonoscopy pairs (natural ESG 0.243, as for its base model). A post hoc variant also trained on unedited images (\msn) scored 0.612 at a hospital not used in training, above two reference VLMs; a difference from the third (0.086, $-0.017$ to 0.190) was not shown. On new external datasets it reported 22.0\% of erased lesions (\ms: 8.3\%). One gastroenterologist called the finding present on 4 of 17 erased colonoscopy images, both trainees on 13 of 32; radiologists' readings are incomplete. VLM answers often persisted after lesion erasure; in one small model, counterfactual training reduced this persistence on edited images only.
 \end{abstract}
-% src: 04_results_a.tex subsec:res_main (507 cases; 41.1-61.6% of 219; ESG 0.269-0.470; 9.6% [6.1, 13.7]; 0.758 [0.701, 0.815]; blank image 0% of 183 = L1784-1805);
-%      05_results_b.tex subsec:res_pairs (103 pairs, 0.243 for both; 116 pairs, 0.612 [0.526, 0.698]; +0.147 [+0.043, +0.250]; +0.310 [+0.181, +0.431]; +0.086 [-0.017, +0.190] = L2145-2159);
-%      05_results_b.tex subsec:res_nmodel (22.0% against 11.3%, +0.107 [+0.054, +0.162] = L2178-2183); 03_methods.tex subsec:models (about 4 billion parameters)
+% Abstract: 250 words (whitespace count, model macros as one word).
+% src: 04_results_a.tex subsec:res_main (507 cases; 82.9-88.8%; 41.1-61.6% of 219; ESG 0.269-0.470; 9.0-30.9% of 288; blank image: none of 183 = L1784-1805);
+%      subsec:res_trained (9.6%; ESG 0.758 [0.701, 0.815] = v5 P663); subsec:res_external (fresh external set: 8.3% against 31.5-42.3%; lesion images correct 47.6% against 74.1% for gemini-4-argon = v5 P1367; 63.4% for gpt-6-astra = v5 P1373);
+%      subsec:res_readers (4 of 17; both trainees 13 of 32; radiologists incomplete = L1385-1394, L1153-1166);
+%      05_results_b.tex subsec:res_pairs (103 pairs, 0.243 for MedScope-4B and its base = L1458-1468; 0.612 at LDPolypVideo; difference from gemini-4-argon 0.086 [-0.017, 0.190] = L2145-2159)
+%      and subsec:res_nmodel (fresh external set: 22.0% against 8.3% for MedScope-4B = L2178-2183, report60 L267-268)
 
 \begin{keyword}
-vision-language models \sep medical imaging \sep counterfactual evaluation \sep inpainting \sep evidence sensitivity \sep reader study \sep colonoscopy
+vision-language models \sep counterfactual evaluation \sep inpainting \sep evidence sensitivity \sep reader study \sep colonoscopy
 \end{keyword}
 
 \end{frontmatter}

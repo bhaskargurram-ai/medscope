@@ -14,11 +14,11 @@ Brackets give 95\% bootstrap intervals over cases; differences are paired by cas
 % ---------------------------------------------------------------------------------------------------------------
 \subsection{Answers of the comparison models often persisted after erasure}\label{subsec:res_main}
 
-On the main test (507 cases, 1{,}115 views), the nine comparison models were correct on $82.9\%$ to $88.8\%$ of lesion images and reported the finding on $41.1\%$ (\gem) to $61.6\%$ (\texttt{gemini-3.8-flash}) of the 219 erased images, with ESG between $0.269$ and $0.470$ (Table~\ref{tab:main}, Fig.~\ref{fig:main}a).
-Models that differed by less than 6 percentage points in lesion images correct thus differed by about 20 points in erased-lesion claims.
+On the main test (507 cases, 1{,}115 views), the nine comparison models reported the finding on $41.1\%$ (\gem) to $61.6\%$ (\texttt{gemini-3.8-flash}) of the 219 images from which the lesion had been erased, with ESG between $0.269$ and $0.470$ (Table~\ref{tab:main}, Fig.~\ref{fig:main}a).
+They were correct on $82.9\%$ to $88.8\%$ of lesion images, so models that differed by less than 6 percentage points in lesion images correct differed by about 20 percentage points in erased-lesion claims.
 The share of erased lesions reported is not a clinical error rate: an erased image is an edited image, and whether readers accept it as lesion-free is the subject of Section~\ref{subsec:res_readers}.
 On the 288 unedited lesion-free images the comparison models reported a finding on $9.0\%$ to $30.9\%$.
-% src: v5 P663 and P676-686 (0.829-0.888 printed as percentages; 41.1-61.6; ESG 0.269-0.470; 9.0-30.9); L484-493; "less than 6" and "about 20" restate the two ranges (brief round 2, decision 4)
+% src: v5 P663 and P676-686 (0.829-0.888 printed as percentages; 41.1-61.6; ESG 0.269-0.470; 9.0-30.9); L484-493; "less than 6" and "about 20" restate the two ranges (round-2 brief, decision 4; referee E.3 item 3)
 
 The question alone did not produce these reports.
 When the image of 183 lesion cases was replaced by a uniform grey image, none of the nine models reported the finding, and each asked for a better image.
@@ -28,8 +28,7 @@ What in the erased image led to the reports (surrounding tissue, the instrument,
 
 On the 114 cases whose question names the finding, the comparison models reported it on $37.7\%$ to $53.5\%$ of erased images (ESG $0.298$ to $0.439$).
 On the 105 cases with a generic question (``Is there an abnormality?''), for which ``yes'' on an erased image is correct if another abnormality remains, they reported it on $44.8\%$ to $70.5\%$ (ESG $0.238$ to $0.505$).
-In colonoscopy they reported $45\%$ of the 83 erased polyps: on average $26.9\%$ of the 24 asked about with a polyp-specific question and $52.4\%$ of the 59 asked about with a generic one.
-The persistence was therefore about twice as frequent under the generic question (Supplementary Table~\ref{tab:s_qtype}).
+In colonoscopy they reported $45\%$ of the 83 erased polyps: on average $26.9\%$ of the 24 asked about with a polyp-specific question and $52.4\%$ of the 59 asked about with a generic one, about twice as often (Supplementary Table~\ref{tab:s_qtype}).
 % src: L1764-1776 (pooled), L1809-1816 (colonoscopy 26.9% and 52.4%), L1224-1226 (45% of 83); facts C11
 
 The persistence was general across models, sources and prompts.
@@ -58,7 +57,8 @@ Model & \parbox[b]{2.2cm}{\centering Lesion images correct (\%)} & \parbox[b]{2.
 \texttt{gemini-3.8-flash} & $86.8$ & $61.6$ & $27.8$ & $0.269$ & $0.263$ \\
 \midrule
 \multicolumn{6}{l}{\textit{Trained on counterfactual views (Section~\ref{subsec:res_trained})}} \\
-\ms & $84.9$ & $9.6$ $\ci{6.1}{13.7}$ & $7.6$ $\ci{4.8}{10.9}$ & $0.758$ $\ci{0.701}{0.815}$ & $0.732$ $\ci{0.649}{0.813}$ \\
+\ms & $84.9$ & $9.6$ & $7.6$ & $0.758$ & $0.732$ \\
+ & & $\ci{6.1}{13.7}$ & $\ci{4.8}{10.9}$ & $\ci{0.701}{0.815}$ & $\ci{0.649}{0.813}$ \\
 \midrule
 \multicolumn{6}{l}{\textit{Open-weight models (six), not fine-tuned}} \\
 Lingshu-7B & $52.7$ & $32.0$ & $12.5$ & $0.416$ & $-0.249$ \\
@@ -91,19 +91,18 @@ Always refers & $0.0$ & $0.0$ & $0.0$ & $0.000$ & $0.110$ \\
 Readers did not accept all erased images as free of the finding (Table~\ref{tab:readers}).
 One board-certified gastroenterologist (20 years of practice) read all 212 images of the specialist round; radiologists' readings were not complete when this version was written \toconfirm{add radiologist readings when the round closes}.
 On colonoscopy images this reader called the finding present on 4 of 17 erased images ($23.5\%$; exact 95\% CI $6.8$ to $49.9$): 3 of 7 erased with LaMa, the tool of the main test ($42.9\%$; $9.9$ to $81.6$), and 1 of 10 erased with Stable Diffusion ($10.0\%$; $0.3$ to $44.5$).
-Three of the four carried the generic question.
-The reader called the finding present on 0 of 7 lesion-free and 8 of 9 unedited lesion images.
+Three of the four carried the generic question, and the reader called the finding present on 0 of 7 lesion-free images.
 The pre-specified criterion (upper limit at most $10\%$) was not met; with 17 images one reader could not have met it (0 of 17 gives $19.5\%$).
 % src: L1385-1394; docs/reader_study/R5_interim_R1.md L4-18 (per tool: 3/7, 42.9%, 9.9-81.6; 1/10, 10.0%, 0.3-44.5); facts E
 
-In an earlier round, two trainee physicians each read 128 main-test images and did not separate edited from unedited images (AUC $0.54$ and $0.55$).
+In an earlier round, two trainee physicians each read 128 main-test images and did not separate edited from unedited images (area under the receiver operating characteristic curve, AUC, $0.54$ and $0.55$).
 They called a finding present on 35 of 64 reads of erased images ($54.7\%$) and on 23 of 64 reads of lesion-free images ($35.9\%$).
-Both did so on 13 of 32 erased images ($40.6\%$; $23.7$ to $59.4$), so the pre-specified criterion was not met.
-The two rates were close only in colonoscopy (3 of 12 against 2 of 12 reads; Supplementary Table~\ref{tab:s_trainee}).
+Both did so on 13 of 32 erased images ($40.6\%$; exact 95\% CI $23.7$ to $59.4$), so the pre-specified criterion was not met.
+The rates on erased and on lesion-free images were close only in colonoscopy (3 of 12 against 2 of 12 reads; Supplementary Table~\ref{tab:s_trainee}).
 % src: L1153-1166, L1692-1695; v5 P787 (3/12 against 2/12), v5 P792 (AUC 0.54 of the first trainee; 40.6% [23.7, 59.4]); facts E
 
-Where both trainees called the finding present (13 erased images), the nine comparison models together reported it on $82\%$ of images; where neither did (10 images), on $26\%$ (95\% interval $10\%$ to $42\%$), and the pre-specified lower bound of $20\%$ was not met (Supplementary Table~\ref{tab:s_rescoring}).
-A substantial part of the erased-lesion claims therefore falls on images that readers did not accept as lesion-free.
+Where both trainees called the finding present (13 erased images), the nine comparison models together reported it on $82\%$ of images; where neither did (10 images), on $26\%$ (95\% CI $10\%$ to $42\%$), and the pre-specified lower bound of $20\%$ was not met (Supplementary Table~\ref{tab:s_rescoring}).
+A substantial part of the erased-lesion claims therefore fell on images that readers did not accept as lesion-free.
 Reader support for the erasures is strongest in colonoscopy and incomplete there.
 Two of the three readers who have finished are co-authors; all read without labels.
 % src: L1207-1222; facts E (authorship of readers: v5 P950-951, P960)
@@ -114,7 +113,7 @@ Two of the three readers who have finished are co-authors; all read without labe
 \centering
 \small
 \setlength{\tabcolsep}{5pt}
-\begin{tabular}{L{3.9cm}L{3.3cm}L{3.1cm}L{2.0cm}L{2.0cm}L{1.6cm}}
+\begin{tabular}{L{3.2cm}L{3.9cm}L{3.6cm}L{2.0cm}L{2.0cm}L{2.0cm}}
 \toprule
  & \multicolumn{2}{l}{Erased images called present} & Lesion-free images called present & Unedited lesion images called present & Edited against unedited, AUC \\
 \cmidrule(lr){2-3}
@@ -139,28 +138,26 @@ Trainee, radiology & 16 of 32 & not read & 7 of 32 & 26 of 32 & $0.55$ \\
 On the main test \ms{} reported the finding on $9.6\%$ $\ci{6.1}{13.7}$ of the 219 erased images and had an ESG of $0.758$ $\ci{0.701}{0.815}$ (Table~\ref{tab:main}, Fig.~\ref{fig:main}a).
 Its ESG exceeded that of each comparison model by $0.288$ $\ci{0.208}{0.367}$ (\gem) to $0.489$, and its erased-lesion claims were lower by $31.5$ to $52.1$ percentage points.
 On the main test this result did not come from answering ``absent'' more often: \ms{} was correct on $84.9\%$ of lesion images, against $82.9\%$ to $88.8\%$ for the comparison models (differences $-3.9$ to $+2.1$ percentage points, all $p \ge 0.12$).
-The lower limits reach $-9$ points, so a small deficit is not excluded.
+The lower limits reach $-9$ percentage points, so a small deficit is not excluded; on the external datasets the deficit was larger (Section~\ref{subsec:res_external}).
 On the 288 unedited lesion-free images it reported a finding on $7.6\%$ $\ci{4.8}{10.9}$, a lower share than eight comparison models and not shown to differ from \gem{} ($9.0\%$; $p = 0.59$).
 Net utility, a measure that favours the trained model (Section~\ref{subsec:measures}), was higher by $0.168$ to $0.477$.
 All 27 primary comparisons had $p \le 0.001$, below the corrected level of $0.05/27$.
 % src: v5 P663 (estimates and intervals), v5 P676-686 (table), v5 P715 (paired differences; -0.039 to +0.021, p >= 0.12, intervals reach -0.09; 8 of 9; p = 0.59); L751-754
 
-This advantage in ESG and erased-lesion claims held against each reference model in each of the five sources (ESG from $0.95$ in colonoscopy to $0.47$ in SLAKE CT and MRI; Fig.~\ref{fig:main}b) and on the 114 cases whose question names the finding.
-There the ESG of \ms{} was $0.728$ $\ci{0.649}{0.807}$, against $0.298$ to $0.439$ for the nine comparison models (smallest difference $0.289$ $\ci{0.175}{0.412}$), and the pre-specified criterion was met.
-In SLAKE CT and MRI its net utility ($0.22$) was below that of \gem{} ($0.38$) and \opus{} ($0.32$).
-% src: v5 P717 and L1630-1641 (imaging type); L1764-1776 (question type)
+The advantage in ESG and erased-lesion claims held in point estimate against each reference model in each of the five sources (ESG from $0.95$ in colonoscopy to $0.47$ in SLAKE CT and MRI; Fig.~\ref{fig:main}b), although in SLAKE CT and MRI its net utility ($0.22$) was below that of \gem{} ($0.38$) and \opus{} ($0.32$).
+On the 114 cases whose question names the finding, the ESG of \ms{} was $0.728$ $\ci{0.649}{0.807}$, against $0.298$ to $0.439$ for the nine comparison models (smallest difference $0.289$ $\ci{0.175}{0.412}$), and the pre-specified criterion was met.
+% src: v5 P717 and L1630-1641 (imaging type; no intervals for the strata); L1764-1776 (question type)
 
-The counterfactual views produced this result.
+The advantage came from the counterfactual views.
 Over three training seeds, models after the first of the three training stages (first-stage models) had a main-test ESG of $0.741$ (SD $0.019$) with counterfactual views and $0.279$ (SD $0.107$) without them (Fig.~\ref{fig:tools}c).
 Matching the share of ``absent'' answers without such views did not raise it ($0.215$), and the effect was reproduced on a second base model (MedGemma 1.5 4B: $0.721$ against $0.374$; difference $0.347$ $\ci{0.276}{0.425}$; Supplementary Table~\ref{tab:s_ablations}).
-Two further seeds of the complete training gave ESG of $0.744$ and $0.731$, each above each reference model, with lesion-free claims of $17.0\%$ and $9.0\%$ (Supplementary Table~\ref{tab:s_seeds}).
+Two further seeds of the complete training gave ESG of $0.744$ and $0.731$, each above each reference model (lesion-free claims $17.0\%$ and $9.0\%$; Supplementary Table~\ref{tab:s_seeds}).
 % src: v5 P735 and P1192-1202 (0.741, 0.279, 0.215; MedGemma 0.721, 0.374, +0.347 [0.276, 0.425]); L1934-1960 (seeds)
 
-Three of the five sources release no patient identifiers, so images of one patient could lie on both sides of the split.
-With the quarter of test cases most similar to a training image removed from each source (378 kept), the ESG of \ms{} was $0.755$ and its advantage over each reference model at least $0.306$ $\ci{0.200}{0.405}$; similarity did not identify images of one patient where identifiers exist (AUC $0.53$), so dissimilar images of one patient are not excluded (Supplementary Table~\ref{tab:s_duplicates}).
+Removing from each source the quarter of test cases most similar to a training image (378 kept) left the ESG of \ms{} at $0.755$ and its advantage over each reference model at least $0.306$ $\ci{0.200}{0.405}$; three sources release no patient identifiers, so dissimilar images of one patient are not excluded (Supplementary Table~\ref{tab:s_duplicates}).
 % src: L1354-1363; v5 P817
 
-With an open-ended request (36 cases), \ms{} reported the finding on $47.2\%$ of original and 0 of 36 erased images (free-text ESG $0.472$ $\ci{0.306}{0.639}$), and the reference models on $69.4\%$ to $86.1\%$ and $38.9\%$ to $52.8\%$ ($0.306$ to $0.361$).
+With an open-ended request (36 cases), \ms{} reported the finding on $47.2\%$ of original and 0 of 36 erased images (free-text ESG $0.472$ $\ci{0.306}{0.639}$), against $0.306$ to $0.361$ for the reference models.
 No difference ($0.111$ to $0.167$) had an interval that excluded zero, so the pre-specified criterion was not met (Supplementary Table~\ref{tab:s_open}).
 The ESG of \ms{} rose with lesion area, from $0.545$ in the lowest quartile to $0.909$ in the highest, and its stated confidence ranked its errors less well than that of the reference models (Supplementary Tables~\ref{tab:s_size} and~\ref{tab:s_sensitivity}).
 % src: L1424-1441 and v5 P823 (open-ended); L1686 and v5 P719 (quartiles); L1003-1004 (confidence)
@@ -168,9 +165,8 @@ The ESG of \ms{} rose with lesion area, from $0.545$ in the lowest quartile to $
 % ---------------------------------------------------------------------------------------------------------------
 \subsection{Detection of the edit does not account for most of the result}\label{subsec:res_alternatives}
 
-\ms{} was trained on erased and control-edited images built by the same procedure as the test, so it might answer ``absent'' whenever an image looks edited.
+\ms{} was trained on erased and control-edited images built by the same procedure as the test, so it might answer ``absent'' whenever an image looks edited (Table~\ref{tab:alternatives}, Fig.~\ref{fig:tools}).
 Edits can be detected: a classifier trained for the purpose separated control-edited from unedited test images with an AUC of $0.826$.
-Table~\ref{tab:alternatives} and Fig.~\ref{fig:tools} give the analyses of this alternative.
 % src: L1416-1417 (AUC 0.826)
 
 \textit{Matched control edit.}
@@ -187,12 +183,11 @@ With LaMa, the first-stage model denied $4.2\%$ of 143 validation lesions after 
 % src: v5 P1305 and P778 (0.042, 0.077, 0.070, 0.196, 0.867); L1269-1271
 
 \textit{Tools not used in training.}
-The erased and control-edited images of 125 main-test cases were remade on the same masks with TELEA and Stable Diffusion.
-The ESG of \ms{} was $0.752$ and $0.720$ with the two training tools (LaMa and tissue transplant) and $0.664$ and $0.640$ with TELEA and Stable Diffusion, above each reference model with each tool (Fig.~\ref{fig:tools}a).
-The smallest advantage was over \gem{} with TELEA ($0.664$ against $0.560$), and these twelve comparisons are exploratory (each $p \le 0.049$ without correction).
-A development version of the model had been run with all four tools, after which tissue transplant was added to training (Supplementary Table~\ref{tab:s_tools}).
+With the erased and control-edited images of 125 main-test cases remade on the same masks, the ESG of \ms{} was $0.752$ and $0.720$ with the two training tools (LaMa and tissue transplant) and $0.664$ and $0.640$ with TELEA and Stable Diffusion, above each reference model with each tool (Fig.~\ref{fig:tools}a).
+The smallest advantage was over \gem{} with TELEA ($0.664$ against $0.560$), and these twelve comparisons are exploratory.
+A development version of the model, trained with LaMa edits only, had been run with all four tools, after which tissue transplant was added to training (Supplementary Table~\ref{tab:s_tools}).
 With Stable Diffusion \ms{} reported $17.6\%$ of erased lesions, against $7.2\%$ with LaMa ($p = 0.006$).
-% src: v5 P739 and P1234-1237 (ESG and claims by tool; p <= 0.049 uncorrected); L700-715 (development version run with the four tools; tissue transplant then added to training); L757-760 (Stable Diffusion +10.4 points, p 0.006)
+% src: v5 P739 and P1234-1237 (ESG and claims by tool); L636-637 (development version trained with LaMa only), L700-715 (run with the four tools; tissue transplant then added to training); L757-761 (Stable Diffusion +10.4 points, p 0.006)
 
 \begin{table*}[!t]
 \caption{Analyses of the alternative explanation that \ms{} responds to the edit and not to the absence of the lesion. Each row gives what a model that responds only to edit traces would be expected to do and what was observed. Rows 1, 2, 3 and 6 use \ms{} on the main test; rows 4 and 5 use the first-stage model on validation cases whose lesion it found on the original image. Denied: answered ``absent'' or referred. Brackets are 95\% bootstrap intervals over cases. Reference models are given in the order \gem, \opus, \gpt. ESG: evidence sensitivity gap.}
@@ -208,53 +203,53 @@ Analysis & $n$ & Expected of a model that responds only to the edit & Observed &
 \addlinespace
 2. Unedited lesion-free images: finding reported & 288 & as its base model ($19.4\%$) & $7.6\%$ $\ci{4.8}{10.9}$ & nine comparison models: $9.0\%$ to $30.9\%$ \\
 \addlinespace
-3. Tools not used in training: ESG with TELEA; with Stable Diffusion & 125 & no advantage & $0.664$; $0.640$ & reference models: $0.560$, $0.296$, $0.256$; $0.392$, $0.352$, $0.256$ \\
+3. Tools not used in training: ESG with TELEA; with Stable Diffusion & 125 & no advantage & $0.664$; $0.640$ & reference models, TELEA: $0.560$, $0.296$, $0.256$; Stable Diffusion: $0.392$, $0.352$, $0.256$ \\
 \addlinespace
 4. Lesion pixels pasted back into the erased image (LaMa): lesion denied & 143 & as after erasure ($86.7\%$) & $7.0\%$ (half of the mask erased: $19.6\%$) & distant control edit: $4.2\%$ \\
 \addlinespace
-5. Edit-site control (TELEA): intact lesion denied after a ring edit at the lesion & 143 & more often than after a distant edit & $20.3\%$ against $12.6\%$; difference $7.7$ points $\ci{0.0}{15.4}$ & base model: $11.6\%$ against $7.0\%$ ($n = 127$) \\
+5. Edit-site control (TELEA): intact lesion denied after a ring edit at the lesion & 143 & more often than after a distant edit & $20.3\%$ against $12.6\%$; difference $7.7$ percentage points $\ci{0.0}{15.4}$ & base model: $11.6\%$ against $7.0\%$ ($n = 127$) \\
 \addlinespace
 6. Low-visibility erasures$^{b}$: ESG & 111 & no advantage & $0.640$ $\ci{0.550}{0.721}$ & reference models lower by $0.270$ $\ci{0.153}{0.387}$, $0.450$ $\ci{0.324}{0.568}$, $0.378$ $\ci{0.243}{0.514}$ \\
 \bottomrule
 \end{tabular}
-\\[3pt]\parbox{17.4cm}{\footnotesize $^{a}$Obtained from ESG and erased-lesion claims ($90.4\%$ of erased images denied). $^{b}$Erasures that a trained edit detector scored no higher than the median control edit.}
+\\[3pt]\parbox{17.4cm}{\footnotesize $^{a}$\,Obtained from ESG and erased-lesion claims ($90.4\%$ of erased images denied). $^{b}$\,Erasures that a trained edit detector scored no higher than the median control edit.}
 \end{table*}
 % src: v5 P888 and P901 (14.6%, 90.4%, derived); v5 P676-689 (7.6%, 9.0-30.9%, base 19.4%); v5 P1234-1237 (tools); L1269-1271 and v5 P1305-1308 (restored 0.070, half erased 0.196, erased 0.867, distant 0.042; TELEA ring 20.3 against 12.6, +0.077 [0.000, 0.154]; base 0.116 against 0.070); L1416-1423 (low visibility)
 
 \begin{figure*}[!t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig3_tools_ablations}
-\caption{Editing tools and training views. (a) Evidence sensitivity gap (ESG) on 125 main-test cases whose erased and control-edited images were remade on the same masks with four editing tools, two used in training (LaMa, tissue transplant) and two not used (TELEA, Stable Diffusion): \ms, the three reference models and, below the dotted line, five first-stage models (after the first of three training stages). (b) Share of 125 intact lesions denied (answered ``absent'' or referred) after a TELEA control edit by first-stage models trained with erasures only, with lesion insertions added, with control edits added, and with both (the views used for \ms); main-test ESG in parentheses. Grey bars: no control edits in training. (c) Main-test ESG (507 cases) of first-stage models trained with and without counterfactual (CF) views on \base{} (mean and SD over three seeds where marked) and on MedGemma 1.5 4B. ``Absent share matched'': no CF views, with the share of ``absent'' answers matched by lesion-free images. ``Then preference optimisation'': no CF views, followed by preference optimisation on erased images (Section~\ref{subsec:res_designs}). In (a) and (b), rows named after one kind of view denote erasures plus that kind. Intervals were not computed for (a) and (b). Values are in Supplementary Tables~\ref{tab:s_tools} and~\ref{tab:s_ablations}.}
+\caption{Editing tools and training views. (a) Evidence sensitivity gap (ESG) on 125 main-test cases whose erased and control-edited images were remade on the same masks with four editing tools, two used in training (LaMa, tissue transplant) and two not used (TELEA, Stable Diffusion): \ms, the three reference models and, below the dotted line, five first-stage models (after the first of three training stages). (b) Share of 125 intact lesions denied (answered ``absent'' or referred) after a TELEA control edit by first-stage models trained with erasures only, with lesion insertions added, with control edits added, and with both (the views used for \ms); main-test ESG in parentheses. Grey bars: no control edits in training. (c) Main-test ESG (507 cases) of first-stage models trained with and without counterfactual (CF) views on \base{} (mean and standard deviation, SD, over three seeds where marked) and on MedGemma 1.5 4B. ``Absent share matched'': no CF views, with the share of ``absent'' answers matched by lesion-free images. ``Then preference optimisation'': no CF views, followed by preference optimisation on erased images (Section~\ref{subsec:res_designs}). In (a) and (b), rows named after one kind of view denote erasures plus that kind. Intervals were not computed for (a) and (b). Values are in Supplementary Tables~\ref{tab:s_tools} and~\ref{tab:s_ablations}.}
 \label{fig:tools}
 \end{figure*}
 % src: v5 P730 (panel description); figures/README.md (labels)
 
 \textit{Edit-site control.}
 Erasures lie on the lesion and control edits away from it, so an edit at the lesion site might itself change the answer.
-After a ring-shaped LaMa edit around the intact lesion the first-stage model denied $7.7\%$ of 143 lesions, against $4.2\%$ after the distant edit.
-With TELEA it denied $20.3\%$ against $12.6\%$ (difference $7.7$ percentage points $\ci{0.0}{15.4}$), which met the pre-specified flag for a site effect.
-In a post hoc comparison with \base{} on the 112 cases found by both, the excess of ring over distant edit was $1.8$ points $\ci{-8.0}{11.6}$ larger for the trained model; the interval is too wide to exclude a site effect of the size the flag was set for.
-Training about doubled the share of intact lesions denied after a TELEA edit at either site ($12.5\%$ against $6.2\%$ at the ring; $8.9\%$ against $4.5\%$ away from it).
-This control was run on the first-stage model and validation cases, not on \ms{} and the test set.
-% src: L1269-1271, L1278-1290 (flag met with TELEA; +0.018 [-0.080, 0.116] printed in percentage points; 12.5 / 6.2; 8.9 / 4.5); v5 P778, v5 P1305-1308
+Like the analysis above, this control was run on the first-stage model and validation cases, not on \ms{} and the test set.
+With LaMa a ring-shaped edit around the intact lesion raised denial from $4.2\%$ to $7.7\%$ (difference $3.5$ percentage points $\ci{-2.1}{9.1}$); with TELEA the model denied $20.3\%$ after the ring edit against $12.6\%$ after the distant edit (difference $7.7$ percentage points $\ci{0.0}{15.4}$), which met the pre-specified flag for a site effect.
+In a post hoc comparison with \base{} on the 112 cases found by both, the excess of ring over distant edit was $1.8$ percentage points $\ci{-8.0}{11.6}$ larger for the trained model; the interval is too wide to exclude a site effect of the size the flag was set for.
+Training about doubled denial after a TELEA edit at either site ($12.5\%$ against $6.2\%$ at the ring; $8.9\%$ against $4.5\%$ away from it; Supplementary Tables~\ref{tab:s_site} and~\ref{tab:s_logodds}).
+% src: L1269-1271, L1278-1290 (flag met with TELEA; +0.077 [0.000, 0.154] and +0.018 [-0.080, 0.116] printed in percentage points; 12.5 / 6.2; 8.9 / 4.5); v5 P778, v5 P1305-1308 (LaMa ring minus distant +0.035 [-0.021, 0.091], printed in percentage points)
 
 \textit{Erasures that an edit detector scores as unedited.}
 An erasure was called low-visibility when a trained edit detector scored it no higher than the median control edit (111 of 219).
-On these the ESG of \ms{} was $0.640$ $\ci{0.550}{0.721}$, higher than that of the reference models by $0.270$, $0.450$ and $0.378$ (intervals in Table~\ref{tab:alternatives}), and the pre-specified criterion was met.
+On these the ESG of \ms{} was $0.640$ $\ci{0.550}{0.721}$, higher than that of each reference model (all $p < 0.001$; differences in Table~\ref{tab:alternatives}), and the pre-specified criterion was met.
 \ms{} reported $16.2\%$ of the low-visibility erasures against $2.8\%$ of the other 108: either some ``absent'' answers follow edit traces or the least visible erasures retain more of the lesion, which this design cannot separate (Supplementary Table~\ref{tab:s_visibility}).
 % src: L1416-1423; facts C10
 
-Taken together, the answers of \ms{} depended mainly on whether the lesion was still shown, with some sensitivity to unfamiliar edit traces; all of these analyses use edited images, and the test without an edit is in Section~\ref{subsec:res_pairs}.
+Taken together, the answers of \ms{} followed mainly whether the lesion region had been erased, with some sensitivity to unfamiliar edit traces; the test without any edit is in Section~\ref{subsec:res_pairs}.
 % src: no new numbers
 
 % ---------------------------------------------------------------------------------------------------------------
 \subsection{External datasets and new test sets}\label{subsec:res_external}
 
-On three further test sets \ms{} reported fewer erased lesions than each reference model (Supplementary Table~\ref{tab:s_external}).
-On the external datasets (169 cases from four datasets not used in training) it reported $11.8\%$ against $53.8\%$ to $66.4\%$, with an ESG of $0.597$ against $0.277$ to $0.412$ ($p \le 0.002$).
-On the fresh internal set (76 cases, 36 with a lesion) its ESG was $0.472$ against $0.000$ to $0.083$ ($p \le 0.001$).
+On three further test sets the erased-lesion claims of \ms{} were lower than those of each reference model, and its ESG was higher on two of them (Supplementary Table~\ref{tab:s_external}).
+On the external datasets (169 cases from four datasets not used in training) it reported $11.8\%$ of erased lesions against $53.8\%$ to $66.4\%$, with an ESG of $0.597$ against $0.277$ to $0.412$ (all $p \le 0.002$).
+The fresh internal and fresh external sets had not been used with any model before the training of \ms{} was fixed.
+On the fresh internal set (76 cases, 36 with a lesion) its ESG was $0.472$ against $0.000$ to $0.083$ (all $p \le 0.001$).
 On the fresh external set (316 cases from four further datasets) it reported $8.3\%$ of erased lesions against $31.5\%$ to $42.3\%$; its ESG ($0.393$) was higher in point estimate than that of \opus{} ($0.292$) and \gpt{} ($0.268$) and not above that of \gem{} ($0.435$).
-% src: v5 P798-800 and P1360-1373; L656-659, L693 (fresh sets; 36 lesion cases), L767-772; L1682-1683; facts C2-C4
+% src: v5 P798-800 and P1360-1373; v5 P549 (fresh sets: no model run on them before MedScope-4B was fixed); L656-659, L693 (fresh sets; 36 lesion cases), L767-772 (no test recorded for erased-lesion claims, hence "lower" without a p value); L1682-1683; facts C2-C4
 
 On the external datasets and the fresh external set \ms{} was correct on fewer lesion images than the reference models: $72.7\%$ against $94.5\%$ to $96.6\%$, and $47.6\%$ against $74.1\%$ for \gem.
 Its net utility was not shown to differ on the external datasets ($0.530$ against $0.544$, $0.544$ and $0.424$ for \gem, \opus{} and \gpt) and was below that of \gem{} on the fresh external set ($-0.053$ against $0.310$; difference $-0.363$ $\ci{-0.496}{-0.233}$).
@@ -262,5 +257,5 @@ Its net utility was not shown to differ on the external datasets ($0.530$ agains
 
 The deficit was concentrated in one finding: \ms{} answered ``absent'' on all 48 pneumothorax films of the fresh external set, which holds them as 256-pixel copies (\gem{} found 30), and on all 100 pneumothorax films of further patients.
 Its first training stage had held four pneumothorax images and the validation set none; questions naming pneumothorax made up 54 of about 7{,}000 chest X-ray training views of that stage, $80\%$ of them with the answer ``absent'', and the models after the first two stages each found $40\%$ of 42 films at original resolution (post hoc; Supplementary Table~\ref{tab:s_pneumothorax}).
-With films of 150 patients with and 150 without pneumothorax added to every stage (\msp, post hoc), 53 of 100 were found and 5 of 100 films without pneumothorax were called positive, and the main test did not change (ESG $0.740$ against $0.758$; difference $-0.018$ $\ci{-0.073}{0.037}$).
-% src: L772 and L998-999 (0/48; gemini-4-argon 30/48), L1370 (0/100; 53/100; 5/100), L774-796 (256-pixel copies; 42 films; 40%; 54 of ~7,000 views naming pneumothorax, 80% answered "No"; 4 pneumothorax images; none in validation), L1366-1373 (main test)
+With films of 150 patients with and 150 without pneumothorax added to every stage (\msp, post hoc), 53 of 100 were found and 5 of 100 films without pneumothorax were called present, with a main-test ESG of $0.740$ against $0.758$ (difference $-0.018$ $\ci{-0.073}{0.037}$).
+% src: L772 and L998-999 (0/48; gemini-4-argon 30/48), L1370 (0/100; 53/100; 5/100), L774-796 and v5 P800 (256-pixel copies; 42 films; 40%; 54 of ~7,000 views naming pneumothorax, 80% answered "No"; 4 pneumothorax images; none in validation), L1366-1373 and v5 P819 (main test -0.018 [-0.073, 0.037])

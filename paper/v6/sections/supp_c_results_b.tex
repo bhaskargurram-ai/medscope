@@ -3,10 +3,10 @@
 % final run (report60 = scratchpad/report60.md, line numbers) or paper/v5/paper.tex (v5 P = line).
 % Claims printed as percentages are the stored proportions times 100 (0.220 -> 22.0%); nothing is re-rounded.
 
-\section{Additional results: unedited pairs, MedScope-4B-N and alternative designs}
+\section{Additional results: unedited pairs, \texorpdfstring{\msn}{MedScope-4B-N} and alternative designs}
 \label{sec:s_results_b}
 
-This section gives the complete tables behind Sections~\ref{subsec:res_pairs} to~\ref{subsec:res_designs}. Two models appear here that the main text does not name: each of the two kinds of unedited training images in \msn{} was first added to \msp{} on its own, giving ``\msp{} with colonoscopy pairs'' and ``\msp{} with CheXthought films'' (Supplementary Table~\ref{tab:s_models}). Unless a caption says otherwise, brackets are 95\% bootstrap intervals, differences are paired over the same cases, videos or patients, $p$ values are two-sided, and a $p$ value stored as $0.000$ is printed as $<0.001$. Claims are printed as percentages and their differences as differences in proportions.
+This section gives the complete tables behind Sections~\ref{subsec:res_pairs} to~\ref{subsec:res_designs}. Two models appear here that the main text does not name: each of the two kinds of unedited training images in \msn{} was first added to \msp{} on its own, giving ``\msp{} with colonoscopy pairs'' and ``\msp{} with CheXthought films'' (Supplementary Table~\ref{tab:s_models}). Unless a caption says otherwise, brackets are 95\% confidence intervals (CI) from $2{,}000$ bootstrap resamples, differences are paired over the same cases, videos or patients, $p$ values are two-sided, and a bootstrap $p$ value of $0.000$ is printed as $<0.001$. Claims are printed as percentages and their differences as differences in proportions, as recorded. The three training seeds of \msn{} are called first, second and third; the first is the model of the main text. n.r.: not recorded (where the record says so, the interval includes zero). --: not applicable or not computed.
 % src: facts A (models); report60 L112, L199 (resampling units)
 
 \subsection{Unedited colonoscopy pairs}
@@ -107,7 +107,7 @@ Model & 1 ($n = 21$) & 2 ($n = 27$) & 3 ($n = 26$) & 4 ($n = 22$) \\
 % src: report60 L157-181; L1514 (7 pairs without a usable frame)
 
 \begin{table}[!htbp]
-\caption{REAL-Colon, leave-one-centre-out (pre-specified): \msp{} with colonoscopy pairs was trained four times, each time without every video of one of the four centres (45 training videos each), and each of the 103 pairs was answered by the model that had used no video of its centre. Shown against the same model cross-validated over videos (centres shared) and against the stored answers of the other models. Columns and intervals as in Supplementary Table~\ref{tab:s_realcolon}; the lower panel gives natural ESG within the pairs of each centre (for the first row, the centre withheld from training). The pre-specified reading compares the leave-one-centre-out answers with each reference model: above each with the interval above zero, above none, or mixed. The result is mixed (above \gpt{} only). The leave-one-centre-out model called 60 polyps present, 50 with a correct box. On the 96 context-matched frames its natural ESG was $0.427$ $\ci{0.286}{0.562}$, with differences of $+0.094$ $\ci{-0.042}{+0.220}$, $+0.104$ $\ci{-0.030}{+0.239}$ and $+0.240$ $\ci{+0.101}{+0.375}$ from \gem{}, \opus{} and \gpt{}. This analysis was not repeated for \msn{}.}
+\caption{REAL-Colon, leave-one-centre-out (pre-specified): \msp{} with colonoscopy pairs was trained four times, each time without every video of one of the four centres (45 training videos each), and each of the 103 pairs was answered by the model that had used no video of its centre. Shown against the same model cross-validated over videos (centres shared) and against the answers of the other models. Columns and intervals as in Supplementary Table~\ref{tab:s_realcolon}; the lower panel gives natural ESG within the pairs of each centre (for the first row, the centre withheld from training). The pre-specified reading compares the leave-one-centre-out answers with each reference model: above each with the interval above zero, above none, or mixed. The result is mixed (above \gpt{} only). The leave-one-centre-out model called 60 polyps present, 50 with a correct box. On the 96 context-matched frames its natural ESG was $0.427$ $\ci{0.286}{0.562}$, with differences of $+0.094$ $\ci{-0.042}{+0.220}$, $+0.104$ $\ci{-0.030}{+0.239}$ and $+0.240$ $\ci{+0.101}{+0.375}$ from \gem{}, \opus{} and \gpt{}. This analysis was not repeated for \msn{}.}
 \label{tab:s_loco}
 \centering
 \footnotesize
@@ -151,7 +151,7 @@ Model & 1 ($n = 23$) & 2 ($n = 28$) & 3 ($n = 28$) & 4 ($n = 24$) \\
 % src: L1862-1889 (leave-one-centre-out rows, by centre, detection, context frames); L1458-1465 (intervals of the stored models); L1560-1562 (by centre, other models)
 
 \begin{table}[!htbp]
-\caption{LDPolypVideo, 116 unedited frame pairs from 160 clips of one hospital, none of whose images was used to train or select any of our models (pre-specified confirmatory test): all models. The dataset holds $40{,}186$ labelled frames ($33{,}875$ with a polyp, $6{,}311$ polyp-free); one pair was built per clip, and 44 clips gave none (39 had no polyp-free frame at least 5 frames from a polyp frame; 5 had no polyp frame with a box of at least $1\%$ of the frame). Columns as in Supplementary Table~\ref{tab:s_realcolon}; brackets are 95\% intervals from $2{,}000$ bootstrap resamples of whole clips. Differences are \msn{} (seed 0, the single model of the main text) minus the row model. The pre-specified reading compares \msn{} with each reference model: above two of three, with the difference from \gem{} not shown. Test and TrainValid are the two parts in which the dataset is distributed; no model was trained on either.}
+\caption{LDPolypVideo, 116 unedited frame pairs from 160 clips of one hospital, not used in training or model selection (pre-specified confirmatory test): all models. The dataset holds $40{,}186$ labelled frames ($33{,}875$ with a polyp, $6{,}311$ polyp-free); one pair was built per clip, and 44 clips gave none (39 had no polyp-free frame at least 5 frames from a polyp frame; 5 had no polyp frame with a box of at least $1\%$ of the frame). Columns as in Supplementary Table~\ref{tab:s_realcolon}; brackets are 95\% intervals from $2{,}000$ bootstrap resamples of whole clips. Differences are \msn{} (first seed, the model of the main text) minus the row model. The pre-specified reading compared \msn{} with each reference model; the result was mixed: above two of three, with the difference from \gem{} not shown. Test and TrainValid are the two parts in which the dataset is distributed; no model was trained on either.}
 \label{tab:s_ldpolyp}
 \centering
 \footnotesize
@@ -160,9 +160,9 @@ Model & 1 ($n = 23$) & 2 ($n = 28$) & 3 ($n = 28$) & 4 ($n = 24$) \\
 \toprule
 Model & \shortstack{Polyp frames\\found} & \shortstack{Polyp-free frames\\absent or referred} & \shortstack{Natural ESG\\{}[95\% CI]} & \shortstack{\msn{} minus model\\{}[95\% CI]} & $p$ \\
 \midrule
-\msn{}, seed 0 & $62.1\%$ & $99.1\%$ & $0.612$ $\ci{0.526}{0.698}$ & -- & -- \\
-\msn{}, seed 1 & $61.2\%$ & $96.6\%$ & $0.578$ $\ci{0.483}{0.672}$ & $+0.034$ $\ci{-0.017}{+0.095}$ & $0.312$ \\
-\msn{}, seed 2 & $62.1\%$ & $95.7\%$ & $0.578$ $\ci{0.491}{0.664}$ & $+0.034$ $\ci{-0.017}{+0.095}$ & $0.300$ \\
+\msn{}, first seed & $62.1\%$ & $99.1\%$ & $0.612$ $\ci{0.526}{0.698}$ & -- & -- \\
+\msn{}, second seed & $61.2\%$ & $96.6\%$ & $0.578$ $\ci{0.483}{0.672}$ & $+0.034$ $\ci{-0.017}{+0.095}$ & $0.312$ \\
+\msn{}, third seed & $62.1\%$ & $95.7\%$ & $0.578$ $\ci{0.491}{0.664}$ & $+0.034$ $\ci{-0.017}{+0.095}$ & $0.300$ \\
 \msn{}, three-seed vote & $61.2\%$ & $97.4\%$ & $0.586$ $\ci{0.491}{0.673}$ & $+0.026$ $\ci{-0.009}{+0.069}$ & $0.238$ \\
 \ms{} & $45.7\%$ & $96.6\%$ & $0.422$ $\ci{0.328}{0.517}$ & $+0.190$ $\ci{+0.112}{+0.267}$ & $<0.001$ \\
 \msp{} with colonoscopy pairs & $59.5\%$ & $99.1\%$ & $0.586$ $\ci{0.491}{0.672}$ & $+0.026$ $\ci{-0.017}{+0.069}$ & $0.351$ \\
@@ -182,9 +182,9 @@ Model & \shortstack{Polyp frames\\found} & \shortstack{Polyp-free frames\\absent
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 Model & Called present & With a correct box & Test ($n = 51$) & TrainValid ($n = 65$) \\
 \midrule
-\msn{}, seed 0 & $72$ ($62.1\%$) & $66$ ($56.9\%$) & $0.59$ & $0.63$ \\
-\msn{}, seed 1 & $71$ ($61.2\%$) & $65$ ($56.0\%$) & $0.59$ & $0.57$ \\
-\msn{}, seed 2 & $71$ ($61.2\%$) & $66$ ($56.9\%$) & $0.59$ & $0.57$ \\
+\msn{}, first seed & $72$ ($62.1\%$) & $66$ ($56.9\%$) & $0.59$ & $0.63$ \\
+\msn{}, second seed & $71$ ($61.2\%$) & $65$ ($56.0\%$) & $0.59$ & $0.57$ \\
+\msn{}, third seed & $71$ ($61.2\%$) & $66$ ($56.9\%$) & $0.59$ & $0.57$ \\
 \msn{}, three-seed vote & $71$ ($61.2\%$) & $65$ ($56.0\%$) & $0.57$ & $0.60$ \\
 \ms{} & $53$ ($45.7\%$) & $50$ ($43.1\%$) & $0.39$ & $0.45$ \\
 \msp{} with colonoscopy pairs & $66$ ($56.9\%$) & $60$ ($51.7\%$) & $0.61$ & $0.57$ \\
@@ -206,19 +206,19 @@ Supplementary Table~\ref{tab:s_chest} gives every model on the two sets of unedi
 % src: pointers only, no numbers
 
 \begin{table}[!htbp]
-\caption{Pneumothorax on unedited chest films: all models on both sets. CheXthought test patients: 300 pneumothorax and 300 lesion-free frontal films of patients not used in training (descriptive; no decision rule); pneumothorax films are those labelled positive in the image source and stated positive, with click points, by at least one CheXthought radiologist. New SIIM patients: 100 pneumothorax and 100 lesion-free films; the pre-specified comparison is \msn{} (seed 0) against \msp{} on films called present, with ``raised'' defined as an interval above zero and lesion-free films called positive not higher by more than 5 percentage points (not raised). The reference models were not run on the SIIM films. The upper panel gives each model's values and the difference in Youden index; the lower panel gives the differences in the two shares that make up the index. Correct box: called present with a box overlapping the reference box (intersection over union at least 0.3; on CheXthought the box around the radiologists' click points). Youden index: share of pneumothorax films called present plus share of lesion-free films answered ``absent'' or referred, minus one. Brackets: 95\% intervals from $2{,}000$ bootstrap resamples of whole patients. Differences are \msn{} (seed 0) minus the row model. \toconfirm{unit of the correct-box column: read as a count of films, as the record states for the SIIM films; the stored table prints it without a unit} \toconfirm{$p$ for \msn{} minus \msp{}, SIIM films called present: $0.920$ in the pre-specified reading and the log, $0.925$ in the stored table}}
+\caption{Pneumothorax on unedited chest films: all models on both sets. CheXthought test patients: 300 pneumothorax films and 300 frontal films without pneumothorax, from patients not used in training (descriptive; no decision rule); pneumothorax films are those labelled positive in the image source and stated positive, with click points, by at least one CheXthought radiologist. New SIIM-ACR patients: 100 pneumothorax films and 100 films without pneumothorax; the pre-specified comparison is \msn{} (first seed) against \msp{} on pneumothorax films called present, with ``raised'' defined as an interval above zero and films without pneumothorax called positive not higher by more than 5 percentage points; the criterion was not met. The reference models were not run on the SIIM-ACR films. Top: each model's values and the difference in Youden index. Bottom: the differences in the two shares that make up the index, as differences in proportions. Correct box: number of pneumothorax films called present with a box overlapping the reference box (intersection over union at least 0.3; on CheXthought the box around the radiologists' click points), of 300 CheXthought or 100 SIIM-ACR films. Youden index: share of pneumothorax films called present plus share of films without pneumothorax answered ``absent'' or referred, minus one. CI: 95\% confidence interval from $2{,}000$ bootstrap resamples of whole patients. Differences are \msn{} (first seed) minus the row model.}
 \label{tab:s_chest}
 \centering
 \footnotesize
 \begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{l ccc c cc}
 \toprule
-Model & \shortstack{Pneumothorax films\\called present} & \shortstack{With a\\correct box, $n$} & \shortstack{Lesion-free films\\absent or referred} & \shortstack{Youden index\\{}[95\% CI]} & \shortstack{\msn{} minus model,\\Youden index [95\% CI]} & $p$ \\
+Model & \shortstack{Pneumothorax films\\called present} & \shortstack{Correct\\box, $n$} & \shortstack{Films without pneumothorax\\absent or referred} & \shortstack{Youden index\\{}[95\% CI]} & \shortstack{\msn{} minus model,\\Youden index [95\% CI]} & $p$ \\
 \midrule
 \multicolumn{7}{l}{\emph{CheXthought test patients ($300 + 300$ films)}} \\
-\msn{}, seed 0 & $75.0\%$ & $65$ & $91.0\%$ & $0.660$ $\ci{0.591}{0.726}$ & -- & -- \\
-\msn{}, seed 1 & $79.7\%$ & $78$ & $86.7\%$ & $0.663$ $\ci{0.592}{0.731}$ & $-0.003$ $\ci{-0.049}{+0.045}$ & $0.927$ \\
-\msn{}, seed 2 & $75.0\%$ & $70$ & $92.3\%$ & $0.673$ $\ci{0.606}{0.735}$ & $-0.013$ $\ci{-0.054}{+0.030}$ & $0.602$ \\
+\msn{}, first seed & $75.0\%$ & $65$ & $91.0\%$ & $0.660$ $\ci{0.591}{0.726}$ & -- & -- \\
+\msn{}, second seed & $79.7\%$ & $78$ & $86.7\%$ & $0.663$ $\ci{0.592}{0.731}$ & $-0.003$ $\ci{-0.049}{+0.045}$ & $0.927$ \\
+\msn{}, third seed & $75.0\%$ & $70$ & $92.3\%$ & $0.673$ $\ci{0.606}{0.735}$ & $-0.013$ $\ci{-0.054}{+0.030}$ & $0.602$ \\
 \msn{}, three-seed vote & $78.7\%$ & $65$ & $91.3\%$ & $0.700$ $\ci{0.633}{0.763}$ & $-0.040$ $\ci{-0.071}{-0.010}$ & $0.008$ \\
 \msp{} with CheXthought films & $80.7\%$ & $61$ & $84.3\%$ & $0.650$ $\ci{0.582}{0.716}$ & $+0.010$ $\ci{-0.035}{+0.057}$ & $0.721$ \\
 \msp{} & $35.7\%$ & $38$ & $93.0\%$ & $0.287$ $\ci{0.195}{0.378}$ & $+0.373$ $\ci{+0.280}{+0.461}$ & $<0.001$ \\
@@ -228,10 +228,10 @@ Model & \shortstack{Pneumothorax films\\called present} & \shortstack{With a\\co
 \opus{} & $37.0\%$ & $21$ & $83.7\%$ & $0.207$ $\ci{0.111}{0.306}$ & $+0.453$ $\ci{+0.344}{+0.560}$ & $<0.001$ \\
 \gpt{} & $41.0\%$ & $35$ & $96.7\%$ & $0.377$ $\ci{0.286}{0.459}$ & $+0.283$ $\ci{+0.196}{+0.375}$ & $<0.001$ \\
 \midrule
-\multicolumn{7}{l}{\emph{New SIIM patients ($100 + 100$ films)}} \\
-\msn{}, seed 0 & $54.0\%$ & $41$ & $96.0\%$ & $0.500$ $\ci{0.380}{0.610}$ & -- & -- \\
-\msn{}, seed 1 & $75.0\%$ & $49$ & $93.0\%$ & $0.680$ $\ci{0.570}{0.780}$ & $-0.180$ $\ci{-0.280}{-0.090}$ & $<0.001$ \\
-\msn{}, seed 2 & $70.0\%$ & $38$ & $94.0\%$ & $0.640$ $\ci{0.530}{0.750}$ & $-0.140$ $\ci{-0.230}{-0.060}$ & $<0.001$ \\
+\multicolumn{7}{l}{\emph{New SIIM-ACR patients ($100 + 100$ films)}} \\
+\msn{}, first seed & $54.0\%$ & $41$ & $96.0\%$ & $0.500$ $\ci{0.380}{0.610}$ & -- & -- \\
+\msn{}, second seed & $75.0\%$ & $49$ & $93.0\%$ & $0.680$ $\ci{0.570}{0.780}$ & $-0.180$ $\ci{-0.280}{-0.090}$ & $<0.001$ \\
+\msn{}, third seed & $70.0\%$ & $38$ & $94.0\%$ & $0.640$ $\ci{0.530}{0.750}$ & $-0.140$ $\ci{-0.230}{-0.060}$ & $<0.001$ \\
 \msn{}, three-seed vote & $68.0\%$ & $49$ & $94.0\%$ & $0.620$ $\ci{0.510}{0.730}$ & $-0.120$ $\ci{-0.200}{-0.040}$ & $0.005$ \\
 \msp{} with CheXthought films & $69.0\%$ & $49$ & $93.0\%$ & $0.620$ $\ci{0.510}{0.730}$ & $-0.120$ $\ci{-0.210}{-0.030}$ & $0.013$ \\
 \msp{} with colonoscopy pairs & $57.0\%$ & $31$ & $93.0\%$ & $0.500$ $\ci{0.380}{0.620}$ & $+0.000$ $\ci{-0.090}{+0.090}$ & $1.000$ \\
@@ -245,13 +245,13 @@ Model & \shortstack{Pneumothorax films\\called present} & \shortstack{With a\\co
 \begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{l cc c}
 \toprule
- & \multicolumn{3}{c}{\msn{} (seed 0) minus model, difference in proportion [95\% CI]} \\
+ & \multicolumn{3}{c}{\msn{} (first seed) minus model, difference in proportion [95\% CI]} \\
 \cmidrule(lr){2-4}
-Model & Pneumothorax films called present & $p$ & Lesion-free films called positive \\
+Model & Pneumothorax films called present & $p$ & Films without pneumothorax called positive \\
 \midrule
 \multicolumn{4}{l}{\emph{CheXthought test patients ($300 + 300$ films)}} \\
-\msn{}, seed 1 & $-0.047$ $\ci{-0.083}{-0.012}$ & $0.007$ & $-0.043$ $\ci{-0.072}{-0.017}$ \\
-\msn{}, seed 2 & $+0.000$ $\ci{-0.036}{+0.036}$ & $1.000$ & $+0.013$ $\ci{-0.007}{+0.035}$ \\
+\msn{}, second seed & $-0.047$ $\ci{-0.083}{-0.012}$ & $0.007$ & $-0.043$ $\ci{-0.072}{-0.017}$ \\
+\msn{}, third seed & $+0.000$ $\ci{-0.036}{+0.036}$ & $1.000$ & $+0.013$ $\ci{-0.007}{+0.035}$ \\
 \msn{}, three-seed vote & $-0.037$ $\ci{-0.063}{-0.013}$ & $0.003$ & $+0.003$ $\ci{-0.010}{+0.017}$ \\
 \msp{} with CheXthought films & $-0.057$ $\ci{-0.087}{-0.029}$ & $<0.001$ & $-0.067$ $\ci{-0.099}{-0.037}$ \\
 \msp{} & $+0.393$ $\ci{+0.328}{+0.455}$ & $<0.001$ & $+0.020$ $\ci{-0.014}{+0.055}$ \\
@@ -261,9 +261,9 @@ Model & Pneumothorax films called present & $p$ & Lesion-free films called posit
 \opus{} & $+0.380$ $\ci{+0.297}{+0.451}$ & $<0.001$ & $-0.073$ $\ci{-0.120}{-0.026}$ \\
 \gpt{} & $+0.340$ $\ci{+0.278}{+0.410}$ & $<0.001$ & $+0.057$ $\ci{+0.024}{+0.092}$ \\
 \midrule
-\multicolumn{4}{l}{\emph{New SIIM patients ($100 + 100$ films)}} \\
-\msn{}, seed 1 & $-0.210$ $\ci{-0.290}{-0.130}$ & $<0.001$ & $-0.030$ $\ci{-0.070}{+0.000}$ \\
-\msn{}, seed 2 & $-0.160$ $\ci{-0.240}{-0.090}$ & $<0.001$ & $-0.020$ $\ci{-0.050}{+0.000}$ \\
+\multicolumn{4}{l}{\emph{New SIIM-ACR patients ($100 + 100$ films)}} \\
+\msn{}, second seed & $-0.210$ $\ci{-0.290}{-0.130}$ & $<0.001$ & $-0.030$ $\ci{-0.070}{+0.000}$ \\
+\msn{}, third seed & $-0.160$ $\ci{-0.240}{-0.090}$ & $<0.001$ & $-0.020$ $\ci{-0.050}{+0.000}$ \\
 \msn{}, three-seed vote & $-0.140$ $\ci{-0.210}{-0.070}$ & $<0.001$ & $-0.020$ $\ci{-0.050}{+0.000}$ \\
 \msp{} with CheXthought films & $-0.150$ $\ci{-0.230}{-0.070}$ & $0.001$ & $-0.030$ $\ci{-0.070}{+0.000}$ \\
 \msp{} with colonoscopy pairs & $-0.030$ $\ci{-0.110}{+0.050}$ & $0.510$ & $-0.030$ $\ci{-0.080}{+0.010}$ \\
@@ -276,7 +276,7 @@ Model & Pneumothorax films called present & $p$ & Lesion-free films called posit
 % src: report60 L186-218; L2169-2176; L1973-1985 (CheXthought rows of the comparison models); docs/REVIEW_EXPERIMENTS.md L490-515 (film selection and rule)
 
 \begin{table}[!htbp]
-\caption{Chest X-ray follow-up pairs (secondary; descriptive): a film whose only label is pneumothorax, effusion, nodule or mass, and the nearest film of the same patient and view labelled as showing no finding (NIH ChestX-ray14; labels mined from reports). Two builds are shown. First build: 200 pairs were built (50 per finding) and 44 remained after a near-copy check that was later found to remove pairs wrongly; the result is reported as run. Rebuild (post hoc): the same 200 pairs with the check corrected, 183 scored. Brackets: 95\% bootstrap intervals over patients where the record gives them. Differences are \ms{} minus the row model on the rebuild. n.r.: the record states that the 95\% interval includes zero and does not give its bounds, or gives no interval. By finding, natural ESG of \ms{} was $0.00$ for effusion ($n = 11$), $0.50$ for mass ($n = 10$), $-0.14$ for nodule ($n = 7$) and $-0.06$ for pneumothorax ($n = 16$) in the first build, and $0.31$, $0.24$, $0.13$ and $0.00$ in the rebuild ($n = 45$ to $46$ each). \msn{} was not run on these pairs.}
+\caption{Chest X-ray follow-up pairs (secondary; descriptive): a film whose only label is pneumothorax, effusion, nodule or mass, and the nearest film of the same patient and view labelled as showing no finding (NIH ChestX-ray14; labels mined from reports). Two builds are shown. In the first build, 200 pairs were built (50 per finding) and a near-copy check that compared coarse image hashes removed 156, leaving 44; the result is reported as run. In the rebuild (post hoc) the check was corrected and 183 of the same 200 pairs were scored. Brackets: 95\% bootstrap intervals over patients where recorded. Differences are \ms{} minus the row model on the rebuild. By finding, natural ESG of \ms{} was $0.00$ for effusion ($n = 11$), $0.50$ for mass ($n = 10$), $-0.14$ for nodule ($n = 7$) and $-0.06$ for pneumothorax ($n = 16$) in the first build, and $0.31$, $0.24$, $0.13$ and $0.00$ in the rebuild ($n = 45$ to $46$ each). \msn{} was not run on these pairs.}
 \label{tab:s_cxrpairs}
 \centering
 \footnotesize
@@ -303,18 +303,18 @@ Model & Natural ESG [95\% CI] & Natural ESG [95\% CI] & \ms{} minus model [95\% 
 \subsection{\texorpdfstring{\msn}{MedScope-4B-N}: training seeds, training mix and the earlier tests}
 \label{subsec:s_nmodel}
 
-Supplementary Tables~\ref{tab:s_nseeds} and~\ref{tab:s_nseeds_ref} give the three training seeds of \msn{} and their vote, Supplementary Table~\ref{tab:s_mix} the two candidate training mixes, Supplementary Table~\ref{tab:s_additions} the two single-addition models, Supplementary Tables~\ref{tab:s_next} to~\ref{tab:s_source} \msn{} against the other trained models on the counterfactual test sets, and Supplementary Table~\ref{tab:s_vqa} standard visual question answering.
+Supplementary Tables~\ref{tab:s_nseeds} and~\ref{tab:s_nseeds_ref} give the three training seeds of \msn{} and their vote, Supplementary Table~\ref{tab:s_mix} the two candidate training mixes, Supplementary Table~\ref{tab:s_additions} the two single-addition models, Supplementary Tables~\ref{tab:s_nmodel}, \ref{tab:s_next_add} and~\ref{tab:s_source} \msn{} against the other trained models, and Supplementary Table~\ref{tab:s_vqa} standard question answering.
 % src: pointers only, no numbers
 
 \begin{table}[!htbp]
-\caption{\msn{}: three training seeds and their majority vote on every test set. Seed 0 is the single model of the main text. Each seed repeats all three training stages on the same training data. The vote takes, for each view, the answer class chosen by two or three seeds, and needs three model runs per image. Mean (SD) is over the three seeds and reflects variation between training runs; it was computed for the five measures of the counterfactual test sets only. Lesion images correct: share of original and control-edited lesion views answered correctly, which is why it differs from the count of original films called present on the SIIM set. The pre-specified conditions were met: every seed's main-test ESG exceeded that of each reference model with the paired interval above zero (Supplementary Table~\ref{tab:s_nseeds_ref}), and the vote had main-test lesion-free claims not above the seeds' mean and ESG not more than 0.02 below it. --: not computed.}
+\caption{\msn{}: three training seeds and their majority vote on every test set. Each seed repeats all three training stages on the same training data. The vote takes, for each view, the answer class chosen by two or three seeds, and needs three model runs per image. Mean (SD) is over the three seeds and reflects variation between training runs; it was computed for the five measures of the counterfactual test sets only. Lesion images correct: share of original and control-edited lesion views answered correctly, which is why it differs from the count of original films called present on the SIIM-ACR set. The pre-specified conditions were met: every seed's main-test ESG exceeded that of each reference model with the paired interval above zero (Supplementary Table~\ref{tab:s_nseeds_ref}), and the vote had main-test lesion-free claims not above the seeds' mean and ESG not more than 0.02 below it. Under the pre-specified rule the vote therefore qualified as the reported operating point; the main text reports the first seed as the primary model, because the confirmatory comparison on LDPolypVideo was specified for the first seed, and gives the vote beside it. --: not computed.}
 \label{tab:s_nseeds}
 \centering
 \footnotesize
 \begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{ll ccc c c}
 \toprule
-Test set & Measure & Seed 0 & Seed 1 & Seed 2 & Mean (SD) & Three-seed vote \\
+Test set & Measure & First seed & Second seed & Third seed & Mean (SD) & Three-seed vote \\
 \midrule
 Main test ($507$ cases) & ESG & $0.744$ & $0.740$ & $0.726$ & $0.737$ ($0.010$) & $0.753$ \\
  & Erased-lesion claims & $9.1\%$ & $13.7\%$ & $14.6\%$ & $12.5\%$ ($2.9\%$) & $10.5\%$ \\
@@ -322,7 +322,7 @@ Main test ($507$ cases) & ESG & $0.744$ & $0.740$ & $0.726$ & $0.737$ ($0.010$) 
  & Lesion images correct & $0.847$ & $0.872$ & $0.874$ & $0.865$ ($0.015$) & $0.863$ \\
  & Net utility & $0.709$ & $0.675$ & $0.721$ & $0.702$ ($0.024$) & $0.726$ \\
 \midrule
-External centres ($169$ cases) & ESG & $0.672$ & $0.647$ & $0.672$ & $0.664$ ($0.015$) & $0.689$ \\
+External datasets ($169$ cases) & ESG & $0.672$ & $0.647$ & $0.672$ & $0.664$ ($0.015$) & $0.689$ \\
  & Erased-lesion claims & $10.9\%$ & $10.1\%$ & $17.6\%$ & $12.9\%$ ($4.1\%$) & $11.8\%$ \\
  & Lesion-free claims & $2.0\%$ & $8.0\%$ & $16.0\%$ & $8.7\%$ ($7.0\%$) & $2.0\%$ \\
  & Lesion images correct & $0.777$ & $0.761$ & $0.836$ & $0.791$ ($0.040$) & $0.803$ \\
@@ -340,7 +340,7 @@ Fresh external ($316$ cases) & ESG & $0.381$ & $0.381$ & $0.411$ & $0.391$ ($0.0
  & Lesion images correct & $0.607$ & $0.676$ & $0.601$ & $0.628$ ($0.041$) & $0.619$ \\
  & Net utility & $0.114$ & $0.192$ & $0.094$ & $0.134$ ($0.052$) & $0.147$ \\
 \midrule
-New SIIM patients ($200$ cases) & ESG & $0.270$ & $0.140$ & $0.280$ & $0.230$ ($0.078$) & $0.270$ \\
+New SIIM-ACR patients ($200$ cases) & ESG & $0.270$ & $0.140$ & $0.280$ & $0.230$ ($0.078$) & $0.270$ \\
  & Erased-lesion claims & $25.0\%$ & $59.0\%$ & $43.0\%$ & $42.3\%$ ($17.0\%$) & $42.0\%$ \\
  & Lesion-free claims & $4.0\%$ & $7.0\%$ & $6.0\%$ & $5.7\%$ ($1.5\%$) & $6.0\%$ \\
  & Lesion images correct & $0.530$ & $0.740$ & $0.705$ & $0.658$ ($0.113$) & $0.685$ \\
@@ -359,7 +359,7 @@ LDPolypVideo ($116$ pairs) & Natural ESG & $0.612$ & $0.578$ & $0.578$ & -- & $0
 % src: report60 L361-413 (five measures by seed, mean (sd), vote); report60 L190-193, L206-209 (chest films); report60 L71-74 (LDPolypVideo); L2127-2139; docs/REVIEW_EXPERIMENTS.md L559-569 (vote rule)
 
 \begin{table}[!htbp]
-\caption{\msn{}: each training seed and the three-seed vote against the three reference models on the main test (507 cases). Entries are the row model minus the reference model, paired over cases, with 95\% bootstrap intervals; differences in claims are differences in proportions. All differences in ESG and in erased-lesion claims have $p < 0.001$. Lesion-free claims of seed 1 were higher than those of \gem{} ($p = 0.011$).}
+\caption{\msn{}: each training seed and the three-seed vote against the three reference models on the main test (507 cases). Entries are the row model minus the reference model, paired over cases, with 95\% bootstrap intervals; differences in claims are differences in proportions. All differences in ESG and in erased-lesion claims have $p < 0.001$. Lesion-free claims of the second seed were higher than those of \gem{} ($p = 0.011$).}
 \label{tab:s_nseeds_ref}
 \centering
 \footnotesize
@@ -368,15 +368,15 @@ LDPolypVideo ($116$ pairs) & Natural ESG & $0.612$ & $0.578$ & $0.578$ & -- & $0
 \toprule
 \msn{} & Reference model & ESG & Erased-lesion claims & Lesion-free claims & Lesion images correct & Net utility \\
 \midrule
-Seed 0 & \gem{} & $+0.274$ $\ci{+0.189}{+0.359}$ & $-0.320$ $\ci{-0.390}{-0.249}$ & $-0.003$ $\ci{-0.048}{+0.040}$ & $-0.027$ $\ci{-0.070}{+0.013}$ & $+0.145$ $\ci{+0.057}{+0.231}$ \\
+First seed & \gem{} & $+0.274$ $\ci{+0.189}{+0.359}$ & $-0.320$ $\ci{-0.390}{-0.249}$ & $-0.003$ $\ci{-0.048}{+0.040}$ & $-0.027$ $\ci{-0.070}{+0.013}$ & $+0.145$ $\ci{+0.057}{+0.231}$ \\
  & \opus{} & $+0.416$ $\ci{+0.337}{+0.495}$ & $-0.447$ $\ci{-0.522}{-0.373}$ & $-0.149$ $\ci{-0.207}{-0.097}$ & $-0.016$ $\ci{-0.060}{+0.029}$ & $+0.352$ $\ci{+0.261}{+0.440}$ \\
  & \gpt{} & $+0.438$ $\ci{+0.350}{+0.525}$ & $-0.498$ $\ci{-0.568}{-0.425}$ & $-0.191$ $\ci{-0.251}{-0.138}$ & $-0.039$ $\ci{-0.084}{+0.007}$ & $+0.401$ $\ci{+0.309}{+0.503}$ \\
 \midrule
-Seed 1 & \gem{} & $+0.269$ $\ci{+0.185}{+0.351}$ & $-0.274$ $\ci{-0.348}{-0.199}$ & $+0.063$ $\ci{+0.017}{+0.114}$ & $-0.002$ $\ci{-0.039}{+0.032}$ & $+0.111$ $\ci{+0.024}{+0.192}$ \\
+Second seed & \gem{} & $+0.269$ $\ci{+0.185}{+0.351}$ & $-0.274$ $\ci{-0.348}{-0.199}$ & $+0.063$ $\ci{+0.017}{+0.114}$ & $-0.002$ $\ci{-0.039}{+0.032}$ & $+0.111$ $\ci{+0.024}{+0.192}$ \\
  & \opus{} & $+0.411$ $\ci{+0.329}{+0.489}$ & $-0.402$ $\ci{-0.478}{-0.324}$ & $-0.083$ $\ci{-0.142}{-0.023}$ & $+0.009$ $\ci{-0.038}{+0.057}$ & $+0.318$ $\ci{+0.224}{+0.411}$ \\
  & \gpt{} & $+0.434$ $\ci{+0.347}{+0.519}$ & $-0.452$ $\ci{-0.522}{-0.380}$ & $-0.125$ $\ci{-0.188}{-0.064}$ & $-0.014$ $\ci{-0.056}{+0.033}$ & $+0.367$ $\ci{+0.274}{+0.459}$ \\
 \midrule
-Seed 2 & \gem{} & $+0.256$ $\ci{+0.171}{+0.338}$ & $-0.265$ $\ci{-0.340}{-0.190}$ & $+0.017$ $\ci{-0.028}{+0.064}$ & $+0.000$ $\ci{-0.039}{+0.039}$ & $+0.156$ $\ci{+0.074}{+0.234}$ \\
+Third seed & \gem{} & $+0.256$ $\ci{+0.171}{+0.338}$ & $-0.265$ $\ci{-0.340}{-0.190}$ & $+0.017$ $\ci{-0.028}{+0.064}$ & $+0.000$ $\ci{-0.039}{+0.039}$ & $+0.156$ $\ci{+0.074}{+0.234}$ \\
  & \opus{} & $+0.397$ $\ci{+0.322}{+0.470}$ & $-0.393$ $\ci{-0.470}{-0.318}$ & $-0.128$ $\ci{-0.184}{-0.071}$ & $+0.011$ $\ci{-0.032}{+0.055}$ & $+0.363$ $\ci{+0.277}{+0.445}$ \\
  & \gpt{} & $+0.420$ $\ci{+0.336}{+0.505}$ & $-0.443$ $\ci{-0.512}{-0.373}$ & $-0.170$ $\ci{-0.233}{-0.114}$ & $-0.011$ $\ci{-0.055}{+0.031}$ & $+0.412$ $\ci{+0.327}{+0.497}$ \\
 \midrule
@@ -390,7 +390,7 @@ Three-seed vote & \gem{} & $+0.283$ $\ci{+0.203}{+0.364}$ & $-0.306$ $\ci{-0.376
 % src: report60 L416-494
 
 \begin{table}[!htbp]
-\caption{The two candidate training mixes of \msn{}. Top: composition of the last training stage. Adding the unedited images lowers the share of erased-lesion views; the second candidate repeats erased-lesion views until their share equals that in \msp{}. Middle: validation images only (main validation set, 540 cases and $1{,}473$ views; SIIM validation patients, 98 cases and 242 views). The rule, fixed before either candidate was trained, selected the second candidate unless the first had a higher net utility over both validation sets together by more than 0.005; the values were $0.547$ and $0.452$, so the first candidate (no repetition) is \msn{}. It also met the pre-specified limits on the main validation set (net utility $0.642$, limit at least $0.593$; lesion-free claims $9.1\%$, limit at most $9.7\%$). Bottom: both candidates on three test sets, run as planned for description only, with differences (selected minus not selected) paired over cases and 95\% bootstrap intervals.}
+\caption{The two candidate training mixes of \msn{}. Top: composition of the last training stage. Adding the unedited images lowers the share of erased-lesion views; the second candidate repeats erased-lesion views until their share equals that in \msp{}. Middle: validation images only (main validation set, 540 cases and $1{,}473$ views; SIIM-ACR validation patients, 98 cases and 242 views). The rule, fixed before either candidate was trained, selected the second candidate unless the first had a higher net utility over both validation sets together by more than 0.005; the values were $0.547$ and $0.452$, so the first candidate (no repetition) is \msn{}. It also met the pre-specified limits on the main validation set (net utility $0.642$, limit at least $0.593$; lesion-free claims $9.1\%$, limit at most $9.7\%$). Bottom: both candidates on three test sets, run as planned for description only, with differences (selected minus not selected) paired over cases and 95\% bootstrap intervals.}
 \label{tab:s_mix}
 \centering
 \footnotesize
@@ -414,7 +414,7 @@ Validation set & Candidate & Net utility [95\% CI] & ESG & Lesion images correct
 \midrule
 Main ($540$ cases) & Selected & $0.642$ $\ci{0.556}{0.721}$ & $0.706$ & $0.819$ & $10.6\%$ & $18.8\%$ & $9.1\%$ \\
  & Not selected & $0.621$ $\ci{0.533}{0.704}$ & $0.716$ & $0.792$ & $7.5\%$ & $20.9\%$ & $10.0\%$ \\
-SIIM patients ($98$ cases) & Selected & $-0.031$ $\ci{-0.313}{0.272}$ & $0.292$ & $0.604$ & $31.3\%$ & $39.6\%$ & $8.0\%$ \\
+SIIM-ACR patients ($98$ cases) & Selected & $-0.031$ $\ci{-0.313}{0.272}$ & $0.292$ & $0.604$ & $31.3\%$ & $39.6\%$ & $8.0\%$ \\
  & Not selected & $-0.576$ $\ci{-0.851}{-0.267}$ & $0.167$ & $0.302$ & $14.6\%$ & $68.8\%$ & $8.0\%$ \\
 \bottomrule
 \end{tabular}
@@ -438,7 +438,7 @@ Fresh external ($316$ cases) & ESG & $0.381$ & $0.405$ & $-0.024$ $\ci{-0.077}{+
  & Lesion images correct & $0.607$ & $0.589$ & $+0.018$ $\ci{-0.020}{+0.056}$ & $0.395$ \\
  & Net utility & $0.114$ & $0.107$ & $+0.007$ $\ci{-0.068}{+0.078}$ & $0.878$ \\
 \midrule
-New SIIM patients ($200$ cases) & ESG & $0.270$ & $0.220$ & $+0.050$ $\ci{-0.050}{+0.151}$ & $0.349$ \\
+New SIIM-ACR patients ($200$ cases) & ESG & $0.270$ & $0.220$ & $+0.050$ $\ci{-0.050}{+0.151}$ & $0.349$ \\
  & Erased-lesion claims & $25.0\%$ & $10.0\%$ & $+0.150$ $\ci{+0.054}{+0.250}$ & $0.002$ \\
  & Lesion-free claims & $4.0\%$ & $5.0\%$ & $-0.010$ $\ci{-0.046}{+0.022}$ & $0.798$ \\
  & Lesion images correct & $0.530$ & $0.320$ & $+0.210$ $\ci{+0.111}{+0.307}$ & $<0.001$ \\
@@ -450,7 +450,7 @@ New SIIM patients ($200$ cases) & ESG & $0.270$ & $0.220$ & $+0.050$ $\ci{-0.050
 % src: L2072-2076 (composition); L2099-2119 (validation, rule, limits); report60 L30-62 (tests)
 
 \begin{table}[!htbp]
-\caption{The two single-addition models on the earlier test sets. Top: \msp{} with colonoscopy pairs (all 60 REAL-Colon videos in training; one seed; post hoc) against \ms{} and \msp{}; differences are this model minus the other, paired over cases, with 95\% bootstrap intervals; all comparisons with \ms{} on the SIIM set have $p \le 0.001$. Bottom: \msp{} with CheXthought films ($1{,}500$ pneumothorax and $1{,}500$ lesion-free training films; one seed; post hoc) against \msp{}. Its pre-specified primary comparison was pneumothorax films called present on the new SIIM patients, with ``raised'' defined as an interval above zero and lesion-free films called positive not higher by more than 5 percentage points; the criterion was met. Both models met their pre-specified limits on validation images before any test was run (net utility $0.654$, limit at least $0.593$, and lesion-free claims $9.1\%$, limit at most $9.7\%$, for the first; $0.628$, limit at least $0.611$, and $9.5\%$, limit at most $10.6\%$, for the second). Their results on unedited pairs and chest films are in Supplementary Tables~\ref{tab:s_realcolon}, \ref{tab:s_ldpolyp} and~\ref{tab:s_chest}. n.r.: reported as not significant, interval not recorded. --: not computed.}
+\caption{The two single-addition models on the earlier test sets. Top: \msp{} with colonoscopy pairs (all 60 REAL-Colon videos in training; one seed; post hoc) against \ms{} and \msp{}; differences are this model minus the other, paired over cases, with 95\% bootstrap intervals; all comparisons with \ms{} on the SIIM-ACR set have $p \le 0.001$. Bottom: \msp{} with CheXthought films ($1{,}500$ training films with and $1{,}500$ without pneumothorax; one seed; post hoc) against \msp{}. Its pre-specified primary comparison was pneumothorax films called present on the new SIIM-ACR patients, with ``raised'' defined as an interval above zero and films without pneumothorax called positive not higher by more than 5 percentage points; the criterion was met. Both models met their pre-specified limits on validation images before any test was run (net utility $0.654$, limit at least $0.593$, and lesion-free claims $9.1\%$, limit at most $9.7\%$, for the first; $0.628$, limit at least $0.611$, and $9.5\%$, limit at most $10.6\%$, for the second). Their results on unedited pairs and chest films are in Supplementary Tables~\ref{tab:s_realcolon}, \ref{tab:s_ldpolyp} and~\ref{tab:s_chest}. --: not computed.}
 \label{tab:s_additions}
 \centering
 \footnotesize
@@ -465,7 +465,7 @@ Main test ($507$ cases) & ESG & $0.744$ & $0.758$ & $-0.014$ $\ci{-0.062}{+0.036
  & Lesion images correct & $0.854$ & $0.849$ & $+0.005$ $\ci{-0.026}{+0.036}$ & $0.840$ & $0.856$ & $-0.002$ $\ci{-0.027}{+0.022}$ & $0.907$ \\
  & Net utility & $0.707$ & $0.732$ & $-0.025$ $\ci{-0.082}{+0.029}$ & $0.420$ & $0.714$ & $-0.007$ $\ci{-0.054}{+0.038}$ & $0.757$ \\
 \midrule
-External centres ($169$ cases) & ESG & $0.681$ & $0.597$ & $+0.084$ $\ci{-0.000}{+0.172}$ & $0.073$ & $0.739$ & $-0.059$ $\ci{-0.132}{+0.017}$ & $0.156$ \\
+External datasets ($169$ cases) & ESG & $0.681$ & $0.597$ & $+0.084$ $\ci{-0.000}{+0.172}$ & $0.073$ & $0.739$ & $-0.059$ $\ci{-0.132}{+0.017}$ & $0.156$ \\
  & Erased-lesion claims & $11.8\%$ & $11.8\%$ & $+0.000$ $\ci{-0.050}{+0.052}$ & $1.000$ & $6.7\%$ & $+0.050$ $\ci{+0.017}{+0.095}$ & $0.005$ \\
  & Lesion-free claims & $2.0\%$ & $4.0\%$ & $-0.020$ $\ci{-0.093}{+0.042}$ & $0.802$ & $6.0\%$ & $-0.040$ $\ci{-0.104}{+0.000}$ & $0.276$ \\
  & Lesion images correct & $0.798$ & $0.727$ & $+0.071$ $\ci{+0.014}{+0.131}$ & $0.019$ & $0.815$ & $-0.017$ $\ci{-0.068}{+0.036}$ & $0.618$ \\
@@ -483,7 +483,7 @@ Fresh external ($316$ cases) & ESG & $0.387$ & $0.393$ & $-0.006$ $\ci{-0.074}{+
  & Lesion images correct & $0.577$ & $0.476$ & $+0.101$ $\ci{+0.043}{+0.162}$ & $0.003$ & $0.536$ & $+0.042$ $\ci{-0.006}{+0.092}$ & $0.106$ \\
  & Net utility & $0.088$ & $-0.053$ & $+0.141$ $\ci{+0.044}{+0.241}$ & $0.006$ & $0.048$ & $+0.040$ $\ci{-0.048}{+0.128}$ & $0.355$ \\
 \midrule
-New SIIM patients ($200$ cases) & ESG & $0.400$ & $0.000$ & $+0.400$ $\ci{+0.299}{+0.500}$ & $\le 0.001$ & $0.360$ & $+0.040$ $\ci{-0.060}{+0.140}$ & $0.482$ \\
+New SIIM-ACR patients ($200$ cases) & ESG & $0.400$ & $0.000$ & $+0.400$ $\ci{+0.299}{+0.500}$ & $\le 0.001$ & $0.360$ & $+0.040$ $\ci{-0.060}{+0.140}$ & $0.482$ \\
  & Erased-lesion claims & $20.0\%$ & $0.0\%$ & $+0.200$ $\ci{+0.125}{+0.280}$ & $\le 0.001$ & $19.0\%$ & $+0.010$ $\ci{-0.063}{+0.083}$ & $0.933$ \\
  & Lesion-free claims & $7.0\%$ & $0.0\%$ & $+0.070$ $\ci{+0.021}{+0.125}$ & $\le 0.001$ & $5.0\%$ & $+0.020$ $\ci{+0.000}{+0.052}$ & $0.284$ \\
  & Lesion images correct & $0.585$ & $0.000$ & $+0.585$ $\ci{+0.490}{+0.670}$ & $\le 0.001$ & $0.540$ & $+0.045$ $\ci{-0.043}{+0.131}$ & $0.342$ \\
@@ -498,9 +498,9 @@ New SIIM patients ($200$ cases) & ESG & $0.400$ & $0.000$ & $+0.400$ $\ci{+0.299
 \toprule
 Test set & Measure & \shortstack{\msp{} with\\CheXthought films} & \msp{} & Difference [95\% CI] & $p$ \\
 \midrule
-New SIIM patients ($100 + 100$ films) & Pneumothorax films called present & $69/100$ & $53/100$ & $+0.160$ $\ci{+0.070}{+0.260}$ & $0.002$ \\
- & Called present with a correct box & $49/100$ & $33/100$ & -- & -- \\
- & Lesion-free films called positive & $7/100$ & $5/100$ & $+0.020$ $\ci{-0.020}{+0.060}$ & -- \\
+New SIIM-ACR patients ($100 + 100$ films) & Pneumothorax films called present & $69$ of $100$ & $53$ of $100$ & $+0.160$ $\ci{+0.070}{+0.260}$ & $0.002$ \\
+ & Called present with a correct box & $49$ of $100$ & $33$ of $100$ & -- & -- \\
+ & Films without pneumothorax called positive & $7$ of $100$ & $5$ of $100$ & $+0.020$ $\ci{-0.020}{+0.060}$ & -- \\
  & Youden index & $0.620$ $\ci{0.510}{0.730}$ & $0.480$ & $+0.140$ $\ci{+0.040}{+0.250}$ & $0.010$ \\
  & ESG & $0.380$ $\ci{0.278}{0.476}$ & $0.360$ & -- & -- \\
  & Erased-lesion claims & $31.0\%$ & $19.0\%$ & -- & -- \\
@@ -525,46 +525,102 @@ Fresh external ($316$ cases) & ESG & $0.381$ $\ci{0.298}{0.461}$ & $0.417$ & n.r
 % src: top: L1578-1602 (= v5 P1096-1124), L1517-1518 (limits); bottom: L1919-1927, L1962-1995 (L1965-1966 limits as re-scored)
 
 \begin{table}[!htbp]
-\caption{\msn{} (single model) against \ms{} and \msp{} on the four counterfactual test sets: values, paired differences (\msn{} minus the other model) with 95\% bootstrap intervals over cases, and two-sided $p$ values. This table adds the $p$ values to Table~\ref{tab:nmodel}. The pre-specified readings were: on the main test, an ESG more than 0.05 below that of \ms{} would count as a loss (not reached); on the fresh external set, an interval above zero for erased-lesion claims against \msp{} means that the cost of the added training images remains (it remains). The other comparisons are descriptive.}
-\label{tab:s_next}
+\caption{\msn{} (first seed) and its three-seed vote against \ms{} and \msp{} on every test set of the main text except the unedited colonoscopy pairs: the full version of Table~\ref{tab:nmodel}. Top: values. Lesion images correct: share of original and control-edited lesion images answered correctly. Youden index: share of pneumothorax films called present plus share of films without pneumothorax answered ``absent'' or referred, minus one. The vote needs three model runs per image. Bottom: \msn{} minus the other model on the four counterfactual test sets, paired over cases, with 95\% CI and two-sided $p$ values; differences in claims are differences in proportions. The pre-specified readings were: on the main test, an ESG more than 0.05 below that of \ms{} would count as a loss (not reached); on the fresh external set, an interval above zero for erased-lesion claims against \msp{} would mean that the added training images carry a cost (interval above zero). The other comparisons are descriptive. Differences on the chest films are in Supplementary Table~\ref{tab:s_chest}; the three seeds are in Supplementary Table~\ref{tab:s_nseeds}.}
+\label{tab:s_nmodel}\label{tab:s_next}
 \centering
 \footnotesize
 \begin{adjustbox}{max width=\linewidth}
-\begin{tabular}{ll c c cc c cc}
+\begin{tabular}{l cccc}
 \toprule
-Test set & Measure & \msn{} & \ms{} & Difference [95\% CI] & $p$ & \msp{} & Difference [95\% CI] & $p$ \\
+Measure & \ms{} & \msp{} & \msn{} & Three-seed vote \\
 \midrule
-Main test ($507$ cases) & ESG & $0.744$ & $0.758$ & $-0.014$ $\ci{-0.068}{+0.040}$ & $0.680$ & $0.740$ & $+0.005$ $\ci{-0.039}{+0.047}$ & $0.928$ \\
- & Erased-lesion claims & $9.1\%$ & $9.6\%$ & $-0.005$ $\ci{-0.044}{+0.034}$ & $0.906$ & $11.0\%$ & $-0.018$ $\ci{-0.054}{+0.018}$ & $0.414$ \\
- & Lesion-free claims & $8.7\%$ & $7.6\%$ & $+0.010$ $\ci{-0.022}{+0.042}$ & $0.583$ & $9.0\%$ & $-0.003$ $\ci{-0.030}{+0.025}$ & $0.867$ \\
- & Lesion images correct & $0.847$ & $0.849$ & $-0.002$ $\ci{-0.040}{+0.034}$ & $0.963$ & $0.856$ & $-0.009$ $\ci{-0.036}{+0.019}$ & $0.584$ \\
- & Net utility & $0.709$ & $0.732$ & $-0.023$ $\ci{-0.089}{+0.040}$ & $0.487$ & $0.714$ & $-0.005$ $\ci{-0.057}{+0.044}$ & $0.851$ \\
+\multicolumn{5}{l}{\emph{Main test ($507$ cases)}} \\
+ESG & $0.758$ & $0.740$ & $0.744$ & $0.753$ \\
+Erased-lesion claims & $9.6\%$ & $11.0\%$ & $9.1\%$ & $10.5\%$ \\
+Lesion-free claims & $7.6\%$ & $9.0\%$ & $8.7\%$ & $9.0\%$ \\
+Lesion images correct & $0.849$ & $0.856$ & $0.847$ & $0.863$ \\
+Net utility & $0.732$ & $0.714$ & $0.709$ & $0.726$ \\
 \midrule
-External centres ($169$ cases) & ESG & $0.672$ & $0.597$ & $+0.076$ $\ci{+0.009}{+0.143}$ & $0.033$ & $0.739$ & $-0.067$ $\ci{-0.126}{-0.009}$ & $0.025$ \\
- & Erased-lesion claims & $10.9\%$ & $11.8\%$ & $-0.008$ $\ci{-0.061}{+0.046}$ & $0.902$ & $6.7\%$ & $+0.042$ $\ci{+0.000}{+0.088}$ & $0.067$ \\
- & Lesion-free claims & $2.0\%$ & $4.0\%$ & $-0.020$ $\ci{-0.093}{+0.045}$ & $0.758$ & $6.0\%$ & $-0.040$ $\ci{-0.103}{+0.000}$ & $0.281$ \\
- & Lesion images correct & $0.777$ & $0.727$ & $+0.050$ $\ci{+0.000}{+0.103}$ & $0.062$ & $0.815$ & $-0.038$ $\ci{-0.089}{+0.017}$ & $0.196$ \\
- & Net utility & $0.625$ & $0.530$ & $+0.096$ $\ci{+0.011}{+0.182}$ & $0.020$ & $0.696$ & $-0.070$ $\ci{-0.149}{+0.014}$ & $0.104$ \\
+\multicolumn{5}{l}{\emph{External datasets ($169$ cases)}} \\
+ESG & $0.597$ & $0.739$ & $0.672$ & $0.689$ \\
+Erased-lesion claims & $11.8\%$ & $6.7\%$ & $10.9\%$ & $11.8\%$ \\
+Lesion-free claims & $4.0\%$ & $6.0\%$ & $2.0\%$ & $2.0\%$ \\
+Lesion images correct & $0.727$ & $0.815$ & $0.777$ & $0.803$ \\
+Net utility & $0.530$ & $0.696$ & $0.625$ & $0.659$ \\
 \midrule
-Fresh internal ($76$ cases) & ESG & $0.417$ & $0.472$ & $-0.056$ $\ci{-0.270}{+0.162}$ & $0.706$ & $0.528$ & $-0.111$ $\ci{-0.276}{+0.056}$ & $0.251$ \\
- & Erased-lesion claims & $25.0\%$ & $19.4\%$ & $+0.056$ $\ci{-0.125}{+0.222}$ & $0.651$ & $25.0\%$ & $+0.000$ $\ci{-0.139}{+0.135}$ & $1.000$ \\
- & Lesion-free claims & $15.0\%$ & $12.5\%$ & $+0.025$ $\ci{-0.125}{+0.179}$ & $0.862$ & $17.5\%$ & $-0.025$ $\ci{-0.156}{+0.105}$ & $0.876$ \\
- & Lesion images correct & $0.681$ & $0.681$ & $+0.000$ $\ci{-0.163}{+0.171}$ & $1.000$ & $0.778$ & $-0.097$ $\ci{-0.221}{+0.027}$ & $0.122$ \\
- & Net utility & $0.372$ & $0.402$ & $-0.030$ $\ci{-0.277}{+0.218}$ & $0.840$ & $0.500$ & $-0.128$ $\ci{-0.314}{+0.042}$ & $0.165$ \\
+\multicolumn{5}{l}{\emph{Fresh internal ($76$ cases)}} \\
+ESG & $0.472$ & $0.528$ & $0.417$ & $0.472$ \\
+Erased-lesion claims & $19.4\%$ & $25.0\%$ & $25.0\%$ & $25.0\%$ \\
+Lesion-free claims & $12.5\%$ & $17.5\%$ & $15.0\%$ & $12.5\%$ \\
+Lesion images correct & $0.681$ & $0.778$ & $0.681$ & $0.722$ \\
+Net utility & $0.402$ & $0.500$ & $0.372$ & $0.438$ \\
 \midrule
-Fresh external ($316$ cases) & ESG & $0.381$ & $0.393$ & $-0.012$ $\ci{-0.095}{+0.061}$ & $0.752$ & $0.417$ & $-0.036$ $\ci{-0.113}{+0.038}$ & $0.335$ \\
- & Erased-lesion claims & $22.0\%$ & $8.3\%$ & $+0.137$ $\ci{+0.077}{+0.202}$ & $<0.001$ & $11.3\%$ & $+0.107$ $\ci{+0.054}{+0.162}$ & $<0.001$ \\
- & Lesion-free claims & $5.4\%$ & $4.7\%$ & $+0.007$ $\ci{-0.033}{+0.045}$ & $0.850$ & $6.8\%$ & $-0.014$ $\ci{-0.058}{+0.032}$ & $0.665$ \\
- & Lesion images correct & $0.607$ & $0.476$ & $+0.131$ $\ci{+0.069}{+0.197}$ & $<0.001$ & $0.536$ & $+0.071$ $\ci{+0.017}{+0.124}$ & $0.011$ \\
- & Net utility & $0.114$ & $-0.053$ & $+0.168$ $\ci{+0.056}{+0.279}$ & $0.002$ & $0.048$ & $+0.067$ $\ci{-0.039}{+0.162}$ & $0.212$ \\
+\multicolumn{5}{l}{\emph{Fresh external ($316$ cases)}} \\
+ESG & $0.393$ & $0.417$ & $0.381$ & $0.399$ \\
+Erased-lesion claims & $8.3\%$ & $11.3\%$ & $22.0\%$ & $22.6\%$ \\
+Lesion-free claims & $4.7\%$ & $6.8\%$ & $5.4\%$ & $6.1\%$ \\
+Lesion images correct & $0.476$ & $0.536$ & $0.607$ & $0.619$ \\
+Net utility & $-0.053$ & $0.048$ & $0.114$ & $0.147$ \\
+\midrule
+\multicolumn{5}{l}{\emph{New SIIM-ACR patients ($200$ cases; $100 + 100$ films)}} \\
+ESG & $0.000$ & $0.360$ & $0.270$ & $0.270$ \\
+Erased-lesion claims & $0.0\%$ & $19.0\%$ & $25.0\%$ & $42.0\%$ \\
+Lesion-free claims & $0.0\%$ & $5.0\%$ & $4.0\%$ & $6.0\%$ \\
+Lesion images correct & $0.000$ & $0.540$ & $0.530$ & $0.685$ \\
+Net utility & $-1.100$ & $-0.096$ & $-0.134$ & $0.080$ \\
+Pneumothorax films called present ($n$ of $100$) & $0$ & $53$ & $54$ & $68$ \\
+Films without pneumothorax absent or referred & $100.0\%$ & $95.0\%$ & $96.0\%$ & $94.0\%$ \\
+Youden index & $0.000$ & $0.480$ & $0.500$ & $0.620$ \\
+\midrule
+\multicolumn{5}{l}{\emph{CheXthought test patients ($300 + 300$ films)}} \\
+Pneumothorax films called present & $0.0\%$ & $35.7\%$ & $75.0\%$ & $78.7\%$ \\
+Films without pneumothorax absent or referred & $100.0\%$ & $93.0\%$ & $91.0\%$ & $91.3\%$ \\
+Youden index & $0.000$ & $0.287$ & $0.660$ & $0.700$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+
+\vspace{0.6em}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{l cc cc}
+\toprule
+Measure & \msn{} minus \ms{} [95\% CI] & $p$ & \msn{} minus \msp{} [95\% CI] & $p$ \\
+\midrule
+\multicolumn{5}{l}{\emph{Main test ($507$ cases)}} \\
+ESG & $-0.014$ $\ci{-0.068}{+0.040}$ & $0.680$ & $+0.005$ $\ci{-0.039}{+0.047}$ & $0.928$ \\
+Erased-lesion claims & $-0.005$ $\ci{-0.044}{+0.034}$ & $0.906$ & $-0.018$ $\ci{-0.054}{+0.018}$ & $0.414$ \\
+Lesion-free claims & $+0.010$ $\ci{-0.022}{+0.042}$ & $0.583$ & $-0.003$ $\ci{-0.030}{+0.025}$ & $0.867$ \\
+Lesion images correct & $-0.002$ $\ci{-0.040}{+0.034}$ & $0.963$ & $-0.009$ $\ci{-0.036}{+0.019}$ & $0.584$ \\
+Net utility & $-0.023$ $\ci{-0.089}{+0.040}$ & $0.487$ & $-0.005$ $\ci{-0.057}{+0.044}$ & $0.851$ \\
+\midrule
+\multicolumn{5}{l}{\emph{External datasets ($169$ cases)}} \\
+ESG & $+0.076$ $\ci{+0.009}{+0.143}$ & $0.033$ & $-0.067$ $\ci{-0.126}{-0.009}$ & $0.025$ \\
+Erased-lesion claims & $-0.008$ $\ci{-0.061}{+0.046}$ & $0.902$ & $+0.042$ $\ci{+0.000}{+0.088}$ & $0.067$ \\
+Lesion-free claims & $-0.020$ $\ci{-0.093}{+0.045}$ & $0.758$ & $-0.040$ $\ci{-0.103}{+0.000}$ & $0.281$ \\
+Lesion images correct & $+0.050$ $\ci{+0.000}{+0.103}$ & $0.062$ & $-0.038$ $\ci{-0.089}{+0.017}$ & $0.196$ \\
+Net utility & $+0.096$ $\ci{+0.011}{+0.182}$ & $0.020$ & $-0.070$ $\ci{-0.149}{+0.014}$ & $0.104$ \\
+\midrule
+\multicolumn{5}{l}{\emph{Fresh internal ($76$ cases)}} \\
+ESG & $-0.056$ $\ci{-0.270}{+0.162}$ & $0.706$ & $-0.111$ $\ci{-0.276}{+0.056}$ & $0.251$ \\
+Erased-lesion claims & $+0.056$ $\ci{-0.125}{+0.222}$ & $0.651$ & $+0.000$ $\ci{-0.139}{+0.135}$ & $1.000$ \\
+Lesion-free claims & $+0.025$ $\ci{-0.125}{+0.179}$ & $0.862$ & $-0.025$ $\ci{-0.156}{+0.105}$ & $0.876$ \\
+Lesion images correct & $+0.000$ $\ci{-0.163}{+0.171}$ & $1.000$ & $-0.097$ $\ci{-0.221}{+0.027}$ & $0.122$ \\
+Net utility & $-0.030$ $\ci{-0.277}{+0.218}$ & $0.840$ & $-0.128$ $\ci{-0.314}{+0.042}$ & $0.165$ \\
+\midrule
+\multicolumn{5}{l}{\emph{Fresh external ($316$ cases)}} \\
+ESG & $-0.012$ $\ci{-0.095}{+0.061}$ & $0.752$ & $-0.036$ $\ci{-0.113}{+0.038}$ & $0.335$ \\
+Erased-lesion claims & $+0.137$ $\ci{+0.077}{+0.202}$ & $<0.001$ & $+0.107$ $\ci{+0.054}{+0.162}$ & $<0.001$ \\
+Lesion-free claims & $+0.007$ $\ci{-0.033}{+0.045}$ & $0.850$ & $-0.014$ $\ci{-0.058}{+0.032}$ & $0.665$ \\
+Lesion images correct & $+0.131$ $\ci{+0.069}{+0.197}$ & $<0.001$ & $+0.071$ $\ci{+0.017}{+0.124}$ & $0.011$ \\
+Net utility & $+0.168$ $\ci{+0.056}{+0.279}$ & $0.002$ & $+0.067$ $\ci{-0.039}{+0.162}$ & $0.212$ \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
 \end{table}
-% src: report60 L221-234, L261-274, L286-299, L306-319; rules: docs/REVIEW_EXPERIMENTS.md L606-610
+% src: top, main test, external datasets, fresh internal, fresh external: report60 L221-234, L261-274, L286-299, L306-319 (values; claims are the report's proportions times 100) and L365-403 (vote); new SIIM-ACR patients: report60 L190-197 (films, Youden), L407-413 (MedScope-4B-N and vote, five measures), L1596-1602 (MedScope-4B-P and MedScope-4B, five measures) and facts C5; CheXthought: report60 L206-212. Bottom: report60 L221-234, L261-274, L286-299, L306-319 (identical to the former Supplementary Table of p values); rules: docs/REVIEW_EXPERIMENTS.md L606-610
 
 \begin{table}[!htbp]
-\caption{\msn{} (single model) against the two single-addition models on the four counterfactual test sets; layout as in Supplementary Table~\ref{tab:s_next}. \msp{} with CheXthought films was not run on the external centres or the fresh internal set (--). On the fresh external set, the erased-lesion claims of \msn{} did not differ from those of either single-addition model with an interval excluding zero: the increase over \msp{} was present in each of them.}
+\caption{\msn{} (first seed) against the two single-addition models on the four counterfactual test sets: values, paired differences (\msn{} minus the other model) with 95\% CI, and two-sided $p$ values. \msp{} with CheXthought films was not run on the external datasets or the fresh internal set (--). On the fresh external set no difference in erased-lesion claims between \msn{} and either single-addition model was shown; each single-addition model reported more erased lesions there than \msp{} (Supplementary Table~\ref{tab:s_additions}).}
 \label{tab:s_next_add}
 \centering
 \footnotesize
@@ -579,7 +635,7 @@ Main test ($507$ cases) & ESG & $0.744$ & $0.744$ & $+0.000$ $\ci{-0.038}{+0.038
  & Lesion images correct & $0.847$ & $0.854$ & $-0.007$ $\ci{-0.032}{+0.017}$ & $0.645$ & $0.840$ & $+0.007$ $\ci{-0.020}{+0.035}$ & $0.683$ \\
  & Net utility & $0.709$ & $0.707$ & $+0.002$ $\ci{-0.040}{+0.046}$ & $0.927$ & $0.725$ & $-0.016$ $\ci{-0.066}{+0.033}$ & $0.525$ \\
 \midrule
-External centres ($169$ cases) & ESG & $0.672$ & $0.681$ & $-0.008$ $\ci{-0.073}{+0.052}$ & $0.828$ & -- & -- & -- \\
+External datasets ($169$ cases) & ESG & $0.672$ & $0.681$ & $-0.008$ $\ci{-0.073}{+0.052}$ & $0.828$ & -- & -- & -- \\
  & Erased-lesion claims & $10.9\%$ & $11.8\%$ & $-0.008$ $\ci{-0.036}{+0.018}$ & $0.798$ & -- & -- & -- \\
  & Lesion-free claims & $2.0\%$ & $2.0\%$ & $+0.000$ $\ci{-0.057}{+0.057}$ & $1.000$ & -- & -- & -- \\
  & Lesion images correct & $0.777$ & $0.798$ & $-0.021$ $\ci{-0.069}{+0.027}$ & $0.426$ & -- & -- & -- \\
@@ -603,7 +659,7 @@ Fresh external ($316$ cases) & ESG & $0.381$ & $0.387$ & $-0.006$ $\ci{-0.084}{+
 % src: report60 L235-244, L275-284, L300-304, L320-324
 
 \begin{table}[!htbp]
-\caption{Results by image source. Top: main test (507 cases) by imaging type for \msn{} and \ms{}. Bottom: fresh external set (316 cases) by source for the five trained models. Values are point estimates as stored, to two decimals; erased-lesion and lesion-free claims are proportions. ETIS-Larib has no lesion-free images (n/a). On the SIIM films of this set, \ms{} called no pneumothorax present.}
+\caption{Results by image source. Top: main test (507 cases) by imaging type for \msn{} and \ms{}. Bottom: fresh external set (316 cases) by source for the five trained models. Point estimates to two decimals; erased-lesion and lesion-free claims are proportions. ETIS-Larib has no lesion-free images (--).}
 \label{tab:s_source}
 \centering
 \footnotesize
@@ -625,7 +681,7 @@ SLAKE CT and MRI ($107$) & \msn{} & & $0.47$ & $0.41$ & $0.06$ & $0.11$ & $0.20$
  & \ms{} & & $0.53$ & $0.47$ & $0.12$ & $0.12$ & $0.22$ \\
 \midrule
 \multicolumn{8}{l}{Fresh external set} \\
-Brain MRI, BraTS meningioma ($82$) & \msn{} & & $0.44$ & $0.31$ & $0.12$ & $0.06$ & $-0.19$ \\
+Brain MRI, BraTS 2023 meningioma ($82$) & \msn{} & & $0.44$ & $0.31$ & $0.12$ & $0.06$ & $-0.19$ \\
  & \msp{} & & $0.48$ & $0.31$ & $0.12$ & $0.18$ & $-0.17$ \\
  & \msp{} with colonoscopy pairs & & $0.42$ & $0.22$ & $0.16$ & $0.06$ & $-0.20$ \\
  & \msp{} with CheXthought films & & $0.48$ & $0.31$ & $0.16$ & $0.06$ & $-0.09$ \\
@@ -635,16 +691,16 @@ Breast ultrasound, BUS-UCLM ($99$) & \msn{} & & $0.72$ & $0.59$ & $0.14$ & $0.10
  & \msp{} with colonoscopy pairs & & $0.73$ & $0.67$ & $0.08$ & $0.06$ & $0.64$ \\
  & \msp{} with CheXthought films & & $0.64$ & $0.59$ & $0.06$ & $0.06$ & $0.52$ \\
  & \ms{} & & $0.73$ & $0.71$ & $0.02$ & $0.06$ & $0.67$ \\
-Chest X-ray, SIIM pneumothorax ($96$) & \msn{} & & $0.42$ & $0.06$ & $0.33$ & $0.00$ & $-0.42$ \\
+Chest X-ray, SIIM-ACR pneumothorax ($96$) & \msn{} & & $0.42$ & $0.06$ & $0.33$ & $0.00$ & $-0.42$ \\
  & \msp{} & & $0.22$ & $0.12$ & $0.10$ & $0.00$ & $-0.70$ \\
  & \msp{} with colonoscopy pairs & & $0.36$ & $0.04$ & $0.35$ & $0.00$ & $-0.56$ \\
  & \msp{} with CheXthought films & & $0.51$ & $0.04$ & $0.46$ & $0.04$ & $-0.33$ \\
  & \ms{} & & $0.00$ & $0.00$ & $0.00$ & $0.00$ & $-1.10$ \\
-Colonoscopy, ETIS-Larib ($39$) & \msn{} & & $0.83$ & $0.56$ & $0.26$ & n/a & $0.58$ \\
- & \msp{} & & $0.74$ & $0.59$ & $0.15$ & n/a & $0.53$ \\
- & \msp{} with colonoscopy pairs & & $0.77$ & $0.59$ & $0.18$ & n/a & $0.55$ \\
- & \msp{} with CheXthought films & & $0.68$ & $0.59$ & $0.10$ & n/a & $0.46$ \\
- & \ms{} & & $0.69$ & $0.46$ & $0.21$ & n/a & $0.38$ \\
+Colonoscopy, ETIS-Larib ($39$) & \msn{} & & $0.83$ & $0.56$ & $0.26$ & -- & $0.58$ \\
+ & \msp{} & & $0.74$ & $0.59$ & $0.15$ & -- & $0.53$ \\
+ & \msp{} with colonoscopy pairs & & $0.77$ & $0.59$ & $0.18$ & -- & $0.55$ \\
+ & \msp{} with CheXthought films & & $0.68$ & $0.59$ & $0.10$ & -- & $0.46$ \\
+ & \ms{} & & $0.69$ & $0.46$ & $0.21$ & -- & $0.38$ \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
@@ -652,7 +708,7 @@ Colonoscopy, ETIS-Larib ($39$) & \msn{} & & $0.83$ & $0.56$ & $0.26$ & n/a & $0.
 % src: report60 L326-359
 
 \begin{table}[!htbp]
-\caption{Accuracy on three standard visual question answering test sets, by question type (closed: yes or no; open: free text). Point estimates; no interval was computed. The training splits of the three benchmarks were used in the last training stage of every model in the table.}
+\caption{Accuracy on three standard visual question answering test sets, by question type (closed: yes or no; open: free text). Point estimates; no interval was computed. The training splits of the three benchmarks were used in the last training stage of each of the four trained models; \base{} is the base model without fine-tuning. For \gem{} only the accuracy over all questions was recorded. The share of requests for a better image by type of image degradation, planned for the four counterfactual test sets, is not reported.}
 \label{tab:s_vqa}
 \centering
 \footnotesize
@@ -667,27 +723,29 @@ Model & Closed & Open & All & Closed & Open & All & Closed & Open & All \\
 \msp{} with colonoscopy pairs & $0.840$ & $0.139$ & $0.503$ & $0.881$ & $0.670$ & $0.747$ & $0.725$ & $0.255$ & $0.517$ \\
 \msp{} & $0.833$ & $0.111$ & $0.487$ & $0.872$ & $0.681$ & $0.750$ & $0.773$ & $0.245$ & $0.539$ \\
 \ms{} & $0.801$ & $0.125$ & $0.477$ & $0.881$ & $0.644$ & $0.730$ & $0.741$ & $0.230$ & $0.514$ \\
+\base{} & $0.545$ & $0.021$ & $0.293$ & $0.826$ & $0.424$ & $0.570$ & $0.657$ & $0.260$ & $0.481$ \\
+\gem{} & -- & -- & $0.417$ & -- & -- & $0.780$ & -- & -- & $0.674$ \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
 \end{table}
-% src: report60 L621-636; v5 P931 (training splits used in the last stage)
+% src: report60 L621-636; v5 P931 (training splits used in the last stage); L1688-1689 (Qwen3.5-4B closed / open / all); L773 and v5 P798 (gemini-4-argon, all questions: PathVQA 0.417, SLAKE 0.780, VQA-RAD 0.674); PREREGISTRATION_v4 amendment 2 (planned clarify rate by degradation type; not in the log)
 
 \clearpage
-\subsection{Counterfactual views, natural pairs and alternative designs}
+\subsection{Counterfactual views, unedited pairs and alternative designs}
 \label{subsec:s_designs}
 
-Supplementary Table~\ref{tab:s_twobytwo} gives the two-by-two comparison of training images. Supplementary Table~\ref{tab:s_designs} lists the twelve alternative designs and the 270 decision rules, Supplementary Tables~\ref{tab:s_designs_obj} to~\ref{tab:s_designs_tools} give their complete results, Supplementary Table~\ref{tab:s_designs_later} three designs tested later, Supplementary Table~\ref{tab:s_inspect} the two tests of rewarding inspection, and Supplementary Fig.~\ref{fig:s_designs} the changes against each comparator.
-% src: pointers only; the counts twelve and 270 are from v5 P767, P772
+Supplementary Table~\ref{tab:s_twobytwo} gives the two-by-two comparison of training images. The seventeen alternative designs of Section~\ref{subsec:res_designs} are the twelve of a first series and five tested later. Supplementary Table~\ref{tab:s_designs} lists the twelve and the 270 decision rules, Supplementary Tables~\ref{tab:s_designs_obj}, \ref{tab:s_designs_cons} and~\ref{tab:s_designs_tools} give their complete results, Supplementary Table~\ref{tab:s_designs_later} three designs tested later, Supplementary Table~\ref{tab:s_inspect} the other two, which rewarded inspection, and Supplementary Fig.~\ref{fig:s_designs} the changes against each comparator.
+% src: pointers only; the counts twelve and 270 are from v5 P767, P772; seventeen = 12 rows of tab:s_designs + 3 of tab:s_designs_later + 2 of tab:s_inspect
 
-\paragraph{The designs in words} Preference optimisation is direct preference optimisation \citep{rafailov2023dpo} on pairs of a preferred and a rejected answer built from lesion removal. The consistency loss asks for the same decision score on an original view and its control edit and for a margin between the control edit and the erasure. Reinforcement learning is group relative policy optimisation \citep{shao2024deepseekmath} on the cost-matrix reward. The multi-agent reader combines the trained model, a copy that does not receive the question, a lesion segmenter, a verifier that erases the reported region, makes an equal edit elsewhere and asks again, and a deciding agent that reads their reports; in the first design the deciding agent was trained on reports for training images, in the second on reports for validation images. The 128 stored-output rules combine the outputs of these agents by thresholds, regularised logistic regression, boosted trees and referral bands. The 142 rules with test-time evidence add three altered copies of the image (mirror, centre crop, contrast), a close-up of the reported region with an equal-area control close-up, a repeated question with a cautious prompt, the probability of the first answer token, a second model (\texttt{Qwen2.5-VL-7B}) and the segmenter score. Among the stored-output rules, the largest gain in net utility on the second half of the validation set came with erased-lesion claims of $3.9\%$ against $11.2\%$ and lesion images correct of $0.727$ against $0.773$.
+\paragraph{The designs in words} Preference optimisation is direct preference optimisation \citep{rafailov2023dpo} on pairs of a preferred and a rejected answer built from lesion removal. The consistency loss asks for the same decision score on an original view and its control edit and for a margin between the control edit and the erasure. Reinforcement learning is group relative policy optimisation \citep{shao2024deepseekmath} on the cost-matrix reward. The multi-agent system combines the trained model, a copy that does not receive the question, a lesion segmenter, a verifier that erases the reported region, makes an equal edit elsewhere and asks again, and a deciding agent that reads their reports; in the first design the deciding agent was trained on reports for training images, in the second on reports for validation images. Of the 270 decision rules, 128 combine the outputs of these agents by thresholds, regularised logistic regression, boosted trees and referral bands. The 142 rules with test-time evidence add three altered copies of the image (mirror, centre crop, contrast), a close-up of the reported region with an equal-area control close-up, a repeated question with a cautious prompt, the probability of the first answer token, a second model (Qwen2.5-VL-7B) and the segmenter score. Among the 128 rules that combine agent outputs, the largest gain in net utility on the second half of the validation set came with erased-lesion claims of $3.9\%$ against $11.2\%$ and lesion images correct of $0.727$ against $0.773$.
 % src: v5 P553-567 (designs), P1043-1044 (rules); L1127-1205
 
-\paragraph{An observation outside the plan (post hoc)} The comparator of the consistency loss, continued training on the same views with no new objective, itself reported fewer erased lesions on unseen tools than the first-stage model in two of three seeds ($-0.080$ and $-0.085$, $p < 0.001$; $-0.012$, not significant) and had a higher unseen-tool ESG in one ($+0.076$, $p = 0.001$; $+0.022$ and $+0.027$, not significant), with fewer unedited lesion images correct at one seed ($-0.049$, $p < 0.001$). This comparison was not planned in advance.
+\paragraph{Continued training as a comparator (post hoc)} The comparator of the consistency loss, continued training on the same views with no new objective, itself reported fewer erased lesions with tools not used in training than the first-stage model in two of three seeds ($-0.080$ and $-0.085$, $p < 0.001$; $-0.012$, interval includes zero) and had a higher ESG with these tools in one ($+0.076$, $p = 0.001$; $+0.022$ and $+0.027$, intervals include zero), with fewer unedited lesion images correct at one seed ($-0.049$, $p < 0.001$). This comparison was not planned in advance.
 % src: v5 P773 (sentence carried over); L980-981
 
 \begin{table}[!htbp]
-\caption{Counterfactual views and natural pairs in training: the two-by-two comparison (pre-specified). Four models received the first training stage only (one seed; no pneumothorax films, no replay of general question answering): with or without counterfactual views, then with or without a continuation on natural REAL-Colon pairs. The two models with natural pairs were trained three times, each without one third of the videos, and each of the 103 pairs was answered by the copy that had not used its video. Top: the 103 REAL-Colon pairs; columns as in Supplementary Table~\ref{tab:s_realcolon}; brackets are 95\% intervals from $2{,}000$ bootstrap resamples of whole videos. The pre-specified primary comparison is both kinds minus natural pairs only: $-0.058$ $\ci{-0.168}{+0.042}$, $p = 0.311$ (not shown; no claim of equivalence). Descriptive: natural pairs only minus neither $+0.350$ $\ci{+0.227}{+0.474}$ and both kinds minus counterfactual views only $+0.282$ $\ci{+0.156}{+0.405}$ (both $p < 0.001$); both kinds minus \gem{} $+0.039$ ($p = 0.635$), minus \opus{} $+0.058$ ($p = 0.409$) and minus \gpt{} $+0.184$ $\ci{+0.047}{+0.321}$ ($p = 0.014$). Bottom: main test (507 cases) for the copies trained without the first third of the videos, paired over cases. n.r.: not recorded.}
+\caption{Counterfactual views and unedited pairs in training: the two-by-two comparison (pre-specified). Four models received the first training stage only (one seed; no pneumothorax films, no replay of general question answering): with or without counterfactual views, then with or without a continuation on unedited REAL-Colon pairs. The two models with unedited pairs were trained three times, each without one third of the videos, and each of the 103 pairs was answered by the copy that had not used its video. Top: the 103 REAL-Colon pairs; columns as in Supplementary Table~\ref{tab:s_realcolon}; brackets are 95\% intervals from $2{,}000$ bootstrap resamples of whole videos. The pre-specified primary comparison is both kinds minus unedited pairs only: $-0.058$ $\ci{-0.168}{+0.042}$, $p = 0.311$ (not shown; no claim of equivalence). Descriptive: unedited pairs only minus neither $+0.350$ $\ci{+0.227}{+0.474}$ and both kinds minus counterfactual views only $+0.282$ $\ci{+0.156}{+0.405}$ (both $p < 0.001$); both kinds minus \gem{} $+0.039$ ($p = 0.635$), minus \opus{} $+0.058$ ($p = 0.409$) and minus \gpt{} $+0.184$ $\ci{+0.047}{+0.321}$ ($p = 0.014$). Bottom: main test (507 cases) for the copies trained without the first third of the videos, paired over cases.}
 \label{tab:s_twobytwo}
 \centering
 \footnotesize
@@ -698,8 +756,8 @@ Supplementary Table~\ref{tab:s_twobytwo} gives the two-by-two comparison of trai
 \cmidrule(lr){7-9}
 Training images & \shortstack{Polyp frames\\found} & \shortstack{Polyp-free frames\\absent or referred} & \shortstack{Natural ESG\\{}[95\% CI]} & \shortstack{Correct box,\\$n$ of $103$} & \shortstack{Polyp reported on\\polyp-free frames, $n$ of $103$} & 0 & 1 & 2 \\
 \midrule
-Counterfactual views and natural pairs & $62.1\%$ & $88.3\%$ & $0.505$ $\ci{0.369}{0.629}$ & $48$ & $12$ & $0.63$ & $0.40$ & $0.47$ \\
-Natural pairs only & $68.9\%$ & $87.4\%$ & $0.563$ $\ci{0.444}{0.676}$ & $57$ & $13$ & $0.58$ & $0.51$ & $0.60$ \\
+Counterfactual views and unedited pairs & $62.1\%$ & $88.3\%$ & $0.505$ $\ci{0.369}{0.629}$ & $48$ & $12$ & $0.63$ & $0.40$ & $0.47$ \\
+Unedited pairs only & $68.9\%$ & $87.4\%$ & $0.563$ $\ci{0.444}{0.676}$ & $57$ & $13$ & $0.58$ & $0.51$ & $0.60$ \\
 Counterfactual views only & $35.9\%$ & $86.4\%$ & $0.223$ $\ci{0.133}{0.309}$ & $33$ & $3$ & -- & -- & -- \\
 Neither & $52.4\%$ & $68.9\%$ & $0.214$ $\ci{0.079}{0.343}$ & $43$ & $27$ & -- & -- & -- \\
 \midrule
@@ -716,11 +774,11 @@ Neither & $52.4\%$ & $68.9\%$ & $0.214$ $\ci{0.079}{0.343}$ & $43$ & $27$ & -- &
 \toprule
 Main test, training images & ESG & Erased-lesion claims & Lesion-free claims & Net utility \\
 \midrule
-Counterfactual views and natural pairs & $0.744$ & $13.7\%$ & $16.3\%$ & $0.684$ \\
-Natural pairs only & $0.260$ & $68.0\%$ & n.r. & $0.343$ \\
+Counterfactual views and unedited pairs & $0.744$ & $13.7\%$ & $16.3\%$ & $0.684$ \\
+Unedited pairs only & $0.260$ & $68.0\%$ & n.r. & $0.343$ \\
 Counterfactual views only & $0.735$ & $11.9\%$ & $9.4\%$ & $0.692$ \\
 \midrule
-Both kinds minus natural pairs only & $+0.484$ $\ci{+0.408}{+0.558}$ & n.r. & n.r. & n.r. \\
+Both kinds minus unedited pairs only & $+0.484$ $\ci{+0.408}{+0.558}$ & n.r. & n.r. & n.r. \\
 Both kinds minus counterfactual views only & $+0.009$ ($p = 0.777$) & n.r. & $+0.069$ $\ci{+0.030}{+0.111}$ ($p = 0.001$) & n.r. \\
 \bottomrule
 \end{tabular}
@@ -729,7 +787,7 @@ Both kinds minus counterfactual views only & $+0.009$ ($p = 0.777$) & n.r. & $+0
 % src: L1997-2026; L1485 (claude-opus-5-5: polyp reported on 20 of 103 polyp-free frames); docs/REVIEW_EXPERIMENTS.md L373-400 (design, primary comparison and reading)
 
 \begin{table}[!htbp]
-\caption{Twelve alternative designs and 270 decision rules, each tested against a criterion fixed in advance (the criteria and dates are in Supplementary Table~\ref{tab:s_plan}). Each row gives what the design changes, its comparator, the stored result and whether the criterion was met. Unseen tools: erasures and control edits remade with TELEA and Stable Diffusion, which were not used in training, pooled (219 cases). Comparator ``first-stage model'': counterfactual training, first stage, one seed. Comparator ``continued training'': the first-stage model trained further on the same views for the same number of steps, without the change. Decision rules were screened on two halves of the validation set; a rule passed if, against the model alone, net utility rose by at least 0.03, ESG rose by at least 0.02, lesion images correct fell by no more than 0.03 and lesion-free claims rose by no more than 0.03 on the first half, and the same held on the second half. $^{\ast}$Unseen-tool comparisons against continued training; lesion images correct against the first-stage model.}
+\caption{Twelve alternative designs and 270 decision rules, each tested against a criterion fixed in advance (the criteria and dates are in Supplementary Table~\ref{tab:s_plan}). Each row gives what the design changes, its comparator, the result and whether the criterion was met. Tools not used in training: erasures and control edits remade with TELEA and Stable Diffusion, pooled (219 cases with TELEA, 191 with Stable Diffusion). Comparator ``first-stage model'': counterfactual training, first stage, one seed. Comparator ``continued training'': the first-stage model trained further on the same views for the same number of steps, without the change. Decision rules were screened on two halves of the validation set; a rule passed if, against the model alone, net utility rose by at least 0.03, ESG rose by at least 0.02, lesion images correct fell by no more than 0.03 and lesion-free claims rose by no more than 0.03 on the first half, and the same held on the second half. $^{\ast}$Comparisons with tools not used in training against continued training; lesion images correct against the first-stage model.}
 \label{tab:s_designs}
 \centering
 \footnotesize
@@ -739,26 +797,26 @@ Both kinds minus counterfactual views only & $+0.009$ ($p = 0.777$) & n.r. & $+0
 What the design changes & Comparator & Result & Criterion \\
 \midrule
 \multicolumn{4}{l}{\emph{Control edit and training objective}} \\
-Control edit matched to the erasure in shape and editing tool & Unmatched control edit & Main-test ESG $0.744$ vs.\ $0.753$; unseen-tool ESG $0.749$ vs.\ $0.761$ (within the variation between seeds; the unmatched design shows a response bias on SIIM films) & Inconclusive \\
-Counterfactual training itself & No counterfactual views, then preference optimisation (three seeds) & Fresh external ESG $0.381 \pm 0.018$ vs.\ $0.355 \pm 0.015$ (preference optimisation has lower lesion images correct, $0.485$ vs.\ $0.587$, and fewer erased-lesion claims) & No difference shown \\
-Preference optimisation added after counterfactual training & First-stage model & Unseen-tool ESG $0.649 \to 0.595$; erased-lesion claims $16.3\% \to 24.4\%$ ($+0.080$ $[0.046, 0.118]$) & Not met \\
-Consistency loss between an original view and its control edit & Continued training (three seeds) & Pooled unseen-tool ESG $+0.020$ ($p = 0.143$); all endpoints move towards ``present'' (fresh external erased-lesion claims $+0.073$, $p < 0.001$) & Not met \\
+Control edit matched to the erasure in shape and editing tool & Unmatched control edit & Main-test ESG $0.744$ against $0.753$; ESG with tools not used in training $0.749$ against $0.761$ (within the variation between seeds; the unmatched design shows a response bias on SIIM-ACR films) & Inconclusive \\
+Counterfactual training itself & No counterfactual views, then preference optimisation (three seeds) & Fresh external ESG $0.381 \pm 0.018$ against $0.355 \pm 0.015$ (preference optimisation has lower lesion images correct, $0.485$ against $0.587$, and fewer erased-lesion claims) & No difference shown \\
+Preference optimisation added after counterfactual training & First-stage model & ESG with tools not used in training $0.649 \to 0.595$; erased-lesion claims $16.3\% \to 24.4\%$ ($+0.080$ $\ci{0.046}{0.118}$) & Not met \\
+Consistency loss between an original view and its control edit & Continued training (three seeds) & Pooled ESG with tools not used in training $+0.020$ ($p = 0.143$); all endpoints move towards ``present'' (fresh external erased-lesion claims $+0.073$, $p < 0.001$) & Not met \\
 \midrule
-\multicolumn{4}{l}{\emph{Adapter, reinforcement learning and system design}} \\
-Adapter rank 64 instead of 16 & First-stage model & Main-test ESG $0.731$ vs.\ $0.735$; calls $25/48$ SIIM pneumothorax films present, and also $21/48$ erased and $12/48$ lesion-free films (SIIM ESG $0.042$) & Not met \\
+\multicolumn{4}{l}{\emph{Adapter, reinforcement learning and agent design}} \\
+Adapter rank 64 instead of 16 & First-stage model & Main-test ESG $0.731$ against $0.735$; calls 25 of 48 SIIM-ACR pneumothorax films present, and also 21 of 48 erased films and 12 of 48 films without pneumothorax (SIIM-ACR ESG $0.042$) & Not met \\
 Adapter on the vision encoder, learning rate $2 \times 10^{-4}$ & First-stage model & ESG $0.000$ on every set; the answer depends on the question only & Not met \\
 Adapter on the vision encoder, learning rate $2 \times 10^{-5}$ & First-stage model & Main-test ESG $0.776$, but fresh external lesion images correct $0.560 \to 0.488$ ($-0.071$, $p = 0.03$); erased-lesion claims $6.8\%$ & Not met \\
-Reinforcement learning on the cost-matrix reward (150 steps) & Continued training & Unseen-tool net utility $+0.056$, erased-lesion claims $+0.022$ (the condition on erased-lesion claims was missed); fresh external net utility $+0.124$, ESG $+0.083$, lesion-free claims $+0.054$ & Not met \\
-Multi-agent reader, first design & Continued training$^{\ast}$ & Unseen-tool net utility $+0.090$ $[+0.004, +0.180]$; lesion images correct $0.769 \to 0.513$ at the external centres and $0.560 \to 0.378$ on the fresh external set & Not met \\
-Multi-agent reader, second design (deciding agent trained on validation views) & Continued training$^{\ast}$ & Main-test net utility $0.809$ (its verifier uses the editing tool of the main test), but unseen-tool ESG $-0.002$ and erased-lesion claims $+0.061$ $[+0.027, +0.096]$ & Not met \\
+Reinforcement learning on the cost-matrix reward (150 steps) & Continued training & Net utility with tools not used in training $+0.056$, erased-lesion claims $+0.022$ (the condition on erased-lesion claims was missed); fresh external net utility $+0.124$, ESG $+0.083$, lesion-free claims $+0.054$ & Not met \\
+Multi-agent reader, first design & Continued training$^{\ast}$ & Net utility with tools not used in training $+0.090$ $\ci{+0.004}{+0.180}$; lesion images correct $0.769 \to 0.513$ on the external datasets and $0.560 \to 0.378$ on the fresh external set & Not met \\
+Multi-agent reader, second design (deciding agent trained on validation views) & Continued training$^{\ast}$ & Main-test net utility $0.809$ (its verifier uses the editing tool of the main test), but ESG with tools not used in training $-0.002$ and erased-lesion claims $+0.061$ $\ci{+0.027}{+0.096}$ & Not met \\
 \midrule
 \multicolumn{4}{l}{\emph{Mix of editing tools in first-stage training}} \\
-Four editing tools & Continued training & Validation TELEA ESG $0.665$ vs.\ $0.648$ ($+0.017$ $[-0.034, 0.067]$); LaMa ESG $-0.022$; TELEA control edit denied $-0.021$ & Not met \\
-Four editing tools with the consistency loss & Continued training & Validation TELEA ESG $0.659$ vs.\ $0.648$ ($+0.011$); lesion-free claims $+0.075$ $[0.013, 0.150]$; edit-site control denied $+0.061$ & Not met \\
+Four editing tools & Continued training & Validation TELEA ESG $0.665$ against $0.648$ ($+0.017$ $\ci{-0.034}{0.067}$); LaMa ESG $-0.022$; TELEA control edit denied $-0.021$ & Not met \\
+Four editing tools with the consistency loss & Continued training & Validation TELEA ESG $0.659$ against $0.648$ ($+0.011$); lesion-free claims $+0.075$ $\ci{0.013}{0.150}$; edit-site control denied $+0.061$ & Not met \\
 \midrule
 \multicolumn{4}{l}{\emph{Decision rules on the outputs of the first-stage model}} \\
-128 rules that recombine stored outputs & Two halves of the validation set & $19/128$ pass on the first half, $0/19$ on the second (net utility $0.539 \to 0.706$ through referral; change in ESG at most $+0.026$) & None passed \\
-142 rules that add test-time evidence & Two halves of the validation set & $0/142$ pass on the first half (TELEA net utility $0.444 \to 0.686$ through abstention; ESG mostly $0.55$ to $0.61$, at most $0.642$, vs.\ $0.600$ for the model alone) & None passed \\
+128 rules that recombine the agents' outputs & Two halves of the validation set & 19 of 128 pass on the first half, 0 of 19 on the second (net utility $0.539 \to 0.706$ through referral; change in ESG at most $+0.026$) & None passed \\
+142 rules that add test-time evidence & Two halves of the validation set & 0 of 142 pass on the first half (TELEA net utility $0.444 \to 0.686$ through abstention; ESG mostly $0.55$ to $0.61$, at most $0.642$, against $0.600$ for the model alone) & None passed \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
@@ -766,7 +824,7 @@ Four editing tools with the consistency loss & Continued training & Validation T
 % src: v5 P1263-1293 (table body carried over; labels replaced by descriptions); v5 P1041-1044 (pass rule for decision rules); L883-897, L905-928, L969-981, L1052-1205
 
 \begin{table}[!htbp]
-\caption{Control edit and training objective: complete results for the first four rows of Supplementary Table~\ref{tab:s_designs} (first training stage, seed 0). Control edit denied: share of intact lesions answered ``absent'' or referred after the control edit. Unseen tools: TELEA and Stable Diffusion pooled, 219 cases. Point estimates as stored.}
+\caption{Control edit and training objective: complete results for the first four rows of Supplementary Table~\ref{tab:s_designs} (first training stage, first seed). Control edit denied: share of intact lesions answered ``absent'' or referred after the control edit. Tools not used in training: TELEA and Stable Diffusion pooled (219 cases with TELEA, 191 with Stable Diffusion). Point estimates.}
 \label{tab:s_designs_obj}
 \centering
 \footnotesize
@@ -781,7 +839,7 @@ Main test ($507$) & Erasures with matched control edits & $0.897$ & $0.744$ & $1
  & No counterfactual views, then preference optimisation & $0.900$ & $0.658$ & $23.7$ & $10.0$ & $0.602$ \\
  & Counterfactual training, then preference optimisation & $0.872$ & $0.753$ & $11.4$ & $13.2$ & $0.700$ \\
 \midrule
-Unseen tools ($219$) & Erasures with matched control edits & $0.859$ & $0.749$ & $11.0$ & $13.7$ & $0.733$ \\
+Tools not used in training ($219$) & Erasures with matched control edits & $0.859$ & $0.749$ & $11.0$ & $13.7$ & $0.733$ \\
  & Erasures with unmatched control edits & $0.868$ & $0.761$ & $10.5$ & $12.9$ & $0.772$ \\
  & Counterfactual training, first stage & $0.810$ & $0.649$ & $16.3$ & $18.8$ & $0.566$ \\
  & No counterfactual views, then preference optimisation & $0.895$ & $0.666$ & $23.4$ & $10.0$ & $0.644$ \\
@@ -799,7 +857,7 @@ Fresh external ($316$) & Erasures with matched control edits & $0.488$ & $0.405$
 % src: v5 P1442-1473 (table body carried over unchanged); L883-914
 
 \begin{table}[!htbp]
-\caption{Consistency loss between an original view and its control edit, against continued training without the loss: three pairs of seeds on unseen tools (TELEA and Stable Diffusion pooled, 219 cases), with the pre-specified check on the main test and one endpoint on the fresh external set. The pre-specified primary endpoint was erased-lesion claims on unseen tools (not met). The pre-specified check on the fresh external set concerned ESG and net utility, which did not fall ($+0.058$ and $+0.146$); the last row shows erased-lesion claims there, which rose. Differences are paired by case with 95\% bootstrap intervals.}
+\caption{Consistency loss between an original view and its control edit, against continued training without the loss: three pairs of seeds with tools not used in training (TELEA and Stable Diffusion pooled; 219 cases with TELEA, 191 with Stable Diffusion), with the pre-specified check on the main test and one endpoint on the fresh external set. The pre-specified primary endpoint was erased-lesion claims with tools not used in training (not met). The pre-specified check on the fresh external set concerned ESG and net utility, which did not fall ($+0.058$ and $+0.146$); the last row shows erased-lesion claims there, which rose. Differences are paired by case with 95\% bootstrap intervals.}
 \label{tab:s_designs_cons}
 \centering
 \footnotesize
@@ -808,18 +866,18 @@ Fresh external ($316$) & Erasures with matched control edits & $0.488$ & $0.405$
 \toprule
 Seed and test set & Endpoint & Consistency loss & Continued training & Difference [95\% CI] & $p$ \\
 \midrule
-Seed 0, unseen tools & Erased-lesion claims & $0.122$ & $0.151$ & $-0.029$ $[-0.062, +0.002]$ & $0.085$ \\
-Seed 1, unseen tools & Erased-lesion claims & $0.137$ & $0.078$ & $+0.059$ $[+0.031, +0.089]$ & $<0.001$ \\
-Seed 2, unseen tools & Erased-lesion claims & $0.120$ & $0.115$ & $+0.005$ $[-0.029, +0.040]$ & $0.818$ \\
+First seed, tools not used in training & Erased-lesion claims & $0.122$ & $0.151$ & $-0.029$ $\ci{-0.062}{+0.002}$ & $0.085$ \\
+Second seed, tools not used in training & Erased-lesion claims & $0.137$ & $0.078$ & $+0.059$ $\ci{+0.031}{+0.089}$ & $<0.001$ \\
+Third seed, tools not used in training & Erased-lesion claims & $0.120$ & $0.115$ & $+0.005$ $\ci{-0.029}{+0.040}$ & $0.818$ \\
 \midrule
-Pooled, unseen tools & Erased-lesion claims & $0.126$ & $0.115$ & $+0.011$ $[-0.009, +0.030]$ & $0.265$ \\
-Pooled, unseen tools & ESG & $0.729$ & $0.709$ & $+0.020$ $[-0.006, +0.047]$ & $0.143$ \\
-Pooled, unseen tools & Control edit denied & $0.143$ & $0.176$ & $-0.033$ $[-0.054, -0.012]$ & $0.001$ \\
-Pooled, unseen tools & Lesion images correct & $0.854$ & $0.824$ & $+0.030$ $[+0.010, +0.051]$ & $0.004$ \\
-Pooled, unseen tools & Net utility & $0.712$ & $0.661$ & $+0.051$ $[+0.002, +0.100]$ & $0.042$ \\
+Pooled, tools not used in training & Erased-lesion claims & $0.126$ & $0.115$ & $+0.011$ $\ci{-0.009}{+0.030}$ & $0.265$ \\
+Pooled, tools not used in training & ESG & $0.729$ & $0.709$ & $+0.020$ $\ci{-0.006}{+0.047}$ & $0.143$ \\
+Pooled, tools not used in training & Control edit denied & $0.143$ & $0.176$ & $-0.033$ $\ci{-0.054}{-0.012}$ & $0.001$ \\
+Pooled, tools not used in training & Lesion images correct & $0.854$ & $0.824$ & $+0.030$ $\ci{+0.010}{+0.051}$ & $0.004$ \\
+Pooled, tools not used in training & Net utility & $0.712$ & $0.661$ & $+0.051$ $\ci{+0.002}{+0.100}$ & $0.042$ \\
 \midrule
-Main test (pre-specified check) & Lesion-free claims & $0.131$ & $0.079$ & $+0.052$ $[+0.032, +0.075]$ & $<0.001$ \\
-Fresh external & Erased-lesion claims & $0.141$ & $0.067$ & $+0.073$ $[+0.045, +0.106]$ & $<0.001$ \\
+Main test (pre-specified check) & Lesion-free claims & $0.131$ & $0.079$ & $+0.052$ $\ci{+0.032}{+0.075}$ & $<0.001$ \\
+Fresh external & Erased-lesion claims & $0.141$ & $0.067$ & $+0.073$ $\ci{+0.045}{+0.106}$ & $<0.001$ \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
@@ -827,7 +885,7 @@ Fresh external & Erased-lesion claims & $0.141$ & $0.067$ & $+0.073$ $[+0.045, +
 % src: v5 P1475-1501 (table body carried over unchanged); L969-981
 
 \begin{table}[!htbp]
-\caption{Four editing tools in first-stage training, on validation images (179 lesion cases and 80 lesion-free images; one seed). Each training case's erasure and control edit were made with one tool drawn from LaMa, blur fill, mean fill with noise and shuffled pixels; TELEA was not used in training. The designs continue the first-stage model on the $2{,}739$ training cases of the comparator (continued training on the same views without the change). Entries are values with, in parentheses, the difference from the comparator paired by case and its 95\% bootstrap interval where stored. The criterion required a rise in TELEA ESG of at least 0.03 and a fall in TELEA control edit denied of at least 0.03, with LaMa ESG not lower by more than 0.02, unedited lesions found not lower by more than 0.03 and lesion-free claims not higher by more than 0.03. The comparator's value in the last row differs between the two designs ($0.191$ and $0.153$) because each comparison is restricted to cases that both models of the pair found on the unedited image.}
+\caption{Four editing tools in first-stage training, on validation images (179 lesion cases and 80 lesion-free images; one seed). Each training case's erasure and control edit were made with one tool drawn from LaMa, blur fill, mean fill with noise and shuffled pixels; TELEA was not used in training. The designs continue the first-stage model on the $2{,}739$ training cases of the comparator (continued training on the same views without the change). Entries are values with, in parentheses, the difference from the comparator paired by case and its 95\% bootstrap interval where recorded. The criterion required a rise in TELEA ESG of at least 0.03 and a fall in TELEA control edit denied of at least 0.03, with LaMa ESG not lower by more than 0.02, unedited lesions found not lower by more than 0.03 and lesion-free claims not higher by more than 0.03. The comparator's value in the last row differs between the two designs ($0.191$ and $0.153$) because each comparison is restricted to cases that both models of the pair found on the unedited image.}
 \label{tab:s_designs_tools}
 \centering
 \footnotesize
@@ -836,14 +894,14 @@ Fresh external & Erased-lesion claims & $0.141$ & $0.067$ & $+0.073$ $[+0.045, +
 \toprule
 Validation quantity & Four editing tools & Four editing tools with the consistency loss & Continued training \\
 \midrule
-Unedited lesions found & $0.821$ ($+0.028$ $[0.000, 0.056]$) & $0.765$ ($-0.028$ $[-0.073, 0.017]$) & $0.793$ \\
-Lesion-free claims & $0.025$ ($+0.013$) & $0.087$ ($+0.075$ $[0.013, 0.150]$) & $0.013$ \\
-ESG, LaMa (used in training) & $0.637$ ($-0.022$ $[-0.073, 0.028]$) & $0.654$ ($-0.006$) & $0.659$ \\
-ESG, TELEA (unseen) & $0.665$ ($+0.017$ $[-0.034, 0.067]$) & $0.659$ ($+0.011$ $[-0.056, 0.084]$) & $0.648$ \\
-Erasure answered ``absent'' or referred, LaMa & $0.821$ ($-0.050$ $[-0.095, -0.006]$) & $0.899$ ($+0.028$) & $0.872$ \\
-Erasure answered ``absent'' or referred, TELEA & $0.899$ ($-0.011$) & $0.950$ ($+0.039$ $[0.000, 0.078]$) & $0.911$ \\
-Control edit denied (lesion found unedited), TELEA & $0.078$ ($-0.021$ $[-0.057, 0.007]$) & $0.107$ ($+0.008$) & $0.099$ \\
-Edit-site control denied (lesion found unedited), TELEA & $0.163$ ($-0.028$ $[-0.064, 0.000]$) & $0.214$ ($+0.061$ $[0.023, 0.107]$) & $0.191$ / $0.153$ \\
+Unedited lesions found & $0.821$ ($+0.028$ $\ci{0.000}{0.056}$) & $0.765$ ($-0.028$ $\ci{-0.073}{0.017}$) & $0.793$ \\
+Lesion-free claims & $0.025$ ($+0.013$) & $0.087$ ($+0.075$ $\ci{0.013}{0.150}$) & $0.013$ \\
+ESG, LaMa (used in training) & $0.637$ ($-0.022$ $\ci{-0.073}{0.028}$) & $0.654$ ($-0.006$) & $0.659$ \\
+ESG, TELEA (not used in training) & $0.665$ ($+0.017$ $\ci{-0.034}{0.067}$) & $0.659$ ($+0.011$ $\ci{-0.056}{0.084}$) & $0.648$ \\
+Erasure answered ``absent'' or referred, LaMa & $0.821$ ($-0.050$ $\ci{-0.095}{-0.006}$) & $0.899$ ($+0.028$) & $0.872$ \\
+Erasure answered ``absent'' or referred, TELEA & $0.899$ ($-0.011$) & $0.950$ ($+0.039$ $\ci{0.000}{0.078}$) & $0.911$ \\
+Control edit denied (lesion found unedited), TELEA & $0.078$ ($-0.021$ $\ci{-0.057}{0.007}$) & $0.107$ ($+0.008$) & $0.099$ \\
+Edit-site control denied (lesion found unedited), TELEA & $0.163$ ($-0.028$ $\ci{-0.064}{0.000}$) & $0.214$ ($+0.061$ $\ci{0.023}{0.107}$) & $0.191$ / $0.153$ \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
@@ -851,21 +909,21 @@ Edit-site control denied (lesion found unedited), TELEA & $0.163$ ($-0.028$ $[-0
 % src: v5 P1503-1525 (table body carried over unchanged); v5 P482 (tools), P984 (criterion); L1309-1323
 
 \begin{table}[!htbp]
-\caption{Three designs tested later, each against a criterion fixed in advance (not among the twelve of Supplementary Table~\ref{tab:s_designs}). Top: two training designs on validation images (179 lesion cases, 80 lesion-free images; one seed), as differences from the comparator paired by case with 95\% bootstrap intervals. The image swap adds a training term that asks the answer to change when the image is replaced by the most similar lesion-free training image of another patient \citep{zafar2026coral}; its criterion was a rise in TELEA ESG of 0.03. The vision adapter is a low-rank adapter on the vision encoder with a learning rate that decays from the top layer down; its criterion was a rise of 0.03 in unedited lesions found. Bottom: a decision rule that subtracts from the model's decision score the score it gives to a uniform grey image with the same question \citep{huang2026medcap}, with a fixed or an adaptive weight; weights and threshold were chosen on half of the validation cases with LaMa views, and results are on the other half (118 cases). Its criterion was a rise of 0.03, with the interval above zero, in the area under the curve for separating TELEA erasures from edit-site controls (a ring-shaped edit next to the intact lesion).}
+\caption{Three of the five designs tested later, each against a criterion fixed in advance (not among the twelve of Supplementary Table~\ref{tab:s_designs}; the other two are in Supplementary Table~\ref{tab:s_inspect}). Top: two training designs on validation images (179 lesion cases, 80 lesion-free images; one seed), as differences from the comparator paired by case with 95\% bootstrap intervals. The image swap adds a training term that asks the answer to change when the image is replaced by the most similar lesion-free training image of another patient \citep{zafar2026coral}; its criterion was a rise in TELEA ESG of 0.03. The vision adapter is a low-rank adapter on the vision encoder with a learning rate that decays from the top layer down; its criterion was a rise of 0.03 in unedited lesions found. Bottom: a decision rule that subtracts from the model's decision score the score it gives to a uniform grey image with the same question \citep{huang2026medcap}, with a fixed or an adaptive weight; weights and threshold were chosen on half of the validation cases with LaMa views, and results are on the other half (118 cases). Its criterion was a rise of 0.03, with the interval above zero, in the area under the curve for separating TELEA erasures from edit-site controls (a ring-shaped edit next to the intact lesion).}
 \label{tab:s_designs_later}
 \centering
 \footnotesize
 \begin{adjustbox}{max width=\linewidth}
 \begin{tabular}{lcc}
 \toprule
-Quantity & \shortstack{Image swap with a hard negative\\vs.\ continued training} & \shortstack{Vision adapter with layer-wise decay\\vs.\ first-stage model} \\
+Quantity & \shortstack{Image swap with a hard negative\\against continued training} & \shortstack{Vision adapter with layer-wise decay\\against first-stage model} \\
 \midrule
-Unedited lesions found & $+0.017$ $[-0.011, 0.045]$ & $+0.017$ $[-0.034, 0.067]$ \\
-Lesion-free claims & $+0.013$ $[0.000, 0.037]$ & $-0.075$ $[-0.150, 0.000]$ \\
-ESG, LaMa & $+0.011$ $[-0.022, 0.050]$ & $+0.061$ $[-0.011, 0.134]$ \\
-ESG, TELEA (unseen) & $-0.028$ $[-0.073, 0.017]$ & $+0.034$ $[-0.028, 0.101]$ \\
-Control edit denied (lesion found unedited), TELEA & $+0.029$ $[0.000, 0.064]$ & $0.000$ $[-0.053, 0.053]$ \\
-Edit-site control denied (lesion found unedited), TELEA & $-0.014$ $[-0.036, 0.000]$ & $+0.075$ $[0.030, 0.128]$ \\
+Unedited lesions found & $+0.017$ $\ci{-0.011}{0.045}$ & $+0.017$ $\ci{-0.034}{0.067}$ \\
+Lesion-free claims & $+0.013$ $\ci{0.000}{0.037}$ & $-0.075$ $\ci{-0.150}{0.000}$ \\
+ESG, LaMa & $+0.011$ $\ci{-0.022}{0.050}$ & $+0.061$ $\ci{-0.011}{0.134}$ \\
+ESG, TELEA (not used in training) & $-0.028$ $\ci{-0.073}{0.017}$ & $+0.034$ $\ci{-0.028}{0.101}$ \\
+Control edit denied (lesion found unedited), TELEA & $+0.029$ $\ci{0.000}{0.064}$ & $0.000$ $\ci{-0.053}{0.053}$ \\
+Edit-site control denied (lesion found unedited), TELEA & $-0.014$ $\ci{-0.036}{0.000}$ & $+0.075$ $\ci{0.030}{0.128}$ \\
 Criterion & Not met & Not met \\
 \bottomrule
 \end{tabular}
@@ -877,7 +935,7 @@ Criterion & Not met & Not met \\
 \toprule
 Subtraction of the score obtained without the image ($118$ cases) & Fixed weight & Adaptive weight \\
 \midrule
-Change in area under the curve, TELEA erasure vs.\ edit-site control (unchanged model: $0.731$) & $+0.003$ $[-0.018, 0.024]$ & $-0.003$ $[-0.022, 0.019]$ \\
+Change in area under the curve, TELEA erasure against edit-site control (unchanged model: $0.731$) & $+0.003$ $\ci{-0.018}{0.024}$ & $-0.003$ $\ci{-0.022}{0.019}$ \\
 Criterion & Not met & Not met \\
 \bottomrule
 \end{tabular}
@@ -886,7 +944,7 @@ Criterion & Not met & Not met \\
 % src: v5 P1049-1067 (top panel carried over unchanged), v5 P806, P815 (designs and criteria); L1337-1342 (top), L1348-1353 (bottom)
 
 \begin{table}[!htbp]
-\caption{Rewarding inspection before the answer: two tests with one seed each (criterion fixed in advance). 38 REAL-Colon pairs of the videos in the first fold, which no model in the table had used. Inspection-first training: the last training stage repeated with training examples in which the model zooms on the lesion site, or on a region of a lesion-free image, before it answers. Reward for inspection: 150 steps of reinforcement learning on the cost-matrix reward plus a reward for a zoom that covers the lesion or the erased site. Its control is the same reinforcement learning without the added reward. The comparison model is \msp{} with colonoscopy pairs trained without the first fold. The last two columns are on validation images. The criterion required, against the comparison model, a natural ESG higher by at least 0.05, at least three more polyps called present with a correct box, validation net utility not lower by more than 0.02 and validation lesion-free claims not higher by more than 0.02; the reward design also had to exceed its control on natural ESG. Neither design met it. Point estimates; no interval was computed for these 38 pairs.}
+\caption{Rewarding inspection before the answer: the other two designs tested later, with one seed each (criterion fixed in advance). 38 REAL-Colon pairs of the videos in the first fold, which no model in the table had used. Inspection-first training: the last training stage repeated with training examples in which the model zooms on the lesion site, or on a region of a lesion-free image, before it answers. Reward for inspection: 150 steps of reinforcement learning on the cost-matrix reward plus a reward for a zoom that covers the lesion or the erased site. Its control is the same reinforcement learning without the added reward. The comparison model is \msp{} with colonoscopy pairs trained without the first fold. The last two columns are on validation images. The criterion required, against the comparison model, a natural ESG higher by at least 0.05, at least three more polyps called present with a correct box, validation net utility not lower by more than 0.02 and validation lesion-free claims not higher by more than 0.02; the reward design also had to exceed its control on natural ESG. Neither design met it. Point estimates; no interval was computed for these 38 pairs.}
 \label{tab:s_inspect}
 \centering
 \footnotesize
@@ -908,7 +966,7 @@ Reinforcement learning, usual reward (control) & $0.579$ & $63.2\%$ & $94.7\%$ &
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/figS_designs.pdf}
-\caption{Alternative designs against their comparators (values in Supplementary Tables~\ref{tab:s_designs} to~\ref{tab:s_designs_later}). (a) Each trained or system design against its comparator: change in erased-lesion claims (horizontal axis) and in the share of intact lesions answered correctly (vertical axis), in percentage points. Held-out tools are the tools unseen in training, TELEA and Stable Diffusion pooled (219 cases); the two designs with a mix of editing tools are on validation TELEA views; the adapter designs are on the main test (507 cases). (b) Change in ESG for every design with a recorded ESG difference (filled symbols: 95\% bootstrap interval over cases recorded; open symbols: point estimate only). Every recorded interval includes zero, and the point estimates lie between $-0.054$ and $+0.041$; the design at $-0.054$, preference optimisation added after counterfactual training, has no recorded interval, and its decrease has $p = 0.027$. Policy-gradient fine-tuning (the reinforcement learning of Supplementary Table~\ref{tab:s_designs}) and the first multi-agent reader have no recorded ESG difference on these sets and appear in panel (a) only. A dagger marks designs compared with the same model trained longer on the same views. The last two rows of panel (b) are the image swap with a hard negative and the vision adapter with layer-wise decay of Supplementary Table~\ref{tab:s_designs_later}.}
+\caption{Alternative designs against their comparators (values in Supplementary Tables~\ref{tab:s_designs} to~\ref{tab:s_designs_later}). (a) Each trained design or agent design against its comparator: change in erased-lesion claims (horizontal axis) and in the share of intact lesions answered correctly (vertical axis), in percentage points; the plotted changes are differences between values in these tables. Tools not used in training are TELEA and Stable Diffusion, pooled (219 cases with TELEA, 191 with Stable Diffusion); the two designs with a mix of editing tools are on validation TELEA views; the adapter designs are on the main test (507 cases). (b) Change in ESG for every design with a recorded ESG difference (filled symbols: 95\% bootstrap interval over cases recorded; open symbols: point estimate only). The point estimates lie between $-0.054$ and $+0.041$, and every recorded interval includes zero. The design at $-0.054$, preference optimisation added after counterfactual training, has no recorded interval; its decrease had $p = 0.027$. Reinforcement learning and the first multi-agent system have no recorded ESG difference on these sets and appear in panel (a) only. A dagger marks designs compared with the same model trained longer on the same views. The last two rows of panel (b) are the image swap with a hard negative and the vision adapter with layer-wise decay of Supplementary Table~\ref{tab:s_designs_later}. In the figure, ``held-out tools'' are the tools not used in training and ``sensitivity on intact lesions'' is the share of intact lesions answered correctly.}
 \label{fig:s_designs}
 \end{figure}
-% src: v5 P752 (caption carried over; labels replaced by descriptions)
+% src: v5 P752 (caption carried over; labels replaced by descriptions); L1087-1088 (219 TELEA and 191 Stable Diffusion cases); figures/make_figures_v6.py (panel a plots differences of table values)
