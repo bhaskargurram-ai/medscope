@@ -2205,3 +2205,11 @@ lead over the flagships on the main test holds for every seed. On real colonosco
 hospitals, one of them unseen, and above two of three flagships at the unseen one; against gemini-4-argon the
 difference is not shown on either set. Two limits stay: erased-lesion claims on the fresh external set remain about
 twice v4.2's, and pneumothorax sensitivity on new SIIM patients depends on the seed (54% to 75%).
+
+## 2026-11-26 — R5 interim look: first board-certified radiologist (post hoc, descriptive)
+
+`docs/reader_study/R5_interim_R9.md`. One board-certified radiologist (8 years) finished all 212 images. Erasures called
+present 36/72 (50.0%, exact 95% CI 38.0-62.0; LaMa 17/36, Stable Diffusion 19/36); radiology sources 29/55; unedited
+lesion images 34/36; control edits 63/68; unedited lesion-free 8/36. Edit detection AUC 0.67 (edited vs unedited), 0.50
+(erasure vs control edit). The 10% criterion is not met by this reader; R5 closes with the second radiologist or on 10
+January 2027. Not planned in advance (Amendment 3a covers the endoscopist only).
