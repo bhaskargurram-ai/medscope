@@ -137,7 +137,7 @@ def panel(ax, data, place, letter, title):
     ax.set_xticks(range(30, 81, 10))
     ax.set_yticks(range(60, 101, 10))
     ax.spines["left"].set_bounds(60, 100)
-    ax.set_xlabel("Lesion frames found (%)")
+    ax.set_xlabel("Polyp frames found (%)")
     ax.text(0.0, 1.03, letter, transform=ax.transAxes, fontsize=8, fontweight="bold", va="bottom", ha="left")
     ax.text(0.065, 1.03, title, transform=ax.transAxes, fontsize=7, va="bottom", ha="left", color=INK)
 
@@ -146,8 +146,8 @@ def main():
     fig, (a, b) = plt.subplots(1, 2, figsize=(W, 3.05))
     fig.subplots_adjust(left=0.085, right=0.995, bottom=0.125, top=0.93, wspace=0.14)
     panel(a, REALCOLON, PLACE_A, "a", "REAL-Colon, 103 unedited same-video pairs")
-    panel(b, LDPOLYP, PLACE_B, "b", "LDPolypVideo, 116 pairs, a hospital no model had seen")
-    a.set_ylabel("Lesion-free frames answered\nabsent or referred (%)")
+    panel(b, LDPOLYP, PLACE_B, "b", "LDPolypVideo, 116 pairs, a hospital not used in training")
+    a.set_ylabel("Polyp-free frames answered\nabsent or referred (%)")
     a.text(27.5, 61.2, "Under each name:\nnatural ESG [95% CI]", fontsize=7, color=MUTED, ha="left", va="bottom",
            linespacing=1.15)
     fig.savefig(OUT / "fig4_natural_pairs.pdf")

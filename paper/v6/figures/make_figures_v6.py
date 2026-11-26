@@ -153,7 +153,7 @@ def fig2():
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Figure 3: editing tools (log Table 5), factorial (log Table 4), first-stage training variants (log Table 3)
-TOOLS = ["LaMa\n(training)", "Transplant\n(training)", "TELEA\n(held out)", "Diffusion\n(held out)"]
+TOOLS = ["LaMa\n(training)", "Tissue transplant\n(training)", "TELEA\n(not in training)", "Stable Diffusion\n(not in training)"]
 BYTOOL = [  # ESG on 125 cases
     ("MedScope-4B", [0.752, 0.720, 0.664, 0.640]),
     ("gemini-4-argon", [0.536, 0.488, 0.560, 0.392]),
@@ -239,13 +239,13 @@ def fig3():
 # percentage points; set = where the design was compared (held-out tools pooled unless noted).
 # Each design is named by what it changes; the old code name is given in the comment.
 SHIFT = [  # label, d_claims, d_sens, set
-    ("unmatched control edit", -0.5, +0.9, "held-out tools"),                          # old: C1 unmatched ctrl
-    ("preference optimisation\non erasures, alone", +7.1, +8.5, "held-out tools"),      # old: C2 no-CF + DPO
-    ("preference\noptimisation on\nerasures, added", +8.0, +2.7, "held-out tools"),     # old: C3 recipe + DPO
-    ("consistency loss", +1.1, +3.0, "held-out tools"),                                # old: C4 CMCC
-    ("policy-gradient fine-tuning", +2.2, +4.1, "held-out tools"),  # old: GRPO. claims: case-weighted over both tools (log); sensitivity: TELEA +2.7 (219) and diffusion +5.8 (191), case-weighted
-    ("multi-agent reader 1", -1.5, +2.2, "held-out tools"),                            # old: Multi-agent v10
-    ("multi-agent reader 2", +6.1, +5.6, "held-out tools"),                            # old: Multi-agent v11
+    ("unmatched control edit", -0.5, +0.9, "tools not used in training"),                          # old: C1 unmatched ctrl
+    ("preference optimisation\non erasures, alone", +7.1, +8.5, "tools not used in training"),      # old: C2 no-CF + DPO
+    ("preference\noptimisation on\nerasures, added", +8.0, +2.7, "tools not used in training"),     # old: C3 recipe + DPO
+    ("consistency loss", +1.1, +3.0, "tools not used in training"),                                # old: C4 CMCC
+    ("policy-gradient fine-tuning", +2.2, +4.1, "tools not used in training"),  # old: GRPO. claims: case-weighted over both tools (log); sensitivity: TELEA +2.7 (219) and diffusion +5.8 (191), case-weighted
+    ("multi-agent system,\nfirst design", -1.5, +2.2, "tools not used in training"),                            # old: Multi-agent v10
+    ("multi-agent system,\nsecond design", +6.1, +5.6, "tools not used in training"),                            # old: Multi-agent v11
     ("larger adapter (rank 64)", -1.4, -1.6, "main test"),                             # old: Rank-64 adapter
     ("vision-encoder adapter", -5.1, +0.7, "main test"),                               # old: Vision LoRA (2e-5)
     ("editing-tool mix", +1.1, +2.8, "validation, TELEA"),                             # old: Tool-family replay
@@ -253,29 +253,29 @@ SHIFT = [  # label, d_claims, d_sens, set
 ]
 DAGGER = "†"  # comparator = the same model trained longer on the same views (old: "vs replay control")
 FOREST = [  # label, dESG, lo, hi (None if no interval recorded), set
-    ("unmatched control edit", 0.012, None, None, "held-out tools"),                    # old: C1 unmatched vs matched control
-    ("preference optimisation on erasures, alone", 0.017, None, None, "held-out tools"),  # old: C2 no-CF + DPO vs recipe
-    ("preference optimisation on erasures, added", -0.054, None, None, "held-out tools"),  # old: C3 recipe + DPO vs recipe
-    ("consistency loss" + DAGGER, 0.020, -0.006, 0.047, "held-out tools"),              # old: C4 CMCC vs replay control
-    ("multi-agent reader 2" + DAGGER, -0.002, None, None, "held-out tools"),            # old: Multi-agent v11 vs replay control
+    ("unmatched control edit", 0.012, None, None, "tools not used in training"),                    # old: C1 unmatched vs matched control
+    ("preference optimisation on erasures, alone", 0.017, None, None, "tools not used in training"),  # old: C2 no-CF + DPO vs recipe
+    ("preference optimisation on erasures, added", -0.054, None, None, "tools not used in training"),  # old: C3 recipe + DPO vs recipe
+    ("consistency loss" + DAGGER, 0.020, -0.006, 0.047, "tools not used in training"),              # old: C4 CMCC vs replay control
+    ("multi-agent system, second design" + DAGGER, -0.002, None, None, "tools not used in training"),            # old: Multi-agent v11 vs replay control
     ("larger adapter (rank 64)", -0.004, None, None, "main test"),                      # old: Rank-64 vs recipe
     ("vision-encoder adapter", 0.041, None, None, "main test"),                         # old: Vision LoRA 2e-5 vs recipe
     ("editing-tool mix" + DAGGER, 0.017, -0.034, 0.067, "validation, TELEA"),           # old: Tool-family replay vs replay control
     ("editing-tool mix + consistency loss" + DAGGER, 0.011, -0.056, 0.084, "validation, TELEA"),  # old: Tool-family + CMCC vs replay control
-    ("whole-image swap term" + DAGGER, -0.028, -0.073, 0.017, "validation, TELEA"),     # old: Hard-negative swap vs replay control
+    ("image swap with a hard negative" + DAGGER, -0.028, -0.073, 0.017, "validation, TELEA"),     # old: Hard-negative swap vs replay control
     ("vision-encoder adapter, layer-wise decay", 0.034, -0.028, 0.101, "validation, TELEA"),  # old: Vision LoRA, layer decay vs recipe
 ]
-SET_M = {"held-out tools": ("o", OK["verm"]), "main test": ("s", OK["blue"]), "validation, TELEA": ("D", OK["green"])}
+SET_M = {"tools not used in training": ("o", OK["verm"]), "main test": ("s", OK["blue"]), "validation, TELEA": ("D", OK["green"])}
 # label offsets in points and alignment (layout only): dx, dy, horizontal, vertical
 OFFS = {"unmatched control edit": (5, -3, "left", "center"),
         "preference optimisation\non erasures, alone": (-5, 0, "right", "center"),
         "preference\noptimisation on\nerasures, added": (3, 5, "center", "bottom"),
-        "consistency loss": (-5, 5, "right", "center"),
+        "consistency loss": (-6, 2, "right", "center"),
         "policy-gradient fine-tuning": (-5, 3, "right", "center"),
-        "multi-agent reader 1": (-5, 2, "right", "center"),
-        "multi-agent reader 2": (5, 0, "left", "center"),
+        "multi-agent system,\nfirst design": (-6, 0, "right", "center"),
+        "multi-agent system,\nsecond design": (5, 0, "left", "center"),
         "larger adapter (rank 64)": (5, -1, "left", "center"),
-        "vision-encoder adapter": (-7, 6, "center", "bottom"),
+        "vision-encoder adapter": (0, -8, "center", "top"),
         "editing-tool mix": (5, -12, "left", "center"),
         "editing-tool mix +\nconsistency loss": (5, -3, "left", "center")}
 

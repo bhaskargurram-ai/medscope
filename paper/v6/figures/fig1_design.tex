@@ -95,8 +95,8 @@
 \draw[black!55, line width=0.5pt] (13.79,8.60) -- (13.52,8.48);
 \draw[black!55, line width=0.5pt] (16.19,8.60) -- (16.52,8.48);
 
-\node[col] at (13.52,8.25) {Lesion frame};
-\node[col] at (16.52,8.25) {Lesion-free frame};
+\node[col] at (13.52,8.25) {Polyp frame};
+\node[col] at (16.52,8.25) {Polyp-free frame};
 
 % enlarged frames (schematic endoscope views)
 \foreach \cx/\haspolyp in {13.52/1, 16.52/0} {
@@ -157,7 +157,7 @@
   {Evidence sensitivity gap, from (a):\\
    \hspace*{0.7em}ESG $=$ $D$(\textcolor{tred}{erased}) $-$ $D$(\textcolor{tblue}{control edit})\\[2pt]
    Natural ESG, from (b):\\
-   \hspace*{0.7em}$D$(\textcolor{tred}{lesion-free frame}) $-$ $D$(\textcolor{tblue}{lesion frame})\\[2pt]
+   \hspace*{0.7em}$D$(\textcolor{tred}{polyp-free frame}) $-$ $D$(\textcolor{tblue}{polyp frame})\\[2pt]
    $D$: share answered absent or referred.\\
    Both gaps are 0 if the image is ignored.\\[3pt]
    Also: erased-lesion claims, lesion-free\\claims, lesion images correct, net utility.};
