@@ -5,6 +5,14 @@
 \subsection{Study design and predictions}
 \label{subsec:design}
 
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig1_design.pdf}
+\caption{Study design. (a) Matched views of one case (brain MRI, TCGA-LGG): the original image, the erased image, the control edit (a region of the same shape filled with the same tool elsewhere; lesion untouched) and an unedited lesion-free image of the same imaging type. The expert lesion annotation and the edited regions are outlined. Every view is shown with the same yes/no question, and the answer expected from a model whose answer depends on the lesion is given below each view. (b) The second design: an unedited frame with an annotated polyp and an unedited polyp-free frame of the same colonoscopy video (frames drawn schematically). (c) Study flow, from the public datasets to the measures and the reader assessment. ESG: evidence sensitivity gap.}
+\label{fig:design}
+\end{figure*}
+% src: figures/fig1_design.tex (panels a-c as drawn by the figure agent); caption checked against fig1_design.pdf (review_copyedit 1.14)
+
 The study varies the image and holds the question fixed (Fig.~\ref{fig:design}). Each test case is an image with an expert lesion mask and a yes/no question whose answer depends on that lesion, for example ``Is there a polyp in this image?''. In the \emph{erased} image the lesion region is filled in by inpainting. In the \emph{control edit} the same tool fills a region of the same shape elsewhere in the image and leaves the lesion untouched. Unedited \emph{lesion-free} images of the same imaging type receive the same kind of question. We call the test images and their scoring MedScope-Bench.
 % src: brief sections 3 and 4; v5 P473-479
 
@@ -13,14 +21,6 @@ A model whose answer depends on the lesion should report the finding on the orig
 
 The design measures whether the answer changes when the lesion region is filled in, not whether the finding has gone: an erasure may leave part of the lesion or its secondary signs. Physicians therefore read a sample of the images without being told which were edited (Section~\ref{subsec:readers}), and a second design, with no edit, pairs an unedited image that shows a lesion with one of the same patient that does not (Section~\ref{subsec:pairs}). Table~\ref{tab:overview} lists the questions in the order of the Results.
 % src: brief section 4 (sentences 5-7); RE193-197
-
-\begin{figure*}[!t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig1_design.pdf}
-\caption{Study design. (a) Matched views of one case (brain MRI, TCGA-LGG): the original image, the erased image, the control edit (a region of the same shape filled with the same tool elsewhere; lesion untouched) and an unedited lesion-free image of the same imaging type. The expert lesion annotation and the edited regions are outlined. Every view is shown with the same yes/no question, and the answer expected from a model whose answer depends on the lesion is given below each view. (b) The second design: an unedited frame with an annotated polyp and an unedited polyp-free frame of the same colonoscopy video (frames drawn schematically). (c) Study flow, from the public datasets to the measures and the reader assessment. ESG: evidence sensitivity gap.}
-\label{fig:design}
-\end{figure*}
-% src: figures/fig1_design.tex (panels a-c as drawn by the figure agent); caption checked against fig1_design.pdf (review_copyedit 1.14)
 
 \begin{table*}[!t]
 \caption{Overview of the study, in the order of the Results. Each row gives a question, the design element that answers it, the test data and the section that reports it. Every analysis, with its status (pre-specified, descriptive or post hoc), its decision rule and its outcome, is listed in Supplementary Tables~\ref{tab:s_overview} and~\ref{tab:s_plan}. Comparison models: the nine models called through their providers' interfaces; reference models: \gem, \opus{} and \gpt{} (Section~\ref{subsec:models}). ESG: evidence sensitivity gap.}
@@ -114,8 +114,8 @@ For unedited pairs, the \emph{natural ESG} is the share of lesion-free images de
 \subsection{Reader study}
 \label{subsec:readers}
 
-The specialist round is the primary reader assessment (protocol in \ref{sec:s_readers}). \emph{Images:} 212 main-test images from different cases, 36 of each kind: unedited lesion and lesion-free images, and erasures and control edits made with LaMa and with Stable Diffusion (32 Stable Diffusion control edits). \emph{Readers:} board-certified radiologists with at least five years of practice after certification, and a board-certified gastroenterologist for colonoscopy images; none had read in the earlier round. \emph{Independence:} each reader worked alone, without labels, kinds of edit, model outputs or other readers' answers; readers who complete the reading are offered authorship, and the gastroenterologist is an author. \emph{Presentation:} one image at a time with its clinical question, in a shuffled order; readers were told only that the study concerns automatically edited images. \emph{Questions:} whether the image had been digitally edited, and the clinical question (yes, no or cannot tell). \emph{Criterion:} for each editing tool, the erasures are accepted when the share of erased images that the reader majority calls present has an exact 95\% upper limit of at most 10\%; the gastroenterologist's answers count for colonoscopy only. The round closes when two radiologists have read all images or on a fixed date.
-% src: facts E; RE77-93, RE140-187; R5_EXPERT_READERS.md (message to readers); supp_a reader protocol (authorship offer); 07_backmatter.tex CRediT (S.C.G. specialist reader)
+The specialist round is the primary reader assessment (protocol in \ref{sec:s_readers}). \emph{Images:} 212 main-test images from different cases, 36 of each kind: unedited lesion and lesion-free images, and erasures and control edits made with LaMa and with Stable Diffusion (32 Stable Diffusion control edits). \emph{Readers:} board-certified radiologists with at least five years of practice after certification, and a board-certified gastroenterologist for colonoscopy images; none had read in the earlier round. \emph{Independence:} each reader worked alone, without labels, kinds of edit, model outputs or other readers' answers; readers who complete the reading are offered authorship, and the gastroenterologist is an author. \emph{Presentation:} one image at a time with its clinical question, in a shuffled order; readers were told only that the study concerns automatically edited images. \emph{Questions:} whether the image had been digitally edited, and the clinical question (yes, no or cannot tell). \emph{Criterion:} for each editing tool, the erasures are accepted when the share of erased images that the reader majority calls present has an exact 95\% upper limit of at most 10\%, which with 36 erased images per tool is possible only if none is called present; with two radiologists, a majority means both. The gastroenterologist's answers count for colonoscopy only. The round closes when two radiologists have read all images or on a fixed date.
+% src: facts E; RE77-93 (with 36 images the criterion can be met only with no residual image, RE89-91), RE140-187; R5_EXPERT_READERS.md (message to readers); supp_a reader protocol (authorship offer); 07_backmatter.tex CRediT (S.C.G. specialist reader)
 
 An earlier round used two trainee physicians (internal medicine and radiology; one is an author), 128 main-test images (32 each of lesion images, LaMa erasures, LaMa control edits and lesion-free images) and the same questions and criterion; the model answers were then re-scored on the erasures that neither trainee called present.
 % src: facts E; READER_VERIFIED.md; v5 P1552; 07_backmatter.tex CRediT (J.C. trainee reader)
@@ -153,17 +153,59 @@ Table~\ref{tab:models} gives the three trained models named in the text; the suf
 \end{table}
 % src: facts A; L1368-1382 (MedScope-4B-P); L1512-1513 (1,727 and 1,881 frames); L1964 (1,500 + 1,500 CheXthought training films); L2046-2076 (MedScope-4B-N, Amendment 9 before training)
 
+% Float placement: Table tab:main (Section 4.1) is defined here so that it prints beside its first citation (Section 3.6).
+\begin{table*}[!t]
+\caption{Main test: 507 cases and 1{,}115 views, every model under the same protocol. Lesion images correct: share of the 438 original and control-edited images answered correctly. Erased-lesion claims: share of the 219 erased images on which the finding was reported. Lesion-free claims: share of the 288 unedited lesion-free images on which a finding was reported. ESG: evidence sensitivity gap. Net utility: mean reward per view under the cost matrix of Section~\ref{subsec:measures}. Brackets are 95\% bootstrap intervals over cases (2{,}000 resamples); they were computed for \ms{} only. Models are ordered by ESG within each group. A constant strategy gives the same answer to every view.}
+\label{tab:main}
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+Model & \parbox[b]{2.2cm}{\centering Lesion images correct (\%)} & \parbox[b]{2.6cm}{\centering Erased-lesion claims (\%)} & \parbox[b]{2.6cm}{\centering Lesion-free claims (\%)} & ESG & Net utility \\
+\midrule
+\multicolumn{6}{l}{\textit{Comparison models (nine)}} \\
+\gem & $87.4$ & $41.1$ & $9.0$ & $0.470$ & $0.565$ \\
+\texttt{claude-sonnet-5-5} & $87.0$ & $48.4$ & $16.7$ & $0.402$ & $0.381$ \\
+\texttt{gemini-3.1-pro-preview} & $84.9$ & $51.6$ & $26.7$ & $0.384$ & $0.306$ \\
+\texttt{gpt-6-sol} & $82.9$ & $51.6$ & $25.7$ & $0.342$ & $0.261$ \\
+\texttt{claude-fable-5-1} & $85.6$ & $52.1$ & $23.3$ & $0.342$ & $0.255$ \\
+\opus & $86.3$ & $53.9$ & $23.6$ & $0.329$ & $0.358$ \\
+\texttt{gpt-6.1-sol} & $88.8$ & $58.9$ & $30.9$ & $0.324$ & $0.276$ \\
+\gpt & $88.6$ & $58.9$ & $27.8$ & $0.306$ & $0.309$ \\
+\texttt{gemini-3.8-flash} & $86.8$ & $61.6$ & $27.8$ & $0.269$ & $0.263$ \\
+\midrule
+\multicolumn{6}{l}{\textit{Trained on counterfactual views (Section~\ref{subsec:res_trained})}} \\
+\ms & $84.9$ & $9.6$ & $7.6$ & $0.758$ & $0.732$ \\
+ & & $\ci{6.1}{13.7}$ & $\ci{4.8}{10.9}$ & $\ci{0.701}{0.815}$ & $\ci{0.649}{0.813}$ \\
+\midrule
+\multicolumn{6}{l}{\textit{Open-weight models (six), not fine-tuned}} \\
+Lingshu-7B & $52.7$ & $32.0$ & $12.5$ & $0.416$ & $-0.249$ \\
+\base{} (base of \ms) & $75.8$ & $42.0$ & $19.4$ & $0.338$ & $0.134$ \\
+Qwen3-VL-8B & $55.3$ & $12.8$ & $12.5$ & $0.297$ & $0.186$ \\
+MedGemma 1.5 4B & $67.4$ & $54.3$ & $24.0$ & $0.283$ & $-0.255$ \\
+HuatuoGPT-Vision-7B & $49.8$ & $30.1$ & $22.9$ & $0.265$ & $-0.426$ \\
+Qwen2.5-VL-7B & $14.4$ & $5.5$ & $24.7$ & $0.146$ & $-0.742$ \\
+\midrule
+\multicolumn{6}{l}{\textit{Constant strategies}} \\
+Always reports the finding & $100.0$ & $100.0$ & $100.0$ & $0.000$ & $-0.478$ \\
+Always answers ``absent'' & $0.0$ & $0.0$ & $0.0$ & $0.000$ & $-0.848$ \\
+Always refers & $0.0$ & $0.0$ & $0.0$ & $0.000$ & $0.110$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+% src: v5 P666-699 (table body carried over; columns reordered, names cleaned; lesion images correct printed as a percentage); L484-493 (comparison models), L751 (MedScope-4B), L1673 (ESG interval)
+
 \msp{} repeats the three stages with the same data, settings and seed, with films of 150 patients with and 150 without pneumothorax from SIIM-ACR, none of them in a test set, added to every stage. \msn{} was designed after the result of \ms{} on unedited pairs was known and after each of its two additions had been tested alone (Supplementary Table~\ref{tab:s_models}); its training mix was chosen on validation data, and its tests were fixed before it was trained (Supplementary Tables~\ref{tab:s_plan} and~\ref{tab:s_mix}). Because REAL-Colon serves in its training and testing, its REAL-Colon answers are \emph{cross-validated}: three copies were each trained without one third of the videos, and each pair is answered by the copy trained without its video.
 % src: facts A (L788-790, RE129-136, L2048-2050, L2072-2076, L2103-2106, RE539-553, RE601-603, RE614-615); L1368-1382; L1512-1513
 
-The training of \ms{} and of \msn{} was repeated with two further seeds; the first seed is the reported model. For \msn{} we also report a three-seed majority vote (three model runs per image); its pre-specified rule made the vote the reported operating point, but the single model stays primary because the confirmatory test at the new hospital was specified for the first seed. Seventeen alternative designs and 270 decision rules were each tested against a criterion fixed in advance (Supplementary Table~\ref{tab:s_plan}).
+The training of \ms{} and of \msn{} was repeated with two further seeds; the first seed is the reported model. For \msn{} the pre-specified rule made a three-seed majority vote (three model runs per image) the reported operating point; in a deviation from the plan we report the first seed instead, because the confirmatory test at the new hospital was specified for it, and give the vote beside it. Seventeen alternative designs and 270 decision rules were each tested against a criterion fixed in advance (Supplementary Table~\ref{tab:s_plan}).
 % src: RE250-252, RE557-569, RE591 (LDPolypVideo test on seed 0); L2128 (vote is the reported operating point by the rule); facts B1, B2 (designs); 05_results_b.tex subsec:res_designs (seventeen); L1184-1205 (270 rules)
 
 \subsection{Unedited image pairs}
 \label{subsec:pairs}
 
-REAL-Colon \citep{biffi2024realcolon} holds 60 colonoscopy videos from four centres, with a box on every frame that shows a resected polyp. For each of a video's three longest runs of boxed frames, a polyp frame from the middle of the run was paired with a polyp-free frame (no box marked) of the same video, 10 to 30~s from the run and at least 10~s from any boxed frame (\ref{sec:s_views}). Both frames received the question ``Is there a polyp in this image?'', which gave 103 pairs from 46 videos; 96 pairs also received a \emph{context-matched} polyp-free frame, 3 to 10~s from the nearest boxed frame. LDPolypVideo \citep{ma2021ldpolyp} holds 160 annotated clips from one hospital on which no model of this study had been trained, selected or tested; with the pairing rules expressed in frames, 116 clips gave a pair.
-% src: v5 P604, P608; RE199-205, RE349-352; L1646; RE573-586, L2067-2070 (LDPolypVideo)
+REAL-Colon \citep{biffi2024realcolon} holds 60 colonoscopy videos from four centres, with a box on every frame that shows a resected polyp. For each of a video's three longest runs of boxed frames, a polyp frame from the middle of the run was paired with a polyp-free frame (no box marked) of the same video, 10 to 30~s from the run and at least 10~s from any boxed frame (\ref{sec:s_views}). Both frames received the question ``Is there a polyp in this image?'', which gave 103 pairs from 46 videos; 96 pairs also received a \emph{context-matched} polyp-free frame, 3 to 10~s from the nearest boxed frame. LDPolypVideo \citep{ma2021ldpolyp} holds 160 annotated clips from one hospital on which no model of this study had been trained, selected or tested; because its clips state no frame rate, the polyp-free frame had to lie at least 5 frames from any polyp frame, a much shorter distance than at REAL-Colon, and 116 clips gave a pair.
+% src: v5 P604 (box on every frame in which a resected polyp is visible), P608; RE199-205, RE349-352; L1646; RE573-586, L2067-2070 (LDPolypVideo; at least 5 frames from a polyp frame, L2069)
 
 Chest films were not paired by patient: pneumothorax detection was tested on the 200 new SIIM-ACR patients \citep{siim2019pneumothorax} and on the 600 CheXthought test films \citep{sharma2026chexthought}, whose labels combine the CheXpert Plus label \citep{chambon2024chexpertplus} with our rule-based reading of radiologists' statements. Same-patient follow-up pairs from NIH ChestX-ray14 \citep{wang2017chestx} are a secondary analysis (\ref{sec:s_views}).
 % src: RE493-500, RE518-520, RE206-210; L1370; L1964; L1443-1450, L1824-1827

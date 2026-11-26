@@ -5,3 +5,4 @@ pdflatex -interaction=nonstopmode main >/dev/null || true
 bibtex main >/dev/null || true
 pdflatex -interaction=nonstopmode main >/dev/null || true
 pdflatex -interaction=nonstopmode main >/dev/null
+pdflatex -interaction=nonstopmode main >/dev/null
