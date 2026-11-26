@@ -7240,6 +7240,142 @@ After a pod restart: Run all again; nothing finished is repeated.
     return out
 
 
+def nb61_paper_checks() -> list[dict]:
+    """Notebook 61: R28-R32 (Amendment 10). Stored answers only: no GPU, no model run, no API call."""
+    return [md("""
+# MedScope 61: checks for manuscript v6 (R28-R32)
+
+Five checks the final reviews of manuscript v6 asked for (`docs/REVIEW_EXPERIMENTS.md`, Amendment 10, fixed before
+this ran). Nothing is trained, no model is run and no API is called: every check reads stored answers on Drive.
+
+1. **R28.** 95% intervals for the 27 primary comparisons (MedScope-4B against the nine comparison models).
+2. **R29.** Model answers on the erasures the specialist readers accepted (the re-scoring the reader study fixed for
+   its final report; rerun this notebook when more radiologists finish).
+3. **R30.** LDPolypVideo pairs restricted to frames at least 25 and 50 frames apart.
+4. **R31.** Share of unreadable answers per model on the main test.
+5. **R32.** Numbers the log lists as unsourced, re-read from the stored reports.
+
+**Runtime:** CPU only (Runtime > Change runtime type > CPU), about 10-15 minutes. **Needs:** `GITHUB_TOKEN`; a
+Google sign-in when section 2 asks (to read the reader Sheet). Run all. The reports are written to
+`MyDrive/medscope/results/r28_* ... r32_*`. Nothing at the end waits for a click.
+""" + SECRETS_NOTE),
+        code(SETUP),
+        code(r"""
+doc = open('/content/medscope/docs/REVIEW_EXPERIMENTS.md').read()
+assert 'Amendment 10' in doc, 'Amendment 10 missing: pull the repository'
+plan = git('log', '--format=%H %ci', '--', 'docs/REVIEW_EXPERIMENTS.md', cwd='/content/medscope').stdout.strip().splitlines()
+print('plan, latest commit:', plan[0])
+import glob, csv, sys
+sys.path.insert(0, '/content/medscope/scripts')
+from medscope.eval.compare import significance_table, load_outcomes
+from medscope.eval.metrics import malformed_rate
+FRONTIER = """ + repr(FRONTIER) + r"""
+FRONTIER_RUNS = [r for r, _, _ in FRONTIER]
+RS = f'{DRIVE}/reader'
+KEY4 = f'{RS}/key_v4.json'
+NP = f'{DRIVE}/natural_pairs'
+LD = f'{NP}/ldpolyp'
+LD_VIEWS = f'{LD}/views_natural_ldpolyp.jsonl'
+R = lambda run: f'{RESULTS}/{run}'
+need = [R('v4_final_test'), R('v6_test'), KEY4, LD_VIEWS] + [R(r) for r in FRONTIER_RUNS]
+missing = [p for p in need if not os.path.exists(p)]
+assert not missing, f'missing on Drive: {missing}'
+print('all inputs found')
+"""),
+        md("## 1. R28: intervals for the 27 primary comparisons"),
+        code(r"""
+t = significance_table(RESULTS, 'v4_final_test', FRONTIER_RUNS, metrics=('esg', 'target_hallucination_rate', 'net_utility'))
+head = ('MedScope-4B (v4_final_test) minus each comparison model on the three primary outcomes; paired case bootstrap, '
+        '2,000 resamples, seed 0. target_hallucination_rate = erased-lesion claims. Bonferroni level 0.05/27.\n\n')
+open(f'{RESULTS}/r28_primary_intervals.md', 'w').write(head + t + '\n')
+print(head + t)
+"""),
+        md("## 2. R29: model answers on erasures the specialists accepted"),
+        code(r"""
+import gspread
+from google.colab import auth
+from google.auth import default as _gdefault
+auth.authenticate_user()
+gc = gspread.authorize(_gdefault()[0])
+info = json.load(open(f'{RS}/pack4_sheet.json'))
+book = gc.open_by_key(info['id'])
+HEAD = {'readers': ['code', 'label', 'created'],
+        'profiles': ['server_time', 'reader', 'pack', 'specialty', 'subspecialty', 'years', 'certified', 'seen_before',
+                     'consent', 'user_agent'],
+        'answers': ['server_time', 'reader', 'pack', 'item', 'edited', 'finding', 'seconds', 'comment', 'client_time',
+                    'position']}
+EXP = f'{WORK}/pack4_export'                  # local only: answers are not copied to Drive by this notebook
+os.makedirs(EXP, exist_ok=True)
+for name, cols in HEAD.items():
+    rows = book.worksheet(name).get_all_records()
+    with open(f'{EXP}/{name}.csv', 'w', newline='') as fh:
+        w = csv.DictWriter(fh, fieldnames=cols, extrasaction='ignore')
+        w.writeheader()
+        w.writerows(rows)
+sh(f'python scripts/make_reader_study.py --from-sheet {EXP} --out {EXP}/answers')
+files = ' '.join(sorted(glob.glob(f'{EXP}/answers/*.json')))
+sh(f'python scripts/reader_rescore.py --key {KEY4} --answers {files} --results {RESULTS} '
+   f'--runs MedScope-4B=v4_final_test MedScope-4B-N=v6_test --comparison {" ".join(FRONTIER_RUNS)} '
+   f'--out {RESULTS}/r29_specialist_accepted.md')
+"""),
+        md("## 3. R30: LDPolypVideo pairs by distance between the two frames"),
+        code(r"""
+views = [json.loads(l) for l in open(LD_VIEWS)]
+gaps = sorted({v['meta']['pair']: v['meta'].get('frames_apart', 0) for v in views}.values())
+print('pairs:', len(gaps), '| frames apart: median', gaps[len(gaps) // 2], '| min', gaps[0], '| max', gaps[-1])
+ld_runs = [('MedScope-4B-N', 'np_v6_ld'), ('MedScope-4B-N-vote', 'np_v6vote_ld'), ('MedScope-4B', 'np_v4_ld'),
+           ('Qwen3.5-4B', 'np_base_ld'), ('gemini-4-argon', 'np_gemini_ld'), ('claude-opus-5-5', 'np_claudeopus_ld'),
+           ('gpt-6-astra', 'np_gpt6astra_ld')]
+for thr in (25, 50):
+    sub = [v for v in views if v['meta'].get('frames_apart', 0) >= thr]
+    f = f'{WORK}/views_ld_gap{thr}.jsonl'
+    with open(f, 'w') as fh:
+        fh.writelines(json.dumps(v) + '\n' for v in sub)
+    print(f'\n### at least {thr} frames apart: {len({v["meta"]["pair"] for v in sub})} pairs')
+    runs = ' '.join(n + '=' + R(r) for n, r in ld_runs)
+    sh(f'python scripts/natural_pairs.py score --views {f} --runs {runs} --ref MedScope-4B-N --by split '
+       f'--out {RESULTS}/r30_ldpolyp_gap{thr}.md')
+"""),
+        md("## 4. R31: unreadable answers per model (main test)"),
+        code(r"""
+lines = ['| Run | Model | Views | Unreadable answers |', '| --- | --- | --- | --- |']
+for d in sorted(glob.glob(f'{RESULTS}/*_test')):
+    s = f'{d}/summary.json'
+    if not os.path.exists(s) or not os.path.exists(f'{d}/outcomes.jsonl'):
+        continue
+    meta = json.load(open(s)).get('meta', {})
+    if meta.get('split') != 'test' or meta.get('prompt', 'agent') != 'agent' or meta.get('ablation') or meta.get('fewshot'):
+        continue
+    outs = load_outcomes(d)
+    lines.append(f"| {os.path.basename(d)} | {meta.get('name', '')} | {len(outs)} | {100 * malformed_rate(outs):.1f}% |")
+t = '\n'.join(lines)
+open(f'{RESULTS}/r31_unreadable.md', 'w').write(t + '\n')
+print(t)
+"""),
+        md("## 5. R32: numbers the log lists as unsourced"),
+        code(r"""
+ans2 = sorted(glob.glob(f'{RS}/answers/*.json'))
+if os.path.exists(f'{RS}/key_v2.json') and ans2:
+    sh(f'python scripts/make_reader_study.py --score --key {RS}/key_v2.json --answers {" ".join(ans2)} --out {RESULTS}/r32_pack2_scores.md')
+else:
+    print('pack-2 key or answers not found on Drive: the trainee AUC cannot be re-read here')
+want = ['0.141', '0.067', '[0.045, 0.106]', '0.045, 0.106', '[-0.022, 0.050]', '-0.022, 0.050']
+found = []
+for f in sorted(glob.glob(f'{RESULTS}/**/*.md', recursive=True)):
+    for i, line in enumerate(open(f, errors='ignore')):
+        for w in want:
+            if w in line:
+                found.append(f'{os.path.relpath(f, RESULTS)}:{i + 1}: {line.strip()[:240]}')
+                break
+t = '\n'.join(found) or 'none of the values was found in results/*.md'
+open(f'{RESULTS}/r32_unsourced_search.md', 'w').write(t + '\n')
+print(t)
+"""),
+        md("## Done\n\nThe five reports are in `MyDrive/medscope/results/` (r28 to r32)."),
+        code(DONE_CELL),
+    ]
+
+
 NOTEBOOKS = {
     "00_sync_drive_to_hf.ipynb": nb00_sync,
     "01_build_slake_views.ipynb": nb01,
@@ -7337,6 +7473,7 @@ NOTEBOOKS = {
     "59_chexthought_pneumothorax.ipynb": nb59_chexthought_pneumothorax,
     "60_final_model_v6.ipynb": nb60_final_model,
     "60r_final_model_v6_runpod.ipynb": nb60_runpod,
+    "61_paper_checks.ipynb": nb61_paper_checks,
     "25r_report.ipynb": nb25_part("report", "the summaries, paired tests and report (CPU; run after 25g and 25h)"),
 }
 

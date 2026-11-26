@@ -621,3 +621,41 @@ in for one model on R9, as before.
 **Fixed.** One attempt. Nothing is tuned beyond the one choice on validation images above. Every result is
 reported, whatever it shows. Code: `scripts/train_sft.py` (`--min-erased-share`, `--mix-only`),
 `scripts/natural_pairs.py` (`ldpolyp-build`), `scripts/seed_vote.py`; notebook 60.
+
+## Amendment 10 (26 Nov 2026, committed before notebook 61 ran; R28-R32)
+
+Written after the final reviews of manuscript v6 and after the first board-certified radiologist finished pack 4
+(`docs/reader_study/R5_interim_R9.md`). Nothing here trains or runs a model: every check uses stored answers.
+
+**R28. Intervals for the 27 primary comparisons.** MedScope-4B (`v4_final_test`) minus each of the nine comparison
+models (`v2_*_test` of the FRONTIER list) on ESG, erased-lesion claims and net utility: paired case bootstrap, 2,000
+resamples, seed 0 (`significance_table`). Computation only; no decision. The stored p values must be reproduced.
+
+**R29. Model answers on erasures the specialists accepted (the model re-scoring that R5 fixed for its final report,
+run now on the specialists who have finished; repeated when the round closes).** Pack-4 images whose views are in
+the main test (LaMa erasures, LaMa control edits, unedited lesion and lesion-free images; the Stable Diffusion views
+are not in the main-test runs and are left out). Judges: board-certified radiologists for brain MRI, breast
+ultrasound, chest X-ray and SLAKE images; gastroenterologists or endoscopists for colonoscopy images. An erasure is
+*specialist-accepted* when no judge answered "yes" (cannot tell counts as not yes), *strictly accepted* when every
+judge answered "no". For each comparison model, MedScope-4B and MedScope-4B-N (`v6_test`): reported findings on
+accepted erasures (k/n, exact 95% CI); the nine comparison models pooled (mean over models, 95% interval by
+resampling images). **Reading (the rule of docs/READER_VERIFIED.md):** the main result holds on specialist-accepted
+erasures if the pooled lower bound for the comparison models is above 20%; otherwise it is not shown there. Also
+reported: the same on strictly accepted erasures, on erasures a judge called present, on reader-confirmed lesions
+and lesion-free images, and the gap between comparison models and MedScope-4B on the same accepted erasures
+(paired by image, bootstrap). Fewer than 10 accepted erasures: descriptive only.
+
+**R30. LDPolypVideo pairs by distance between the two frames.** The pairs of R26 restricted to those whose
+polyp-free frame is at least 25 frames, and at least 50 frames, from its polyp frame (`meta.frames_apart`; thresholds
+fixed here, before the distances were looked at). Natural ESG of every R26 run and MedScope-4B-N minus each reference
+model on each subset. Descriptive: the R26 result is called insensitive to near frames if every difference keeps its
+sign at both thresholds.
+
+**R31. Unreadable answers.** Share of malformed answers per model on the main test (`malformed_rate`), for the nine
+comparison models, the six open-weight models, MedScope-4B and MedScope-4B-N. Descriptive.
+
+**R32. Numbers the log lists as unsourced.** Re-read from the stored reports: the edit-detection AUC of the
+internal-medicine trainee (pack 2, recomputed with `scripts/make_reader_study.py --score`) and the consistency-loss
+and image-swap values quoted from manuscript v5 (searched in `results/*.md`). Reported as found or not found.
+
+**Fixed.** One run of notebook 61. Every result is reported. Code: `scripts/reader_rescore.py`, notebook 61.
