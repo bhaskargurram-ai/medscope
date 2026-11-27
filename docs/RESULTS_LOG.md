@@ -2308,3 +2308,10 @@ gemini-4-argon 0.522 / 0.531; claude-opus-5-5 0.461 / 0.480; gpt-6-astra 0.304 /
 **R31 correction.** The R28-R32 entry says "seven of the nine comparison models" at 0.0%; the report gives six
 (gpt-6-sol, gpt-6-astra, claude-fable-5-1, claude-opus-5-5, gemini-4-argon, gemini-3.1-pro-preview); the three others
 are 0.1%, 0.3% and 0.4% as stated. Under the highest reasoning setting (345 views) claude-opus-5-5 had 2.6% unreadable.
+
+## 2026-11-27 — Trainee agreement on the finding recomputed (R32 check; stored answers only)
+
+`r32_pack2_scores.md` (notebook 61, current `scripts/make_reader_study.py`): Cohen's kappa between the two trainees on
+the finding 0.57 on 105 images (images with a "cannot tell" answer left out); on "edited" 0.10 on 128 images, as before.
+The 13 Nov entry (L1158-1159) gives 0.47 on the finding without saying how "cannot tell" was handled, and the script of
+that day is not recoverable from the entry; the manuscript now uses the reproducible 0.57 with its definition.
