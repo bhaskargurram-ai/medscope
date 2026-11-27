@@ -2213,3 +2213,53 @@ present 36/72 (50.0%, exact 95% CI 38.0-62.0; LaMa 17/36, Stable Diffusion 19/36
 lesion images 34/36; control edits 63/68; unedited lesion-free 8/36. Edit detection AUC 0.67 (edited vs unedited), 0.50
 (erasure vs control edit). The 10% criterion is not met by this reader; R5 closes with the second radiologist or on 10
 January 2027. Not planned in advance (Amendment 3a covers the endoscopist only).
+
+## 2026-11-26 — R28-R32 (notebook 61; Amendment 10; stored answers only)
+
+Reports in `results/`: `r28_primary_intervals.md`, `r29_specialist_accepted.md`, `r30_ldpolyp_gap25.md`,
+`r30_ldpolyp_gap50.md`, `r31_unreadable.md`, `r32_pack2_scores.md`, `r32_unsourced_search.md`.
+
+**R28, intervals for the 27 primary comparisons** (MedScope-4B minus each comparison model; paired case bootstrap,
+2,000 resamples, seed 0; all 27 p < 0.001, as stored). ESG / erased-lesion claims / net utility:
+
+| Comparison model | ESG | Erased-lesion claims | Net utility |
+| --- | --- | --- | --- |
+| gpt-6-sol | +0.416 [+0.341, +0.489] | -0.420 [-0.491, -0.346] | +0.472 [+0.389, +0.554] |
+| gpt-6-astra | +0.452 [+0.364, +0.539] | -0.493 [-0.562, -0.426] | +0.424 [+0.329, +0.522] |
+| gpt-6.1-sol | +0.434 [+0.354, +0.520] | -0.493 [-0.566, -0.423] | +0.456 [+0.360, +0.552] |
+| claude-fable-5-1 | +0.416 [+0.339, +0.496] | -0.425 [-0.500, -0.355] | +0.477 [+0.384, +0.566] |
+| claude-opus-5-5 | +0.429 [+0.345, +0.507] | -0.443 [-0.515, -0.368] | +0.374 [+0.283, +0.466] |
+| claude-sonnet-5-5 | +0.356 [+0.284, +0.431] | -0.388 [-0.459, -0.318] | +0.351 [+0.267, +0.437] |
+| gemini-4-argon | +0.288 [+0.208, +0.367] | -0.315 [-0.385, -0.243] | +0.168 [+0.083, +0.254] |
+| gemini-3.1-pro-preview | +0.374 [+0.298, +0.448] | -0.420 [-0.491, -0.350] | +0.426 [+0.337, +0.519] |
+| gemini-3.8-flash | +0.489 [+0.407, +0.566] | -0.521 [-0.596, -0.446] | +0.470 [+0.380, +0.560] |
+
+**R29, model answers on erasures the specialists accepted: HOLDS.** Judges: one board-certified radiologist (brain
+MRI, breast ultrasound, chest X-ray, SLAKE) and one gastroenterologist (colonoscopy); 144 pack-4 images in the main test
+(Stable Diffusion views left out). Accepted erasures (no judge said yes) 20 (brain MRI 2, breast ultrasound 5, chest
+X-ray 4, colonoscopy 4, SLAKE 5); strictly accepted 15; called present by a judge 16. Comparison models pooled: findings
+reported on accepted erasures 43.3% (31.7-56.1), strictly accepted 37.8% (23.7-53.3), erasures a judge called present
+64.6% (44.4-83.4), reader-confirmed lesion-free images 15.8% (9.3-22.2). Per comparison model on accepted erasures: 5/20
+to 12/20 (gpt-6-sol 5, gpt-6-astra 11, gpt-6.1-sol 10, claude-fable-5-1 10, claude-opus-5-5 12, claude-sonnet-5-5 7,
+gemini-4-argon 5, gemini-3.1-pro-preview 10, gemini-3.8-flash 8). MedScope-4B 1/20 (5.0%, 0.1-24.9), MedScope-4B-N 1/20;
+both found 59/66 and 61/66 reader-confirmed lesions. Comparison models pooled minus MedScope-4B on the same accepted
+erasures: +38.3 percentage points [+22.8, +52.8] (20 images; same for MedScope-4B-N). Reading (rule of
+READER_VERIFIED.md): pooled lower bound 31.7% > 20%, the main result holds on specialist-accepted erasures. Interim: one
+radiologist; repeated when R5 closes.
+
+**R30, LDPolypVideo pairs by frame distance (descriptive): insensitive.** At least 25 frames apart (115 pairs):
+MedScope-4B-N 0.609 [0.522, 0.696]; minus gemini-4-argon +0.087 [-0.017, +0.191], p = 0.126; claude-opus-5-5 +0.148
+[+0.043, +0.252], p = 0.004; gpt-6-astra +0.304 [+0.174, +0.435], p < 0.001; MedScope-4B +0.191 [+0.113, +0.278]. At
+least 50 frames apart (98 pairs): 0.622 [0.520, 0.714]; minus gemini-4-argon +0.092 [-0.031, +0.204], p = 0.161;
+claude-opus-5-5 +0.143 [+0.031, +0.255], p = 0.020; gpt-6-astra +0.306 [+0.173, +0.439], p < 0.001; MedScope-4B +0.214
+[+0.132, +0.306]. Every difference keeps its sign.
+
+**R31, unreadable answers (main test, 1,115 views):** 0.0% for MedScope-4B, MedScope-4B-N and seven of the nine
+comparison models; claude-sonnet-5-5 0.1%, gemini-3.8-flash 0.3%, gpt-6.1-sol 0.4%; open-weight models 0.0% except
+Qwen3.5-4B 1.4% and MedGemma 1.5 4B 3.9%.
+
+**R32, unsourced numbers.** The internal-medicine trainee's edit AUC 0.54 is reproduced from the pack-2 answers
+(`r32_pack2_scores.md`; radiology trainee 0.55). The values 0.141, 0.067 and +0.073 [+0.045, +0.106] are the
+consistency-loss check (C4) on the fresh external set, erased-lesion claims (`results/v7_confirmation.md` line 65), not
+the tool-family arm as L1707 says; the image-swap interval [-0.022, 0.050] is R1, ESG with LaMa
+(`results/48_review_experiments_report.md` line 24). Both are placed correctly in manuscript v6.
