@@ -85,17 +85,42 @@ Fresh external (316) & ESG & $0.393$ & $0.333$ $\ci{0.253}{0.410}$ & $0.375$ & $
 \midrule
 \multicolumn{6}{l}{\textit{Main test, seed minus reference model}} \\
 ESG & minus \gem & $0.288$ $\ci{0.208}{0.367}$ & $0.274$ $\ci{0.190}{0.359}$ & $0.260$ $\ci{0.178}{0.341}$ & \\
- & minus \opus & --$^{\ast}$ & $0.416$ $\ci{0.333}{0.495}$ & $0.402$ $\ci{0.311}{0.484}$ & \\
- & minus \gpt & --$^{\ast}$ & $0.438$ $\ci{0.350}{0.526}$ & $0.425$ $\ci{0.332}{0.514}$ & \\
-Erased-lesion claims & minus each of the three & $-0.315$ to $-0.521^{\ast}$ & $-0.297$ to $-0.475$ & $-0.306$ to $-0.484$ & \\
-Net utility & minus each of the three & $0.168$ to $0.477^{\ast}$ & $0.107$ to $0.363$ & $0.134$ to $0.390$ & \\
+ & minus \opus & $0.429$ $\ci{0.345}{0.507}$ & $0.416$ $\ci{0.333}{0.495}$ & $0.402$ $\ci{0.311}{0.484}$ & \\
+ & minus \gpt & $0.452$ $\ci{0.364}{0.539}$ & $0.438$ $\ci{0.350}{0.526}$ & $0.425$ $\ci{0.332}{0.514}$ & \\
+Erased-lesion claims & minus each of the three & $-0.315$ to $-0.521$ & $-0.297$ to $-0.475$ & $-0.306$ to $-0.484$ & \\
+Net utility & minus each of the three & $0.168$ to $0.477$ & $0.107$ to $0.363$ & $0.134$ to $0.390$ & \\
 Lesion-free claims & minus \gem & $-0.014$ & $0.080$ $\ci{0.034}{0.130}$ & none (both $0.090$) & \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
-\\[2pt]\parbox{\linewidth}{\footnotesize Note. Erased-lesion claims and lesion-free claims in the lower part are differences of proportions. $^{\ast}$\,For the first seed only the difference from \gem{} has an interval; the differences from \opus{} and \gpt{} lie within the range over all nine comparison models ($0.288$ to $0.489$ in ESG), and the intervals of the other primary comparisons were not stored and will be recomputed from the stored answers; the erased-lesion-claim and net-utility ranges of the first seed are likewise over the nine models. For the first seed all ESG and erased-lesion-claim differences from the nine comparison models have $p < 0.001$ and all net-utility differences $p \le 0.001$; for the second and third seeds all ESG and erased-lesion-claim differences from the reference models have $p < 0.001$ and their net-utility differences $p \le 0.015$. Lesion-free claims minus \gem: $p = 0.59$ for the first seed and $p = 0.002$ for the second; lesion-free claims of the second and third seeds were lower than those of \opus{} and \gpt{} ($p < 0.001$ for the third). The pre-specified criterion, every seed above each reference model on main-test ESG with the interval above zero, was met.}
+\\[2pt]\parbox{\linewidth}{\footnotesize Note. Erased-lesion claims and lesion-free claims in the lower part are differences of proportions. The erased-lesion-claim and net-utility ranges of the first seed are over all nine comparison models, whose intervals are in Supplementary Table~\ref{tab:s_primary}. For the first seed all 27 differences from the nine comparison models have $p < 0.001$; for the second and third seeds all ESG and erased-lesion-claim differences from the reference models have $p < 0.001$ and their net-utility differences $p \le 0.015$. Lesion-free claims minus \gem: $p = 0.59$ for the first seed and $p = 0.002$ for the second; lesion-free claims of the second and third seeds were lower than those of \opus{} and \gpt{} ($p < 0.001$ for the third). The pre-specified criterion, every seed above each reference model on main-test ESG with the interval above zero, was met.}
 \end{table}
-% src: L1891-1910 (second-seed intervals), L1934-1960 (three seeds, paired differences; third seed and gemini-4-argon 0.090 each); v5 P715 (first seed: minus gemini-4-argon 0.288 [0.208, 0.367]; ranges over the nine models 0.288 to 0.489, -0.315 to -0.521, 0.168 to 0.477; lesion-free -0.014, p = 0.59; no separate values for claude-opus-5-5 or gpt-6-astra in any source); L1673 (first-seed interval)
+% src: L1891-1910 (second-seed intervals), L1934-1960 (three seeds, paired differences; third seed and gemini-4-argon 0.090 each); v5 P715 (first seed: minus gemini-4-argon 0.288 [0.208, 0.367]; ranges over the nine models 0.288 to 0.489, -0.315 to -0.521, 0.168 to 0.477; lesion-free -0.014, p = 0.59; no separate values for claude-opus-5-5 or gpt-6-astra in any source); L1673 (first-seed interval); L2222-2235 (R28: first seed minus claude-opus-5-5 0.429 [0.345, 0.507], minus gpt-6-astra 0.452 [0.364, 0.539]; all 27 p < 0.001)
+
+\begin{table}[!htbp]
+\caption{The 27 primary comparisons: \ms{} minus each comparison model on the main test (507 cases), paired by case. Brackets are 95\% intervals from 2,000 bootstrap resamples of cases. Erased-lesion claims are differences in percentage points. Every difference has $p < 0.001$, below the Bonferroni-corrected level of $0.05/27$.}
+\label{tab:s_primary}
+\centering
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lccc}
+\toprule
+Comparison model & ESG & Erased-lesion claims (points) & Net utility \\
+\midrule
+\texttt{gpt-6-sol} & $0.416$ $\ci{0.341}{0.489}$ & $-42.0$ $\ci{-49.1}{-34.6}$ & $0.472$ $\ci{0.389}{0.554}$ \\
+\gpt & $0.452$ $\ci{0.364}{0.539}$ & $-49.3$ $\ci{-56.2}{-42.6}$ & $0.424$ $\ci{0.329}{0.522}$ \\
+\texttt{gpt-6.1-sol} & $0.434$ $\ci{0.354}{0.520}$ & $-49.3$ $\ci{-56.6}{-42.3}$ & $0.456$ $\ci{0.360}{0.552}$ \\
+\texttt{claude-fable-5-1} & $0.416$ $\ci{0.339}{0.496}$ & $-42.5$ $\ci{-50.0}{-35.5}$ & $0.477$ $\ci{0.384}{0.566}$ \\
+\opus & $0.429$ $\ci{0.345}{0.507}$ & $-44.3$ $\ci{-51.5}{-36.8}$ & $0.374$ $\ci{0.283}{0.466}$ \\
+\texttt{claude-sonnet-5-5} & $0.356$ $\ci{0.284}{0.431}$ & $-38.8$ $\ci{-45.9}{-31.8}$ & $0.351$ $\ci{0.267}{0.437}$ \\
+\gem & $0.288$ $\ci{0.208}{0.367}$ & $-31.5$ $\ci{-38.5}{-24.3}$ & $0.168$ $\ci{0.083}{0.254}$ \\
+\texttt{gemini-3.1-pro-preview} & $0.374$ $\ci{0.298}{0.448}$ & $-42.0$ $\ci{-49.1}{-35.0}$ & $0.426$ $\ci{0.337}{0.519}$ \\
+\texttt{gemini-3.8-flash} & $0.489$ $\ci{0.407}{0.566}$ & $-52.1$ $\ci{-59.6}{-44.6}$ & $0.470$ $\ci{0.380}{0.560}$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+% src: L2222-2235 (R28; proportion differences and bounds multiplied by 100 for erased-lesion claims)
 
 \begin{table}[!htbp]
 \caption{Blank-image control (pre-specified): 183 main-test lesion cases whose question is answered ``yes'' on the original image. Blank image: a uniform grey image of the same size. Swapped image: an unedited lesion-free main-test image of another imaging type (available for 141 of the 183 cases). Entries are the share of images on which the model reported the finding, answered ``absent'', or asked for a better image. The last column is the paired difference between the share of erased images and the share of blank images on which the finding was reported, in percentage points.}
@@ -263,7 +288,7 @@ Ranking of errors by stated confidence & Selective risk (error rate among the an
 \subsection{Reader assessment}
 
 \begin{table}[!htbp]
-\caption{Specialist round (pre-specified): 212 main-test images, each from a different case. Results of the reader who had read all images, a board-certified gastroenterologist (20 years of practice; median reading time $6.7$~s per image). (A) Colonoscopy images, the reader's specialty (61 images): number of images on which the finding was called present, with exact 95\% CI for erased images. (B) Other imaging types, outside the reader's specialty (descriptive), and edit detection.}
+\caption{Specialist round (pre-specified): 212 main-test images, each from a different case. Results of the two readers who have read all images: a board-certified gastroenterologist (20 years of practice; median reading time $6.7$~s per image) and a board-certified radiologist (8 years of practice). (A) Gastroenterologist, colonoscopy images (61): number of images on which the finding was called present, with exact 95\% CI for erased images. (B) Gastroenterologist, other imaging types (outside the specialty; descriptive), and edit detection. (C) Radiologist, radiology images (brain MRI, breast ultrasound, chest X-ray and SLAKE; 151), and all images.}
 \label{tab:s_expert}
 \centering
 \small
@@ -288,12 +313,24 @@ Erased images of the other imaging types called present & 20 of 55 ($36.4\%$); `
 Edited against unedited images, AUC, by imaging type & brain MRI $0.56$; breast ultrasound $0.54$; chest X-ray $0.48$; SLAKE CT and MRI $0.51$ \\
 Edited against unedited images, AUC, all images; erased against control-edited & $0.54$; $0.59$ \\
 Agreement on the finding with the two trainee readers (39 images read in both rounds) & 21 of 39 (Cohen's $\kappa$ $0.24$) and 24 of 39 ($\kappa$ $0.39$) \\
+\midrule
+\multicolumn{2}{l}{\textit{(C) Radiologist: radiology images, finding called present}} \\
+\midrule
+Unedited lesion images & 25 of 27 ($92.6\%$) \\
+Control-edited images (lesion intact), LaMa / Stable Diffusion & 25 of 28 / 10 of 12 \\
+Erased images, LaMa & 13 of 29 ($44.8\%$; $26.4$ to $64.3$) \\
+Erased images, Stable Diffusion & 16 of 26 ($61.5\%$; $40.6$ to $79.8$) \\
+Erased images by source, both tools: brain MRI / breast ultrasound / chest X-ray / SLAKE & 8 of 13 / 9 of 18 / 10 of 17 / 2 of 7 \\
+Unedited lesion-free images & 5 of 29 ($17.2\%$) \\
+Edited against unedited images, AUC; erased against control-edited, AUC & $0.64$; $0.53$ \\
+All 212 images: erased images called present, LaMa / Stable Diffusion & 17 of 36 / 19 of 36; colonoscopy (outside the specialty) 7 of 17 \\
+All 212 images: edited against unedited, AUC; erased against control-edited & $0.67$; $0.50$ \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
-\\[2pt]\parbox{\linewidth}{\footnotesize The pre-specified criterion (upper bound of the share of erased images called present at most $10\%$) was not met; with 17 erased images one reader could not have met it, because 0 of 17 gives an upper bound of $19.5\%$. The re-scoring of model answers on erasures that the specialist judged free of the finding (4 LaMa and 7 Stable Diffusion colonoscopy erasures) was planned for this interim analysis and was not run.}
+\\[2pt]\parbox{\linewidth}{\footnotesize The pre-specified criterion (upper bound of the share of erased images called present at most $10\%$ for each tool) was not met: with each imaging type read by its specialist, 16 of 36 LaMa and 17 of 36 Stable Diffusion erasures were called present. The model answers on the erasures that the specialists accepted are in Supplementary Table~\ref{tab:s_specialist}. The round remains open for further radiologists.}
 \end{table}
-% src: docs/reader_study/R5_interim_R1.md (20 years; 6.7 s; per-tool counts and intervals); L1385-1394 (criterion not judgeable from one reader; re-scoring not run in the interim, a deviation); facts E
+% src: docs/reader_study/R5_interim_R1.md (20 years; 6.7 s; per-tool counts and intervals); L1385-1394; facts E; (C) L2272-2281 and L2209-2215; docs/reader_study/R5_interim_R9.md (by source: 8/13, 9/18, 10/17, 2/7)
 
 \begin{table}[!htbp]
 \caption{Earlier reader round: two trainee physicians (internal medicine and radiology) each read the same 128 main-test images in random order, 32 each of original, erased (LaMa), control-edited and unedited lesion-free images, without knowing which were edited. (A) Per reader. (B) Erased and lesion-free images called present by imaging type (6 or 7 images of each kind per type).}
@@ -354,6 +391,36 @@ Open-weight models and trained variants, pooled (43 evaluation runs) & $12\%$ & 
 \\[2pt]\parbox{\linewidth}{\footnotesize The pre-specified reading required the lower bound of the comparison models' rate on the images neither reader called present to be above $20\%$; it was not met (10 images). Restricted to comparison models that had reported the lesion on the original image of the same case, the rates were $30\%$ (19 of 63 model-image pairs) on images neither reader called present, $54\%$ on images the readers disagreed on and $85\%$ on images both called present. \ms{} found 56 of 63 lesions that the readers confirmed and reported a finding on 0 of 16 images that the readers confirmed as lesion-free. The 10 images neither reader called present include 4 colonoscopy images. Over all erased images of the main test, the nine comparison models pooled reported the erased finding on $45\%$ of 83 colonoscopy images (and found $96\%$ of the unedited polyps), $46\%$ of brain MRI, $71\%$ of breast ultrasound, $60\%$ of chest X-ray and $49\%$ of SLAKE images.}
 \end{table}
 % src: L1207-1231, L1692-1695; v5 P794; facts E
+
+\begin{table}[!htbp]
+\caption{Model answers re-scored on the specialist round (144 images whose views are in the main test; Stable Diffusion views are not). Each imaging type was judged by its specialist: the radiologist for brain MRI, breast ultrasound, chest X-ray and SLAKE, the gastroenterologist for colonoscopy. Accepted erasure: the specialist did not call the finding present; strictly accepted: the specialist answered ``no''. Entries are the number of images on which the model reported the finding, except for confirmed lesions, where they are lesions found.}
+\label{tab:s_specialist}
+\centering
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lccccc}
+\toprule
+Model & \Chd{1.8cm}{Accepted erasures (20)} & \Chd{1.8cm}{Strictly accepted (15)} & \Chd{2.2cm}{Erasures called present (16)} & \Chd{1.8cm}{Confirmed lesions (66)} & \Chd{2.0cm}{Confirmed lesion-free (31)} \\
+\midrule
+\texttt{gpt-6-sol} & 5 & 2 & 10 & 59 & 7 \\
+\gpt & 11 & 6 & 10 & 62 & 8 \\
+\texttt{gpt-6.1-sol} & 10 & 5 & 10 & 64 & 6 \\
+\texttt{claude-fable-5-1} & 10 & 7 & 11 & 59 & 9 \\
+\opus & 12 & 9 & 11 & 60 & 4 \\
+\texttt{claude-sonnet-5-5} & 7 & 5 & 11 & 64 & 0 \\
+\gem & 5 & 3 & 11 & 63 & 0 \\
+\texttt{gemini-3.1-pro-preview} & 10 & 8 & 10 & 58 & 6 \\
+\texttt{gemini-3.8-flash} & 8 & 6 & 9 & 62 & 4 \\
+\midrule
+Nine comparison models, pooled & $43.3\%$ ($31.7$ to $56.1$) & $37.8\%$ ($23.7$ to $53.3$) & $64.6\%$ ($44.4$ to $83.4$) & & $15.8\%$ ($9.3$ to $22.2$) \\
+\ms & 1 & 1 & 3 & 59 & 1 \\
+\msn & 1 & 1 & 3 & 61 & 3 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\\[2pt]\parbox{\linewidth}{\footnotesize Pooled: mean over the nine models of the per-image share, with a 95\% interval from 2,000 resamples of images; because every model read the same images, the interval reflects the images, not the models. The rule, written before this analysis was run and after the radiologist had finished, took the persistence to hold if the pooled lower bound on accepted erasures was above $20\%$, the bound used in Supplementary Table~\ref{tab:s_rescoring}; it was met ($31.7\%$). The nine models pooled minus \ms{} on the 20 accepted erasures: $38.3$ percentage points (95\% CI $22.8$ to $52.8$); the same for \msn. Accepted erasures by source: brain MRI 2, breast ultrasound 5, chest X-ray 4, colonoscopy 4, SLAKE 5. Interim: one specialist per imaging type.}
+\end{table}
+% src: L2237-2248 (R29 pooled rates, gap, verdict, by source), L2283-2297 (per-model counts); docs/REVIEW_EXPERIMENTS.md Amendment 10 (rule)
 
 \clearpage
 % ===============================================================================================================

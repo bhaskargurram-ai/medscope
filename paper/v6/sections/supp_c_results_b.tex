@@ -12,7 +12,7 @@ This section gives the complete tables behind Sections~\ref{subsec:res_pairs} to
 \subsection{Unedited colonoscopy pairs}
 \label{subsec:s_pairs}
 
-Supplementary Tables~\ref{tab:s_realcolon} to~\ref{tab:s_ldpolyp} give every model on the REAL-Colon pairs, on the context-matched frames, with one centre withheld from training, and on LDPolypVideo.
+Supplementary Tables~\ref{tab:s_realcolon} to~\ref{tab:s_framegap} give every model on the REAL-Colon pairs, on the context-matched frames, with one centre withheld from training, and on LDPolypVideo, also with pairs restricted by frame distance.
 % src: pointers only, no numbers
 
 \paragraph{Where \ms{} missed polyps (descriptive)} On the 103 polyp-free REAL-Colon frames \ms{} reported a polyp on 2 (\base{} 15, \opus{} 20) and asked for a better image on 12, of which 11 came from one centre; this is why $86.4\%$ (89 of 103) of its polyp-free frames count as answered ``absent'' or referred. On the polyp frames it called the polyp present on 36 and asked for a better image on 3. By thirds of polyp box area (small, middle, large) it called 5 of 34, 7 of 35 and 24 of 34 present; \base{} 5, 8 and 27; \opus{} 19, 23 and 31. The median polyp box covered $2.9\%$ of the frame, and 35 of 103 covered less than $2\%$. \ms{} made no tool call on 61 polyp frames (5 called present, 53 ``absent'', 3 requests for a better image) and one zoom on 42 (31 called present, 11 ``absent'').
@@ -197,6 +197,32 @@ Model & Called present & With a correct box & Test ($n = 51$) & TrainValid ($n =
 \end{adjustbox}
 \end{table}
 % src: report60 L64-112; L2067-2070 (dataset counts)
+
+\begin{table}[!htbp]
+\caption{LDPolypVideo pairs restricted by the distance between the polyp frame and the polyp-free frame of a pair (descriptive). A polyp-free frame close to a polyp frame may still show part of the polyp; the restriction tests whether such pairs drive the result. Brackets are 95\% intervals from 2,000 bootstrap resamples of whole clips.}
+\label{tab:s_framegap}
+\centering
+\small
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{At least 25 frames apart (115 pairs)} & \multicolumn{2}{c}{At least 50 frames apart (98 pairs)} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Model & Natural ESG & \msn{} minus model, $p$ & Natural ESG & \msn{} minus model, $p$ \\
+\midrule
+\msn & $0.609$ $\ci{0.522}{0.696}$ & -- & $0.622$ $\ci{0.520}{0.714}$ & -- \\
+\msn, three-seed vote & $0.583$ & $+0.026$, $0.238$ & $0.592$ & $+0.031$, $0.231$ \\
+\ms & $0.417$ & $+0.191$ $\ci{+0.113}{+0.278}$, $<0.001$ & $0.408$ & $+0.214$ $\ci{+0.132}{+0.306}$, $<0.001$ \\
+\base & $0.357$ & $+0.252$ $\ci{+0.148}{+0.357}$, $<0.001$ & $0.357$ & $+0.265$ $\ci{+0.153}{+0.378}$, $<0.001$ \\
+\gem & $0.522$ & $+0.087$ $\ci{-0.017}{+0.191}$, $0.126$ & $0.531$ & $+0.092$ $\ci{-0.031}{+0.204}$, $0.161$ \\
+\opus & $0.461$ & $+0.148$ $\ci{+0.043}{+0.252}$, $0.004$ & $0.480$ & $+0.143$ $\ci{+0.031}{+0.255}$, $0.020$ \\
+\gpt & $0.304$ & $+0.304$ $\ci{+0.174}{+0.435}$, $<0.001$ & $0.316$ & $+0.306$ $\ci{+0.173}{+0.439}$, $<0.001$ \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\\[2pt]\parbox{\linewidth}{\footnotesize \msn{} answered ``absent'' or referred on $99.1\%$ and $100.0\%$ of the polyp-free frames of the two subsets. Every difference kept the sign it had on all 116 pairs (Supplementary Table~\ref{tab:s_ldpolyp}).}
+\end{table}
+% src: L2250-2255 (R30 differences, intervals and p), L2301-2306 (natural ESG of every model; 99.1% and 100.0%; vote and Qwen3.5-4B differences); r30_ldpolyp_gap25.md, r30_ldpolyp_gap50.md
 
 \clearpage
 \subsection{Chest films}

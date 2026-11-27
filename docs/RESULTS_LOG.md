@@ -2263,3 +2263,48 @@ Qwen3.5-4B 1.4% and MedGemma 1.5 4B 3.9%.
 consistency-loss check (C4) on the fresh external set, erased-lesion claims (`results/v7_confirmation.md` line 65), not
 the tool-family arm as L1707 says; the image-swap interval [-0.022, 0.050] is R1, ESG with LaMa
 (`results/48_review_experiments_report.md` line 24). Both are placed correctly in manuscript v6.
+
+## 2026-11-27 — R5 interim radiologist by tool and imaging area; R29 and R30 tables; R31 count corrected (stored answers only)
+
+Recomputed from the private pack-4 answers and key (not in the repository) with `scripts/make_reader_study.py`
+(`exact_ci`, `auc`); post hoc and descriptive, as the R5 interim entry above.
+
+**Board-certified radiologist, radiology sources** (brain MRI, breast ultrasound, chest X-ray, SLAKE; 151 images):
+finding called present on LaMa erasures 13/29 (44.8%, exact 95% CI 26.4-64.3), Stable Diffusion erasures 16/26 (61.5%,
+40.6-79.8), unedited lesion-free 5/29 (17.2%, 5.8-35.8), unedited lesion 25/27 (92.6%, 75.7-99.1), LaMa control edits
+25/28, Stable Diffusion control edits 10/12. AUC edited vs unedited 0.64; erasure vs control edit 0.53.
+**All 212 images:** LaMa erasures 17/36 (47.2%, 30.4-64.5), Stable Diffusion 19/36 (52.8%, 35.5-69.6), lesion-free 8/36
+(22.2%, 10.1-39.2), unedited lesion 34/36, LaMa control edits 33/36, Stable Diffusion control edits 30/32; AUC 0.67 and
+0.50 (as in the R5 interim entry). Colonoscopy (outside specialty): LaMa 4/7, Stable Diffusion 3/10 (7/17).
+**Each imaging area read by its specialist** (radiologist for radiology sources, gastroenterologist for colonoscopy):
+LaMa erasures called present 13 + 3 = 16/36 (the 16 "called present by a judge" of R29); Stable Diffusion 16 + 1 = 17/36.
+The 10% criterion is not met for either tool.
+
+**R29 full table** (`r29_specialist_accepted.md`; findings reported k/n): accepted erasures (20) / strictly accepted (15) /
+erasures a judge called present (16) / reader-confirmed lesions found (66) / reader-confirmed lesion-free images with a
+finding reported (31):
+
+| Model | Accepted | Strict | Called present | Lesions found | Lesion-free reported |
+| --- | --- | --- | --- | --- | --- |
+| gpt-6-sol | 5/20 | 2/15 | 10/16 | 59/66 | 7/31 |
+| gpt-6-astra | 11/20 | 6/15 | 10/16 | 62/66 | 8/31 |
+| gpt-6.1-sol | 10/20 | 5/15 | 10/16 | 64/66 | 6/31 |
+| claude-fable-5-1 | 10/20 | 7/15 | 11/16 | 59/66 | 9/31 |
+| claude-opus-5-5 | 12/20 | 9/15 | 11/16 | 60/66 | 4/31 |
+| claude-sonnet-5-5 | 7/20 | 5/15 | 11/16 | 64/66 | 0/31 |
+| gemini-4-argon | 5/20 | 3/15 | 11/16 | 63/66 | 0/31 |
+| gemini-3.1-pro-preview | 10/20 | 8/15 | 10/16 | 58/66 | 6/31 |
+| gemini-3.8-flash | 8/20 | 6/15 | 9/16 | 62/66 | 4/31 |
+| MedScope-4B | 1/20 | 1/15 | 3/16 | 59/66 | 1/31 |
+| MedScope-4B-N | 1/20 | 1/15 | 3/16 | 61/66 | 3/31 |
+
+**R30 full tables** (`r30_ldpolyp_gap25.md`, `r30_ldpolyp_gap50.md`). Natural ESG [95% CI], >=25 frames apart (115
+pairs) / >=50 frames apart (98 pairs): MedScope-4B-N 0.609 [0.522, 0.696] / 0.622 [0.520, 0.714] (polyp-free frames absent
+or referred 99.1% / 100.0%); three-seed vote 0.583 / 0.592; MedScope-4B 0.417 / 0.408; Qwen3.5-4B 0.357 / 0.357;
+gemini-4-argon 0.522 / 0.531; claude-opus-5-5 0.461 / 0.480; gpt-6-astra 0.304 / 0.316. MedScope-4B-N minus Qwen3.5-4B
++0.252 [+0.148, +0.357] / +0.265 [+0.153, +0.378] (both p < 0.001); minus the vote +0.026 [-0.009, +0.070], p = 0.238 /
++0.031 [-0.010, +0.082], p = 0.231 (not shown).
+
+**R31 correction.** The R28-R32 entry says "seven of the nine comparison models" at 0.0%; the report gives six
+(gpt-6-sol, gpt-6-astra, claude-fable-5-1, claude-opus-5-5, gemini-4-argon, gemini-3.1-pro-preview); the three others
+are 0.1%, 0.3% and 0.4% as stated. Under the highest reasoning setting (345 views) claude-opus-5-5 had 2.6% unreadable.
